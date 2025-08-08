@@ -180,7 +180,7 @@ Configuration class for the research agent.
 #### Parameters
 
 - `api_key`: OpenAI API key (required)
-- `model`: Model to use (default: "o3-deep-research-2025-06-26")
+- `model`: Model to use (default: "o3-deep-research")
 - `timeout`: Maximum time for research in seconds (default: 1800)
 - `poll_interval`: Polling interval in seconds (default: 30)
 - `max_retries`: Maximum retry attempts (default: 3)
