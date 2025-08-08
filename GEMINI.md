@@ -102,6 +102,14 @@ The code follows standard Python conventions (PEP 8). While no specific linter i
 
 **Important**: Never use emojis in code, comments, docstrings, or any part of the codebase.
 
+### Code Simplicity & Minimal Changes
+
+*   Keep code simple and clean: prefer straightforward solutions over complex ones.
+*   Make minimal changes: only implement what was explicitly requested, nothing more.
+*   Avoid adding extra functionality, features, or optimizations that weren't asked for.
+*   Use existing patterns and structures in the codebase rather than introducing new approaches.
+*   When fixing bugs, address only the specific issue without refactoring unrelated code.
+
 ### Contribution Guidelines
 
 The `README.md` does not specify any contribution guidelines. However, based on the project structure, it is recommended to:
