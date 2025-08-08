@@ -26,6 +26,13 @@
 - Logging: prefer `structlog`; avoid printing directly in library code.
 - Never use emojis in code, comments, docstrings, or any part of the codebase.
 
+## Code Simplicity & Minimal Changes
+- Keep code simple and clean: prefer straightforward solutions over complex ones.
+- Make minimal changes: only implement what was explicitly requested, nothing more.
+- Avoid adding extra functionality, features, or optimizations that weren't asked for.
+- Use existing patterns and structures in the codebase rather than introducing new approaches.
+- When fixing bugs, address only the specific issue without refactoring unrelated code.
+
 ## Testing Guidelines
 - Frameworks: `pytest`, `pytest-asyncio` for async behavior.
 - Location: place files under `tests/` matching `test_*.py`; mirror package structure where helpful.
