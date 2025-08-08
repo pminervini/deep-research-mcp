@@ -6,66 +6,69 @@ Usage: python simple-cli.py "Your research question here"
 """
 import os
 import sys
+import structlog
 from openai import OpenAI
 
 
 def main():
+    logger = structlog.get_logger()
+
     if len(sys.argv) != 2:
-        print("Usage: python simple-cli.py 'Your research question'")
+        logger.error("Usage: python simple-cli.py 'Your research question'")
         sys.exit(1)
-    
+
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        print("Error: OPENAI_API_KEY environment variable not set")
+        logger.error("Error: OPENAI_API_KEY environment variable not set")
         sys.exit(1)
-    
+
     query = sys.argv[1]
-    
-    print(f"Researching: {query}")
-    print("This may take a few minutes...")
-    
+
+    logger.info(f"Researching: {query}")
+    logger.info("This may take a few minutes...")
+
     try:
         client = OpenAI(api_key=api_key)
-        
+
         response = client.responses.create(
             model="o4-mini-deep-research-2025-06-26",
             input=[
-                {
-                    "role": "user",
-                    "content": [{"type": "input_text", "text": query}]
-                }
+                {"role": "user", "content": [{"type": "input_text", "text": query}]}
             ],
             reasoning={"summary": "auto"},
-            tools=[
-                {"type": "web_search_preview"}
-            ]
+            tools=[{"type": "web_search_preview"}],
         )
-        
-        print("\n" + "="*80)
-        print("RESEARCH RESULTS")
-        print("="*80)
-        
+
+        logger.info("\n" + "=" * 80)
+        logger.info("RESEARCH RESULTS")
+        logger.info("=" * 80)
+
         # Get the final report
         if response.output and len(response.output) > 0:
             final_output = response.output[-1]
-            if hasattr(final_output, 'content') and final_output.content:
+            if hasattr(final_output, "content") and final_output.content:
                 report = final_output.content[0].text
-                print(report)
-                
+                logger.info(report)
+
                 # Show citations if available
-                if hasattr(final_output.content[0], 'annotations') and final_output.content[0].annotations:
-                    print("\n" + "-"*40)
-                    print("CITATIONS")
-                    print("-"*40)
-                    for i, annotation in enumerate(final_output.content[0].annotations, 1):
-                        if hasattr(annotation, 'citation') and annotation.citation:
-                            print(f"[{i}] {annotation.citation.title}")
-                            print(f"    {annotation.citation.url}")
+                if (
+                    hasattr(final_output.content[0], "annotations")
+                    and final_output.content[0].annotations
+                ):
+                    logger.info("\n" + "-" * 40)
+                    logger.info("CITATIONS")
+                    logger.info("-" * 40)
+                    for i, annotation in enumerate(
+                        final_output.content[0].annotations, 1
+                    ):
+                        if hasattr(annotation, "citation") and annotation.citation:
+                            logger.info(f"[{i}] {annotation.citation.title}")
+                            logger.info(f"    {annotation.citation.url}")
         else:
-            print("No results returned from the research API.")
-            
+            logger.warning("No results returned from the research API.")
+
     except Exception as e:
-        print(f"Error: {e}")
+        logger.error(f"Error: {e}")
         sys.exit(1)
 
 
