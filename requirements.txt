@@ -1,0 +1,33 @@
+# Core dependencies
+openai>=1.0.0
+fastmcp>=0.1.0
+httpx>=0.25.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+python-dotenv>=1.0.0
+
+# Async and concurrency
+asyncio-throttle>=1.0.2
+tenacity>=8.2.0
+
+# Logging and monitoring
+structlog>=23.1.0
+colorama>=0.4.6  # For colored logs on Windows
+
+# Optional: For enhanced functionality
+aiofiles>=23.2.1  # For async file operations
+python-json-logger>=2.0.7  # For JSON logging
+
+# Development dependencies (optional, can be in requirements-dev.txt)
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+black>=23.7.0
+pylint>=2.17.0
+mypy>=1.5.0
+pre-commit>=3.3.0
+
+# Documentation (optional)
+mkdocs>=1.5.0
+mkdocs-material>=9.2.0
