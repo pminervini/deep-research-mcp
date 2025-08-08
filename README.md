@@ -4,13 +4,13 @@ A Python-based agent that integrates OpenAI's Deep Research API with Claude Code
 
 ## Features
 
-- 🔍 **Autonomous Research**: Automatically decomposes complex queries into research strategies
-- 🌐 **Real-time Web Search**: Built-in web search capabilities for current information
-- 💻 **Code Execution**: Integrated code interpreter for data analysis and visualization
-- 📚 **Citation Management**: Automatic source attribution with metadata tracking
-- 🔄 **Async Operations**: Full asynchronous support for long-running research tasks
-- 🛡️ **Rate Limiting**: Built-in rate limiting and retry logic
-- 🔌 **MCP Integration**: Seamless integration with Claude Code via Model Context Protocol
+- **Autonomous Research**: Automatically decomposes complex queries into research strategies
+- **Real-time Web Search**: Built-in web search capabilities for current information
+- **Code Execution**: Integrated code interpreter for data analysis and visualization
+- **Citation Management**: Automatic source attribution with metadata tracking
+- **Async Operations**: Full asynchronous support for long-running research tasks
+- **Rate Limiting**: Built-in rate limiting and retry logic
+- **MCP Integration**: Seamless integration with Claude Code via Model Context Protocol
 
 ## Prerequisites
 
