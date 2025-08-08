@@ -56,10 +56,10 @@ async def research(query: str, model: str = "o3-deep-research-2025-06-26") -> No
         # Display results
         if result["status"] == "completed":
             print("Research completed successfully!")
-            print(f"📋 Task ID: {result['task_id']}")
-            print(f"🔢 Total steps: {result['total_steps']}")
-            print(f"🔍 Search queries: {len(result['search_queries'])}")
-            print(f"📚 Citations: {len(result['citations'])}")
+            print(f"Task ID: {result['task_id']}")
+            print(f"Total steps: {result['total_steps']}")
+            print(f"Search queries: {len(result['search_queries'])}")
+            print(f"Citations: {len(result['citations'])}")
             print("\n" + "=" * 60)
             print("RESEARCH REPORT")
             print("=" * 60)
@@ -72,23 +72,23 @@ async def research(query: str, model: str = "o3-deep-research-2025-06-26") -> No
                 for citation in result['citations']:
                     print(f"{citation['index']}. [{citation['title']}]({citation['url']})")
         elif result["status"] == "failed":
-            print(f"❌ Research failed: {result.get('message', 'Unknown error')}")
+            print(f"Research failed: {result.get('message', 'Unknown error')}")
             if result.get('error_code'):
-                print(f"🔢 Error code: {result['error_code']}")
+                print(f"Error code: {result['error_code']}")
             if result.get('task_id'):
-                print(f"📋 Task ID: {result['task_id']}")
+                print(f"Task ID: {result['task_id']}")
         else:
-            print(f"❌ Research error: {result.get('message', 'Unknown error')}")
+            print(f"Research error: {result.get('message', 'Unknown error')}")
             
     except ResearchError as e:
-        print(f"❌ Research error: {e}")
+        print(f"Research error: {e}")
     except Exception as e:
-        print(f"❌ Unexpected error: {e}")
+        print(f"Unexpected error: {e}")
 
 
 async def list_models() -> None:
     """List available models"""
-    print("📋 Available Deep Research Models:")
+    print("Available Deep Research Models:")
     print("-" * 40)
     models = [
         {
@@ -112,23 +112,23 @@ async def list_models() -> None:
 
 async def check_config() -> None:
     """Check configuration"""
-    print("🔧 Checking configuration...")
+    print("Checking configuration...")
     print("-" * 30)
     
     try:
         config = ResearchConfig.from_env()
         config.validate()
         
-        print("✅ Configuration is valid")
-        print(f"🔑 API Key: {'*' * 20}{config.api_key[-10:] if len(config.api_key) > 10 else '*' * len(config.api_key)}")
-        print(f"🤖 Model: {config.model}")
-        print(f"⏱️  Timeout: {config.timeout} seconds")
-        print(f"🔄 Poll interval: {config.poll_interval} seconds")
-        print(f"🔁 Max retries: {config.max_retries}")
+        print("Configuration is valid")
+        print(f"API Key: {'*' * 20}{config.api_key[-10:] if len(config.api_key) > 10 else '*' * len(config.api_key)}")
+        print(f"Model: {config.model}")
+        print(f"Timeout: {config.timeout} seconds")
+        print(f"Poll interval: {config.poll_interval} seconds")
+        print(f"Max retries: {config.max_retries}")
         
     except Exception as e:
-        print(f"❌ Configuration error: {e}")
-        print("\n💡 Make sure you have set the OPENAI_API_KEY environment variable")
+        print(f"Configuration error: {e}")
+        print("\nMake sure you have set the OPENAI_API_KEY environment variable")
 
 
 def main():

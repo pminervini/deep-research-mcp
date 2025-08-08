@@ -21,8 +21,8 @@ def main():
     
     query = sys.argv[1]
     
-    print(f"🔍 Researching: {query}")
-    print("⏳ This may take a few minutes...")
+    print(f"Researching: {query}")
+    print("This may take a few minutes...")
     
     try:
         client = OpenAI(api_key=api_key)

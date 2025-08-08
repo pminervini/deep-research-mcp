@@ -14,6 +14,7 @@ Examples:
     python cli/complex-cli.py "What are the economic impacts of remote work on urban real estate markets?"
     python cli/complex-cli.py "Compare the effectiveness of different COVID-19 vaccines"
 """
+
 import os
 import sys
 import json
@@ -30,7 +31,7 @@ class FourAgentPipeline:
         """
         Triage Agent: Inspects query and decides if clarification is needed
         """
-        print("🔍 Triage Agent: Analyzing your query...")
+        print("Triage Agent: Analyzing your query...")
         
         triage_prompt = f"""
         You are a Triage Agent. Your job is to analyze the user's research query and decide if it needs clarification.
@@ -59,7 +60,7 @@ class FourAgentPipeline:
         
         try:
             result = json.loads(response.choices[0].message.content)
-            print(f"📋 Assessment: {result['query_assessment']}")
+            print(f"Assessment: {result['query_assessment']}")
             return result
         except json.JSONDecodeError:
             # Fallback if JSON parsing fails
@@ -74,7 +75,7 @@ class FourAgentPipeline:
         """
         Clarifier Agent: Asks follow-up questions and enriches the query
         """
-        print("\n❓ Clarifier Agent: I need some additional information...")
+        print("\nClarifier Agent: I need some additional information...")
         
         enriched_context = []
         
@@ -106,14 +107,14 @@ class FourAgentPipeline:
         )
         
         enriched_query = response.choices[0].message.content.strip()
-        print(f"\n✅ Enriched Query: {enriched_query}")
+        print(f"\nEnriched Query: {enriched_query}")
         return enriched_query
     
     def instruction_builder_agent(self, query: str) -> str:
         """
         Instruction Builder Agent: Converts query into precise research brief
         """
-        print("\n📝 Instruction Builder Agent: Creating detailed research brief...")
+        print("\nInstruction Builder Agent: Creating detailed research brief...")
         
         instruction_prompt = f"""
         You are an Instruction Builder Agent. Your job is to convert a research query into a precise, comprehensive research brief that will guide a Research Agent to produce high-quality results.
@@ -140,15 +141,15 @@ class FourAgentPipeline:
         )
         
         research_brief = response.choices[0].message.content
-        print("📋 Research brief created successfully")
+        print("Research brief created successfully")
         return research_brief
     
     def research_agent(self, research_brief: str) -> str:
         """
         Research Agent: Performs the actual deep research
         """
-        print("\n🔬 Research Agent: Conducting comprehensive research...")
-        print("⏳ This may take several minutes...")
+        print("\nResearch Agent: Conducting comprehensive research...")
+        print("This may take several minutes...")
         
         try:
             response = self.client.responses.create(
@@ -180,7 +181,7 @@ class FourAgentPipeline:
         """
         Execute the complete Four-Agent Deep Research Pipeline
         """
-        print("🚀 Starting Four-Agent Deep Research Pipeline")
+        print("Starting Four-Agent Deep Research Pipeline")
         print("="*60)
         
         # Step 1: Triage Agent
@@ -189,11 +190,11 @@ class FourAgentPipeline:
         # Step 2: Clarifier Agent (if needed)
         working_query = user_query
         if triage_result["needs_clarification"] and triage_result["potential_clarifications"]:
-            print(f"\n💡 Reasoning: {triage_result['reasoning']}")
+            print(f"\nReasoning: {triage_result['reasoning']}")
             working_query = self.clarifier_agent(user_query, triage_result["potential_clarifications"])
         else:
-            print(f"\n💡 Reasoning: {triage_result['reasoning']}")
-            print("✅ Query is clear enough, proceeding without clarification")
+            print(f"\nReasoning: {triage_result['reasoning']}")
+            print("Query is clear enough, proceeding without clarification")
         
         # Step 3: Instruction Builder Agent
         research_brief = self.instruction_builder_agent(working_query)
@@ -228,10 +229,11 @@ def main():
         print(results)
         
     except KeyboardInterrupt:
-        print("\n\n⚠️  Pipeline interrupted by user")
+        print("\n\nPipeline interrupted by user")
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ Error: {e}")
+        print(f"
+Error: {e}")
         sys.exit(1)
 
 
