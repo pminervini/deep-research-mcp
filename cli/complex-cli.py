@@ -18,6 +18,7 @@ Examples:
 import os
 import sys
 import json
+import structlog
 from typing import Dict, Any, Optional, List
 from openai import OpenAI
 
@@ -26,13 +27,14 @@ class FourAgentPipeline:
     def __init__(self, api_key: str):
         self.client = OpenAI(api_key=api_key)
         self.conversation_history: List[Dict[str, Any]] = []
-    
+
     def triage_agent(self, user_query: str) -> Dict[str, Any]:
         """
         Triage Agent: Inspects query and decides if clarification is needed
         """
-        print("Triage Agent: Analyzing your query...")
-        
+        logger = structlog.get_logger()
+        logger.info("Triage Agent: Analyzing your query...")
+
         triage_prompt = f"""
         You are a Triage Agent. Your job is to analyze the user's research query and decide if it needs clarification.
         
@@ -51,16 +53,16 @@ class FourAgentPipeline:
             "query_assessment": "brief assessment of the query quality"
         }}
         """
-        
+
         response = self.client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": triage_prompt}],
-            temperature=0.3
+            temperature=0.3,
         )
-        
+
         try:
             result = json.loads(response.choices[0].message.content)
-            print(f"Assessment: {result['query_assessment']}")
+            logger.info(f"Assessment: {result['query_assessment']}")
             return result
         except json.JSONDecodeError:
             # Fallback if JSON parsing fails
@@ -68,26 +70,29 @@ class FourAgentPipeline:
                 "needs_clarification": False,
                 "reasoning": "Could not parse triage response, proceeding with original query",
                 "potential_clarifications": [],
-                "query_assessment": "Unable to assess"
+                "query_assessment": "Unable to assess",
             }
-    
+
     def clarifier_agent(self, user_query: str, clarifications: List[str]) -> str:
         """
         Clarifier Agent: Asks follow-up questions and enriches the query
         """
-        print("\nClarifier Agent: I need some additional information...")
-        
+        logger = structlog.get_logger()
+        logger.info("\nClarifier Agent: I need some additional information...")
+
         enriched_context = []
-        
+
         for i, question in enumerate(clarifications[:3], 1):  # Limit to 3 questions
-            print(f"\nQuestion {i}: {question}")
+            logger.info(f"\nQuestion {i}: {question}")
             user_input = input("Your answer (or press Enter to skip): ").strip()
-            
+
             if user_input:
                 enriched_context.append(f"Q: {question}\nA: {user_input}")
             else:
-                enriched_context.append(f"Q: {question}\nA: [No additional information provided]")
-        
+                enriched_context.append(
+                    f"Q: {question}\nA: [No additional information provided]"
+                )
+
         # Create enriched query
         enrichment_prompt = f"""
         Original Query: "{user_query}"
@@ -99,23 +104,24 @@ class FourAgentPipeline:
         
         Return only the enriched query, nothing else.
         """
-        
+
         response = self.client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": enrichment_prompt}],
-            temperature=0.2
+            temperature=0.2,
         )
-        
+
         enriched_query = response.choices[0].message.content.strip()
-        print(f"\nEnriched Query: {enriched_query}")
+        logger.info(f"\nEnriched Query: {enriched_query}")
         return enriched_query
-    
+
     def instruction_builder_agent(self, query: str) -> str:
         """
         Instruction Builder Agent: Converts query into precise research brief
         """
-        print("\nInstruction Builder Agent: Creating detailed research brief...")
-        
+        logger = structlog.get_logger()
+        logger.info("\nInstruction Builder Agent: Creating detailed research brief...")
+
         instruction_prompt = f"""
         You are an Instruction Builder Agent. Your job is to convert a research query into a precise, comprehensive research brief that will guide a Research Agent to produce high-quality results.
         
@@ -133,108 +139,108 @@ class FourAgentPipeline:
         
         Format your response as a detailed research brief.
         """
-        
+
         response = self.client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": instruction_prompt}],
-            temperature=0.2
+            temperature=0.2,
         )
-        
+
         research_brief = response.choices[0].message.content
-        print("Research brief created successfully")
+        logger.info("Research brief created successfully")
         return research_brief
-    
+
     def research_agent(self, research_brief: str) -> str:
         """
         Research Agent: Performs the actual deep research
         """
-        print("\nResearch Agent: Conducting comprehensive research...")
-        print("This may take several minutes...")
-        
+        logger = structlog.get_logger()
+        logger.info("\nResearch Agent: Conducting comprehensive research...")
+        logger.info("This may take several minutes...")
+
         try:
             response = self.client.responses.create(
                 model="o4-mini-deep-research-2025-06-26",
                 input=[
                     {
                         "role": "user",
-                        "content": [{"type": "input_text", "text": research_brief}]
+                        "content": [{"type": "input_text", "text": research_brief}],
                     }
                 ],
                 reasoning={"summary": "auto"},
-                tools=[
-                    {"type": "web_search_preview"}
-                ]
+                tools=[{"type": "web_search_preview"}],
             )
-            
+
             # Extract the research results
             if response.output and len(response.output) > 0:
                 final_output = response.output[-1]
-                if hasattr(final_output, 'content') and final_output.content:
+                if hasattr(final_output, "content") and final_output.content:
                     return final_output.content[0].text
-            
+
             return "No research results were generated."
-            
+
         except Exception as e:
             return f"Research failed with error: {str(e)}"
-    
+
     def run_pipeline(self, user_query: str) -> str:
         """
         Execute the complete Four-Agent Deep Research Pipeline
         """
-        print("Starting Four-Agent Deep Research Pipeline")
-        print("="*60)
-        
+        logger = structlog.get_logger()
+        logger.info("Starting Four-Agent Deep Research Pipeline")
+        logger.info("=" * 60)
+
         # Step 1: Triage Agent
         triage_result = self.triage_agent(user_query)
-        
+
         # Step 2: Clarifier Agent (if needed)
         working_query = user_query
-        if triage_result["needs_clarification"] and triage_result["potential_clarifications"]:
-            print(f"\nReasoning: {triage_result['reasoning']}")
-            working_query = self.clarifier_agent(user_query, triage_result["potential_clarifications"])
+        if (
+            triage_result["needs_clarification"]
+            and triage_result["potential_clarifications"]
+        ):
+            logger.info(f"\nReasoning: {triage_result['reasoning']}")
+            working_query = self.clarifier_agent(
+                user_query, triage_result["potential_clarifications"]
+            )
         else:
-            print(f"\nReasoning: {triage_result['reasoning']}")
-            print("Query is clear enough, proceeding without clarification")
-        
+            logger.info(f"\nReasoning: {triage_result['reasoning']}")
+            logger.info("Query is clear enough, proceeding without clarification")
+
         # Step 3: Instruction Builder Agent
         research_brief = self.instruction_builder_agent(working_query)
-        
+
         # Step 4: Research Agent
         research_results = self.research_agent(research_brief)
-        
+
         return research_results
 
 
 def main():
+    logger = structlog.get_logger()
+
     if len(sys.argv) != 2:
-        print("Usage: python complex-cli.py 'Your research question'")
-        print("\nExample:")
-        print("python complex-cli.py 'What are the latest developments in quantum computing?'")
+        logger.error("Usage: python complex-cli.py 'Your research question'")
+        logger.info("\nExample:")
+        logger.info(
+            "python complex-cli.py 'What are the latest developments in quantum computing?'"
+        )
         sys.exit(1)
-    
+
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        print("Error: OPENAI_API_KEY environment variable not set")
+        logger.error("Error: OPENAI_API_KEY environment variable not set")
         sys.exit(1)
-    
+
     user_query = sys.argv[1]
-    
-    try:
-        pipeline = FourAgentPipeline(api_key)
-        results = pipeline.run_pipeline(user_query)
-        
-        print("\n" + "="*80)
-        print("FINAL RESEARCH RESULTS")
-        print("="*80)
-        print(results)
-        
-    except KeyboardInterrupt:
-        print("\n\nPipeline interrupted by user")
-        sys.exit(1)
-    except Exception as e:
-        print(f"
-Error: {e}")
-        sys.exit(1)
+
+    pipeline = FourAgentPipeline(api_key)
+    results = pipeline.run_pipeline(user_query)
+
+    logger.info("\n" + "=" * 80)
+    logger.info("FINAL RESEARCH RESULTS")
+    logger.info("=" * 80)
+    logger.info(results)
 
 
 if __name__ == "__main__":
