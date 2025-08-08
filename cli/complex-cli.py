@@ -1,8 +1,18 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
 Four-Agent Deep Research Pipeline CLI
 Implements the Four-Agent Deep Research Pipeline with Triage, Clarifier, Instruction Builder, and Research Agents.
-Usage: python complex-cli.py "Your research question here"
+
+Usage: 
+    python complex-cli.py "Your research question here"
+
+Examples:
+    python cli/complex-cli.py "What are the latest developments in quantum computing?"
+    python cli/complex-cli.py "How has climate change affected Arctic ice coverage in the last decade?"
+    python cli/complex-cli.py "What are the economic impacts of remote work on urban real estate markets?"
+    python cli/complex-cli.py "Compare the effectiveness of different COVID-19 vaccines"
 """
 import os
 import sys

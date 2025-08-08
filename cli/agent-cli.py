@@ -33,8 +33,8 @@ Be analytical, avoid generalities, and ensure that each section supports data-ba
 
 async def research(query: str, model: str = "o3-deep-research-2025-06-26") -> None:
     """Use the research functionality"""
-    print(f"🔍 Starting research with query: '{query}'")
-    print(f"📊 Using model: {model}")
+    print(f"Starting research with query: '{query}'")
+    print(f"Using model: {model}")
     print("-" * 50)
 
     try:
@@ -55,7 +55,7 @@ async def research(query: str, model: str = "o3-deep-research-2025-06-26") -> No
         
         # Display results
         if result["status"] == "completed":
-            print("✅ Research completed successfully!")
+            print("Research completed successfully!")
             print(f"📋 Task ID: {result['task_id']}")
             print(f"🔢 Total steps: {result['total_steps']}")
             print(f"🔍 Search queries: {len(result['search_queries'])}")
