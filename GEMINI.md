@@ -100,6 +100,8 @@ pytest --cov=deep_research_mcp tests/
 
 The code follows standard Python conventions (PEP 8). While no specific linter is enforced in the `requirements.txt`, it is recommended to use a tool like `flake8` or `black` to maintain a consistent code style.
 
+**Important**: Never use emojis in code, comments, docstrings, or any part of the codebase.
+
 ### Contribution Guidelines
 
 The `README.md` does not specify any contribution guidelines. However, based on the project structure, it is recommended to:
