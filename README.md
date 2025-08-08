@@ -78,7 +78,7 @@ Create or update `~/.config/claude-code/mcp.json`:
       "args": ["/path/to/deep-research-mcp/src/deep_research_mcp/mcp_server.py"],
       "env": {
         "OPENAI_API_KEY": "${OPENAI_API_KEY}",
-        "RESEARCH_MODEL": "o3-deep-research-2025-06-26"
+        "RESEARCH_MODEL": "o3-deep-research"
       }
     }
   }
@@ -215,91 +215,4 @@ pytest --cov=deep_research_mcp tests/
 
 # Run specific test file
 pytest tests/test_agent.py
-```
-
-### Linting and Formatting
-
-```bash
-# Format code
-black src/ tests/
-
-# Lint
-pylint src/
-
-# Type checking
-mypy src/
-```
-
-## Deployment
-
-### Docker
-
-```bash
-# Build image
-docker build -t deep-research-mcp .
-
-# Run container
-docker run -e OPENAI_API_KEY=$OPENAI_API_KEY deep-research-mcp
-```
-
-### Kubernetes
-
-See `docs/DEPLOYMENT.md` for Kubernetes deployment instructions.
-
-## Troubleshooting
-
-### Common Issues
-
-1. **"Rate limit exceeded" errors**
-   - Solution: Implement proper rate limiting or upgrade your OpenAI plan
-
-2. **Research tasks timing out**
-   - Solution: Increase `RESEARCH_TIMEOUT` environment variable
-   - Note: Some complex queries may take 10-30 minutes
-
-3. **Claude Code not finding the MCP server**
-   - Verify the path in `mcp.json` is correct
-   - Ensure Python environment has all dependencies
-   - Check Claude Code logs for error messages
-
-4. **Memory issues with large research tasks**
-   - Solution: Implement result streaming or pagination
-   - Consider using the mini model for faster processing
-
-## Contributing
-
-Contributions are welcome! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- OpenAI for the Deep Research API
-- Anthropic for Claude Code and MCP protocol
-- The open-source community for various dependencies
-
-## Support
-
-- **Issues**: [GitHub Issues](https://github.com/yourusername/deep-research-mcp/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/deep-research-mcp/discussions)
-- **Documentation**: [Full Documentation](docs/)
-
-## Citation
-
-If you use this project in your research or work, please cite:
-
-```bibtex
-@software{deep_research_mcp,
-  title = {Deep Research MCP: OpenAI Deep Research Integration for Claude Code},
-  year = {2025},
-  url = {https://github.com/pminervini/deep-research-mcp}
-}
 ```
