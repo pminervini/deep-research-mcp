@@ -19,7 +19,6 @@ graph TD
         D[agent.py]
         E[config.py]
         F[errors.py]
-        G[rate_limiter.py]
     end
 
     subgraph External Services
@@ -31,7 +30,6 @@ graph TD
     B -- "Instantiates and uses" --> D
     D -- "Uses configuration from" --> E
     D -- "Handles" --> F
-    D -- "Could use (but not directly implemented)" --> G
     D -- "Makes API calls to" --> H
 ```
 
@@ -41,11 +39,10 @@ The project is composed of three main layers:
 
 1.  **MCP Server (`mcp_server.py`)**: This is the entry point for external clients like Claude Code. It uses the `fastmcp` library to expose the core research functionality as tools. It handles incoming requests, initializes the `DeepResearchAgent`, and formats the results for the client.
 
-2.  **Core Logic (`agent.py`, `config.py`, `errors.py`, `rate_limiter.py`)**: This layer contains the main business logic of the application.
+2.  **Core Logic (`agent.py`, `config.py`, `errors.py`)**: This layer contains the main business logic of the application.
     *   `agent.py` is the heart of the project, managing the interaction with the OpenAI Deep Research API.
     *   `config.py` handles loading and validating configuration from environment variables.
     *   `errors.py` defines custom exception classes for better error handling.
-    *   `rate_limiter.py` provides utilities for rate limiting, although it is not currently used in the agent.
 
 3.  **External Services**: This layer represents the external APIs the project interacts with, primarily the OpenAI Deep Research API.
 
@@ -88,13 +85,6 @@ The project is composed of three main layers:
     -   `TaskTimeoutError`: An exception for when a research task takes too long to complete.
     -   `ConfigurationError`: An exception for errors in the application's configuration.
 
-### `src/deep_research_mcp/rate_limiter.py`
-
--   **Purpose**: Provides rate limiting functionality.
--   **Key Functionality**:
-    -   `RateLimiter`: A token bucket rate limiter.
-    -   `AsyncLimiter`: An asynchronous rate limiter using a semaphore.
--   **Note**: While these classes are defined, they are not currently used by the `DeepResearchAgent`.
 
 ### `src/deep_research_mcp/__init__.py`
 

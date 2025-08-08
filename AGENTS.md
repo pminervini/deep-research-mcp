@@ -5,7 +5,6 @@
   - `agent.py`: Orchestrates Deep Research flows.
   - `config.py`: Pydantic settings and `.env` loading.
   - `mcp_server.py`: MCP entrypoint used by Claude Code.
-  - `rate_limiter.py`: Retry/backoff and throttling.
   - `errors.py`: Exception types.
 - Tests (expected): `tests/` alongside `src/` using `pytest`.
 
@@ -37,7 +36,7 @@
 - Frameworks: `pytest`, `pytest-asyncio` for async behavior.
 - Location: place files under `tests/` matching `test_*.py`; mirror package structure where helpful.
 - Async tests: mark with `@pytest.mark.asyncio`.
-- Coverage: target ≥80% for changed code; include edge cases (timeouts, rate limits, API errors).
+- Coverage: target ≥80% for changed code; include edge cases (timeouts, API errors).
 
 ## Commit & Pull Requests
 - Commits: use Conventional Commits where possible (e.g., `feat: add task polling`, `fix(rate): backoff jitter bug`). Keep diffs focused.
@@ -50,9 +49,9 @@
 ## Security & Configuration
 - Secrets: never commit API keys. Use `.env` and `ResearchConfig.from_env()`.
 - Example Claude Code config: point to `src/deep_research_mcp/mcp_server.py` in `~/.config/claude-code/mcp.json` and pass `OPENAI_API_KEY` via env.
-- Cost/rate limits: prefer the mini model for iteration; respect `MAX_RETRIES` and backoff.
+- Cost: prefer the mini model for iteration.
 
 ## Architecture Notes
-- Core flow: `DeepResearchAgent` (domain) + `mcp_server.py` (transport) + `config.py` (settings) + `rate_limiter.py` (resilience).
+- Core flow: `DeepResearchAgent` (domain) + `mcp_server.py` (transport) + `config.py` (settings).
 - Keep business logic in `agent.py`; avoid coupling transport logic into domain code.
 
