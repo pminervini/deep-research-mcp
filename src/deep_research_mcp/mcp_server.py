@@ -136,7 +136,7 @@ async def list_models() -> str:
     """List available Deep Research models"""
     models = [
         {
-            "name": "o3-deep-research",
+            "name": "o3-deep-research-2025-06-26",
             "description": "Highest quality model with 200K token context",
             "cost": "$40 per 1M output tokens",
         },
