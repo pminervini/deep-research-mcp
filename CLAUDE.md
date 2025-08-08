@@ -11,7 +11,6 @@ Deep Research MCP is a Python-based agent that integrates OpenAI's Deep Research
 - **Core Agent**: `src/deep_research_mcp/agent.py` - Main `DeepResearchAgent` class that orchestrates Deep Research API interactions, handles async task polling, and manages research workflows
 - **MCP Server**: `src/deep_research_mcp/mcp_server.py` - FastMCP-based server that exposes research capabilities to Claude Code via MCP protocol
 - **Configuration**: `src/deep_research_mcp/config.py` - Environment-based settings using Pydantic dataclasses, handles API keys and research parameters
-- **Rate Limiting**: `src/deep_research_mcp/rate_limiter.py` - Retry logic with exponential backoff for API resilience
 - **Error Handling**: `src/deep_research_mcp/errors.py` - Custom exception types for research failures, timeouts, and rate limits
 
 The agent supports two Deep Research models: `o3-deep-research-2025-06-26` (full model) and `o4-mini-deep-research-2025-06-26` (faster, lower-cost alternative).
@@ -41,7 +40,7 @@ python src/deep_research_mcp/mcp_server.py
 
 ## Testing Strategy
 
-Uses `pytest` with `pytest-asyncio` for async tests. Test files mirror package structure in `tests/` directory. Mark async tests with `@pytest.mark.asyncio`. Focus on testing error conditions like API failures, timeouts, and rate limiting scenarios.
+Uses `pytest` with `pytest-asyncio` for async tests. Test files mirror package structure in `tests/` directory. Mark async tests with `@pytest.mark.asyncio`. Focus on testing error conditions like API failures and timeouts.
 
 ## Environment Configuration
 
