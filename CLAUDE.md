@@ -77,3 +77,4 @@ Configure in `~/.config/claude-code/mcp.json`:
 - Snake_case for functions/variables, PascalCase for classes
 - Use `structlog` for logging, avoid direct prints in library code
 - Never commit API keys or secrets
+- Never use emojis in code, comments, docstrings, or any part of the codebase

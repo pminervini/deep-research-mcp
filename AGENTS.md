@@ -24,6 +24,7 @@
 - Naming: `snake_case` for functions/vars, `PascalCase` for classes, `UPPER_SNAKE` for constants, module names in `snake_case`.
 - Docstrings: short, imperative summaries; include error cases and return types where non-obvious.
 - Logging: prefer `structlog`; avoid printing directly in library code.
+- Never use emojis in code, comments, docstrings, or any part of the codebase.
 
 ## Testing Guidelines
 - Frameworks: `pytest`, `pytest-asyncio` for async behavior.
