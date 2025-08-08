@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 """
@@ -135,7 +136,7 @@ async def list_models() -> str:
     """List available Deep Research models"""
     models = [
         {
-            "name": "o3-deep-research-2025-06-26",
+            "name": "o3-deep-research",
             "description": "Highest quality model with 200K token context",
             "cost": "$40 per 1M output tokens",
         },
