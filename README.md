@@ -78,7 +78,7 @@ Create or update `~/.config/claude-code/mcp.json`:
       "args": ["/path/to/deep-research-mcp/src/deep_research_mcp/mcp_server.py"],
       "env": {
         "OPENAI_API_KEY": "${OPENAI_API_KEY}",
-        "RESEARCH_MODEL": "o3-deep-research"
+        "RESEARCH_MODEL": "o3-deep-research-2025-06-26"
       }
     }
   }
@@ -180,7 +180,7 @@ Configuration class for the research agent.
 #### Parameters
 
 - `api_key`: OpenAI API key (required)
-- `model`: Model to use (default: "o3-deep-research")
+- `model`: Model to use (default: "o3-deep-research-2025-06-26")
 - `timeout`: Maximum time for research in seconds (default: 1800)
 - `poll_interval`: Polling interval in seconds (default: 30)
 - `max_retries`: Maximum retry attempts (default: 3)
@@ -188,8 +188,8 @@ Configuration class for the research agent.
 ## Cost Considerations
 
 Deep Research API pricing (as of January 2025):
-- **o3-deep-research**: $40 per 1M output tokens
-- **o4-mini-deep-research**: Lower cost alternative with faster processing
+- **o3-deep-research-2025-06-26**: $40 per 1M output tokens
+- **o4-mini-deep-research-2025-06-26**: Lower cost alternative with faster processing
 
 Monitor your usage carefully as research tasks can generate substantial token usage.
 

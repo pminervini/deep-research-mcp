@@ -75,7 +75,11 @@ class DeepResearchAgent:
         response = await self._create_research_task(input_messages, tools)
 
         # Poll for completion with timeout
-        final_response = await self._wait_for_completion(response.id)
+        try:
+            final_response = await self._wait_for_completion(response.id)
+        except ResearchError as e:
+            # Return error details instead of raising
+            return {"status": "failed", "message": str(e)}
 
         # Send callback if provided
         if callback_url and final_response.get("status") == "completed":
@@ -116,7 +120,18 @@ class DeepResearchAgent:
                     self.logger.info(f"Research completed: {task_id}")
                     return response
                 elif response.status == "failed":
-                    raise ResearchError(f"Research task failed: {task_id}")
+                    error_details = getattr(response, 'error', None)
+                    if error_details:
+                        # Handle different error object types
+                        if hasattr(error_details, 'get'):
+                            error_msg = f"Research task failed: {error_details.get('message', 'Unknown error')}"
+                            if error_details.get('code'):
+                                error_msg += f" (Code: {error_details['code']})"
+                        else:
+                            error_msg = f"Research task failed: {str(error_details)}"
+                    else:
+                        error_msg = f"Research task failed: {task_id}"
+                    raise ResearchError(error_msg)
 
                 # Continue polling
                 self.logger.debug(f"Task {task_id} status: {response.status}")
@@ -160,6 +175,27 @@ class DeepResearchAgent:
 
     def _extract_results(self, response) -> Dict[str, Any]:
         """Extract and structure final results"""
+        # Handle failed responses
+        if response.status == "failed":
+            error_details = getattr(response, 'error', None)
+            if error_details:
+                # Handle different error object types
+                if hasattr(error_details, 'get'):
+                    return {
+                        "status": "failed",
+                        "message": error_details.get('message', 'Unknown error'),
+                        "error_code": error_details.get('code'),
+                        "task_id": response.id
+                    }
+                else:
+                    return {
+                        "status": "failed",
+                        "message": str(error_details),
+                        "task_id": response.id
+                    }
+            else:
+                return {"status": "failed", "message": f"Task failed: {response.id}"}
+        
         if not response.output:
             return {"status": "error", "message": "No output received"}
 
