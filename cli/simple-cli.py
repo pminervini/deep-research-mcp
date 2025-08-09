@@ -15,29 +15,26 @@ Examples:
 
 import os
 import sys
+import argparse
 import structlog
 from openai import OpenAI
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Simple OpenAI Deep Research API CLI")
+    parser.add_argument("query", help="Your research question")
+    
+    args = parser.parse_args()
+    
     logger = structlog.get_logger()
 
-    if len(sys.argv) != 2:
-        logger.error("Usage: python simple-cli.py 'Your research question'")
-        sys.exit(1)
-
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        logger.error("Error: OPENAI_API_KEY environment variable not set")
-        sys.exit(1)
-
-    query = sys.argv[1]
+    query = args.query
 
     logger.info(f"Researching: {query}")
     logger.info("This may take a few minutes...")
 
     try:
-        client = OpenAI(api_key=api_key)
+        client = OpenAI()
 
         response = client.responses.create(
             model="o4-mini-deep-research-2025-06-26",
