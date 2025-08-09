@@ -135,6 +135,11 @@ async def list_models() -> str:
     """List available Deep Research models"""
     models = [
         {
+            "name": "gpt-4o",
+            "description": "GPT-4o is a model from OpenAI. It is a general-purpose model that can be used for a variety of tasks.",
+            "cost": "$0.15 per 1M input tokens, $0.60 per 1M output tokens"
+        },
+        {
             "name": "o3-deep-research-2025-06-26",
             "description": "Highest quality model with 200K token context",
             "cost": "$40 per 1M output tokens",
