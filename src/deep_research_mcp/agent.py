@@ -120,12 +120,12 @@ class DeepResearchAgent:
                     self.logger.info(f"Research completed: {task_id}")
                     return response
                 elif response.status == "failed":
-                    error_details = getattr(response, 'error', None)
+                    error_details = getattr(response, "error", None)
                     if error_details:
                         # Handle different error object types
-                        if hasattr(error_details, 'get'):
+                        if hasattr(error_details, "get"):
                             error_msg = f"Research task failed: {error_details.get('message', 'Unknown error')}"
-                            if error_details.get('code'):
+                            if error_details.get("code"):
                                 error_msg += f" (Code: {error_details['code']})"
                         else:
                             error_msg = f"Research task failed: {str(error_details)}"
@@ -177,25 +177,25 @@ class DeepResearchAgent:
         """Extract and structure final results"""
         # Handle failed responses
         if response.status == "failed":
-            error_details = getattr(response, 'error', None)
+            error_details = getattr(response, "error", None)
             if error_details:
                 # Handle different error object types
-                if hasattr(error_details, 'get'):
+                if hasattr(error_details, "get"):
                     return {
                         "status": "failed",
-                        "message": error_details.get('message', 'Unknown error'),
-                        "error_code": error_details.get('code'),
-                        "task_id": response.id
+                        "message": error_details.get("message", "Unknown error"),
+                        "error_code": error_details.get("code"),
+                        "task_id": response.id,
                     }
                 else:
                     return {
                         "status": "failed",
                         "message": str(error_details),
-                        "task_id": response.id
+                        "task_id": response.id,
                     }
             else:
                 return {"status": "failed", "message": f"Task failed: {response.id}"}
-        
+
         if not response.output:
             return {"status": "error", "message": "No output received"}
 
