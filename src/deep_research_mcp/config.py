@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from typing import Optional
 from dotenv import load_dotenv
 
+from deep_research_mcp.models import is_valid_model
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -54,11 +56,7 @@ class ResearchConfig:
         if self.max_retries < 0:
             raise ValueError("Max retries must be non-negative")
 
-        if self.model not in [
-            "gpt-4o",
-            "o3-deep-research-2025-06-26",
-            "o4-mini-deep-research-2025-06-26",
-        ]:
+        if not is_valid_model(self.model):
             raise ValueError(f"Unknown model: {self.model}")
 
         return True
