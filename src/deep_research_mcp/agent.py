@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class DeepResearchAgent:
-    """Production-ready Deep Research agent with full async support"""
+    """Deep Research agent with full async support"""
 
     def __init__(self, config: ResearchConfig):
         self.config = config
