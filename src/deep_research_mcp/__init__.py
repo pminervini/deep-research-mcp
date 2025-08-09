@@ -6,9 +6,9 @@ Deep Research MCP - OpenAI Deep Research Integration for Claude Code
 
 __version__ = "0.1.0"
 
-from .agent import DeepResearchAgent
-from .config import ResearchConfig
-from .errors import ResearchError, RateLimitError, TaskTimeoutError
+from deep_research_mcp.agent import DeepResearchAgent
+from deep_research_mcp.config import ResearchConfig
+from deep_research_mcp.errors import ResearchError, RateLimitError, TaskTimeoutError
 
 __all__ = [
     "DeepResearchAgent",
