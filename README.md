@@ -65,24 +65,17 @@ LOG_LEVEL=INFO  # Logging level (DEBUG, INFO, WARNING, ERROR)
 
 1. **Configure MCP Server**
 
-Create or update `~/.config/claude-code/mcp.json`:
+Add the MCP server using Claude Code's command line:
 
-```json
-{
-  "mcpServers": {
-    "deep-research": {
-      "command": "python",
-      "args": ["/path/to/deep-research-mcp/src/deep_research_mcp/mcp_server.py"],
-      "env": {
-        "OPENAI_API_KEY": "${OPENAI_API_KEY}",
-        "RESEARCH_MODEL": "o3-deep-research-2025-06-26"
-      }
-    }
-  }
-}
+```bash
+claude mcp add deep-research python /path/to/deep-research-mcp/src/deep_research_mcp/mcp_server.py
 ```
 
-2. **Restart Claude Code** to load the MCP server
+Replace `/path/to/deep-research-mcp/` with the actual path to your cloned repository.
+
+2. **Set Environment Variables**
+
+Ensure your `OPENAI_API_KEY` is available in your environment or `.env` file.
 
 3. **Use in Claude Code**:
    - The research tools will appear in Claude Code's tool palette
