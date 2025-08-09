@@ -207,23 +207,8 @@ class DeepResearchAgent:
                 )
 
         # Extract intermediate steps for debugging
-        reasoning_steps = [
-            item.summary
-            for item in response.output
-            if item.type == "reasoning" and hasattr(item, "summary")
-        ]
-
-        # breakpoint()
-        # (Pdb) type(item)
-        # <class 'openai.types.responses.response_function_web_search.ResponseFunctionWebSearch'>
-        # (Pdb) type(item.action)
-        # <class 'openai.types.responses.response_function_web_search.ActionSearch'>
-
-        search_queries = [
-            getattr(item.action, "query", "") # item.action.get("query", "")
-            for item in response.output
-            if item.type == "web_search_call" and hasattr(item, "action")
-        ]
+        reasoning_steps = [item.summary for item in response.output if item.type == "reasoning" and hasattr(item, "summary")]
+        search_queries = [getattr(item.action, "query", "") for item in response.output if item.type == "web_search_call" and hasattr(item, "action")]
 
         return {
             "status": "completed",
