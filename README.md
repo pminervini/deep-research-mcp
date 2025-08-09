@@ -41,9 +41,6 @@ cp .env.example .env
 # Install with development dependencies
 pip install -r requirements.txt
 pip install -e .
-
-# Or using Poetry
-poetry install
 ```
 
 ## Configuration
