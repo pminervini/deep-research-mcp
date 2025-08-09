@@ -3,8 +3,16 @@
 
 """
 Simple command-line interface for OpenAI Deep Research API.
-Usage: python simple-cli.py "Your research question here"
+
+Usage: python cli/simple-cli.py "Your research question here"
+
+Examples:
+    python cli/simple-cli.py "What are the latest developments in quantum computing?"
+    python cli/simple-cli.py "How does climate change affect ocean currents?"
+    python cli/simple-cli.py "Compare the economic impact of remote work policies"
+    python cli/simple-cli.py "What are the current trends in artificial intelligence research?"
 """
+
 import os
 import sys
 import structlog
@@ -52,16 +60,11 @@ def main():
                 logger.info(report)
 
                 # Show citations if available
-                if (
-                    hasattr(final_output.content[0], "annotations")
-                    and final_output.content[0].annotations
-                ):
+                if hasattr(final_output.content[0], "annotations") and final_output.content[0].annotations:
                     logger.info("\n" + "-" * 40)
                     logger.info("CITATIONS")
                     logger.info("-" * 40)
-                    for i, annotation in enumerate(
-                        final_output.content[0].annotations, 1
-                    ):
+                    for i, annotation in enumerate(final_output.content[0].annotations, 1):
                         if hasattr(annotation, "citation") and annotation.citation:
                             logger.info(f"[{i}] {annotation.citation.title}")
                             logger.info(f"    {annotation.citation.url}")
