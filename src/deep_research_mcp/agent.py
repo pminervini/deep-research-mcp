@@ -7,7 +7,6 @@ Deep Research Agent implementation for OpenAI's Deep Research API.
 import asyncio
 import time
 from typing import Dict, Any, Optional, List
-from dataclasses import dataclass
 import logging
 from openai import OpenAI
 import httpx
@@ -27,13 +26,11 @@ class DeepResearchAgent:
         self.client = OpenAI(api_key=config.api_key)
         self.logger = logging.getLogger(__name__)
 
-    async def research(
-        self,
-        query: str,
-        system_prompt: Optional[str] = None,
-        include_code_interpreter: bool = True,
-        callback_url: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    async def research(self,
+                       query: str,
+                       system_prompt: Optional[str] = None,
+                       include_code_interpreter: bool = True,
+                       callback_url: Optional[str] = None) -> Dict[str, Any]:
         """
         Perform deep research on a query with full async handling
 
@@ -87,21 +84,18 @@ class DeepResearchAgent:
 
         return self._extract_results(final_response)
 
-    @retry(
-        stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)
-    )
-    async def _create_research_task(
-        self, input_messages: List[Dict], tools: List[Dict]
-    ):
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    async def _create_research_task(self,
+                                    input_messages: List[Dict],
+                                    tools: List[Dict]) -> Dict[str, Any]:
         """Create research task with retry logic"""
         try:
-            response = self.client.responses.create(
-                model=self.config.model,
-                input=input_messages,
-                tools=tools,
-                reasoning={"summary": "auto"},
-                background=True,  # Essential for long-running tasks
-            )
+            response: Dict[str, Any] = self.client.responses.create(model=self.config.model,
+                                                                    input=input_messages,
+                                                                    tools=tools,
+                                                                    reasoning={"summary": "auto"},
+                                                                    background=True)  # Essential for long-running tasks
+
             self.logger.info(f"Research task started: {response.id}")
             return response
         except Exception as e:
@@ -114,7 +108,7 @@ class DeepResearchAgent:
 
         while time.time() - start_time < self.config.timeout:
             try:
-                response = self.client.responses.retrieve(task_id)
+                response: Dict[str, Any] = self.client.responses.retrieve(task_id)
 
                 if response.status == "completed":
                     self.logger.info(f"Research completed: {task_id}")
@@ -148,28 +142,23 @@ class DeepResearchAgent:
         except:
             pass
 
-        raise TaskTimeoutError(
-            f"Research task {task_id} did not complete within {self.config.timeout} seconds"
-        )
+        raise TaskTimeoutError(f"Research task {task_id} did not complete within {self.config.timeout} seconds")
 
-    async def _send_completion_callback(
-        self, callback_url: str, response_data: Dict[str, Any]
-    ):
+    async def _send_completion_callback(self,
+                                        callback_url: str,
+                                        response_data: Dict[str, Any]):
         """Send completion notification to callback URL"""
         try:
             async with httpx.AsyncClient() as client:
-                await client.post(
-                    callback_url,
-                    json={
-                        "status": "completed",
-                        "task_id": response_data.get("id"),
-                        "timestamp": time.time(),
-                        "result_preview": response_data.get("output", [])[-1]
-                        .get("content", [{}])[0]
-                        .get("text", "")[:500],
-                    },
-                    timeout=30,
-                )
+                payload = {
+                    "status": "completed",
+                    "task_id": response_data.get("id"),
+                    "timestamp": time.time(),
+                    "result_preview": response_data.get("output", [])[-1]
+                    .get("content", [{}])[0]
+                    .get("text", "")[:500],
+                }
+                await client.post(callback_url, json=payload, timeout=30)
         except Exception as e:
             self.logger.error(f"Failed to send callback to {callback_url}: {e}")
 
@@ -224,8 +213,14 @@ class DeepResearchAgent:
             if item.type == "reasoning" and hasattr(item, "summary")
         ]
 
+        # breakpoint()
+        # (Pdb) type(item)
+        # <class 'openai.types.responses.response_function_web_search.ResponseFunctionWebSearch'>
+        # (Pdb) type(item.action)
+        # <class 'openai.types.responses.response_function_web_search.ActionSearch'>
+
         search_queries = [
-            item.action.get("query", "")
+            getattr(item.action, "query", "") # item.action.get("query", "")
             for item in response.output
             if item.type == "web_search_call" and hasattr(item, "action")
         ]

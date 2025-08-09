@@ -18,7 +18,7 @@ class ResearchConfig:
     """Configuration for Deep Research agent"""
 
     api_key: str
-    model: str = "o3-deep-research-2025-06-26"
+    model: str = "gpt-4o"
     timeout: float = 1800.0  # 30 minutes
     poll_interval: float = 30.0
     max_retries: int = 3
@@ -55,6 +55,7 @@ class ResearchConfig:
             raise ValueError("Max retries must be non-negative")
 
         if self.model not in [
+            "gpt-4o",
             "o3-deep-research-2025-06-26",
             "o4-mini-deep-research-2025-06-26",
         ]:
