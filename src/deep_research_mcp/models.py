@@ -15,6 +15,11 @@ AVAILABLE_MODELS = [
         "cost": "$2.50 per 1M input tokens, $10.00 per 1M output tokens"
     },
     {
+        "name": "gpt-4o-mini",
+        "description": "Cost-efficient small language model with 128K context window and 16K output capacity. Supports text and vision inputs with strong performance in reasoning, math, coding, and multimodal tasks",
+        "cost": "$0.15 per 1M input tokens, $0.60 per 1M output tokens"
+    },
+    {
         "name": "gpt-5",
         "description": "OpenAI's flagship reasoning model with 272K input context and 128K output capacity. State-of-the-art performance in coding, math, and agentic tasks with advanced reasoning capabilities",
         "cost": "$1.25 per 1M input tokens, $10.00 per 1M output tokens"
