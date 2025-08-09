@@ -26,17 +26,37 @@ research_agent: Optional[DeepResearchAgent] = None
 
 @mcp.tool()
 async def deep_research(
-    query: Annotated[str, "Research query or question to investigate"],
+    query: Annotated[
+        str, 
+        "Specific research question or topic. Examples: 'Latest quantum computing breakthroughs in 2024', 'Compare renewable energy adoption rates globally', 'Analyze Tesla's financial performance vs competitors'"
+    ],
     system_instructions: Annotated[
-        str, "Optional system prompt for research approach"
+        str, 
+        "Custom research approach instructions. Examples: 'Focus on peer-reviewed sources only', 'Include financial data and charts', 'Prioritize recent developments from 2024-2025'. Leave empty for balanced analysis."
     ] = "",
     include_analysis: Annotated[
-        bool, "Whether to include code analysis capabilities"
+        bool, 
+        "Enable code execution for data analysis, calculations, and visualizations. Useful for: statistical analysis, creating charts/graphs, processing datasets. Set to False for text-only research."
     ] = True,
 ) -> str:
     """
-    Perform comprehensive research using OpenAI's Deep Research API.
-    Returns a detailed report with citations and analysis.
+    Performs autonomous deep research using OpenAI's Deep Research API with web search and analysis capabilities.
+    
+    **What it does:**
+    - Decomposes complex queries into research strategies
+    - Conducts real-time web searches for current information  
+    - Executes code for data analysis and visualization (when include_analysis=True)
+    - Synthesizes findings into comprehensive reports with citations
+    
+    **Best for:**
+    - Current events and recent developments
+    - Data-driven analysis requiring statistics/charts
+    - Complex topics needing multiple source synthesis
+    - Academic-style research with proper citations
+    
+    **Returns:** Structured markdown report with citations, metadata, and research insights.
+    
+    **Note:** Uses OpenAI's Deep Research models - monitor costs as research can generate substantial tokens.
     """
     global research_agent
 
@@ -101,9 +121,21 @@ async def deep_research(
 
 @mcp.tool()
 async def research_status(
-    task_id: Annotated[str, "Task ID to check status for"],
+    task_id: Annotated[
+        str, 
+        "Research task ID returned by deep_research tool. Format: UUID string like 'abc123-def456-ghi789'"
+    ],
 ) -> str:
-    """Check the status of a research task by ID"""
+    """
+    Check the current status and progress of a running research task.
+    
+    **Use when:**
+    - Research is taking a long time (>5 minutes)
+    - Want to check if a task completed successfully
+    - Need creation/completion timestamps
+    
+    **Returns:** Task status ('running', 'completed', 'failed') with timestamps.
+    """
     global research_agent
 
     if not research_agent:
@@ -132,7 +164,16 @@ async def research_status(
 
 @mcp.tool()
 async def list_models() -> str:
-    """List available Deep Research models"""
+    """
+    Display all available OpenAI Deep Research models with pricing and capabilities.
+    
+    **Use when:**
+    - Need to check current model options before research
+    - Want to understand cost implications
+    - Planning research strategy based on model capabilities
+    
+    **Returns:** Formatted list of models with descriptions and costs.
+    """
     models = [
         {
             "name": "gpt-4o",
