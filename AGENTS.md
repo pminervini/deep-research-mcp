@@ -1,6 +1,11 @@
 # Repository Guidelines
 
 ## Project Structure & Modules
+
+For complete project overview and features, see [README.md](README.md).
+
+For detailed architecture documentation, see [ARCH.md](ARCH.md).
+
 - `src/deep_research_mcp/`: Python package.
   - `agent.py`: Orchestrates Deep Research flows.
   - `config.py`: Pydantic settings and `.env` loading.
@@ -9,8 +14,10 @@
 - Tests (expected): `tests/` alongside `src/` using `pytest`.
 
 ## Build, Test, and Development
-- Install: `pip install -r requirements.txt` (use Python 3.9+).
-- Editable install (optional): `pip install -e .`
+
+For installation and usage instructions, see [README.md](README.md).
+
+Development commands:
 - Run MCP server locally: `python src/deep_research_mcp/mcp_server.py`
 - Run tests: `pytest` or `pytest --cov=deep_research_mcp tests/`
 - Format: `black src/ tests/`
