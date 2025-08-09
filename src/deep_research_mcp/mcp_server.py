@@ -5,14 +5,13 @@
 MCP Server implementation for Claude Code integration.
 """
 
-import asyncio
 import logging
 from typing import Annotated, Optional
 from fastmcp import FastMCP
 
-from .agent import DeepResearchAgent
-from .config import ResearchConfig
-from .errors import ResearchError
+from deep_research_mcp.agent import DeepResearchAgent
+from deep_research_mcp.config import ResearchConfig
+from deep_research_mcp.errors import ResearchError
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

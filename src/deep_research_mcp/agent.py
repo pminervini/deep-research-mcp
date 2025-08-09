@@ -13,8 +13,8 @@ from openai import OpenAI
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from .config import ResearchConfig
-from .errors import ResearchError, RateLimitError, TaskTimeoutError
+from deep_research_mcp.config import ResearchConfig
+from deep_research_mcp.errors import ResearchError, RateLimitError, TaskTimeoutError
 
 logger = logging.getLogger(__name__)
 
