@@ -18,6 +18,7 @@ Examples:
 import os
 import sys
 import json
+import argparse
 import structlog
 from typing import Dict, Any, Optional, List
 from openai import OpenAI
@@ -217,22 +218,19 @@ class FourAgentPipeline:
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Four-Agent Deep Research Pipeline CLI")
+    parser.add_argument("query", help="Your research question")
+    
+    args = parser.parse_args()
+    
     logger = structlog.get_logger()
-
-    if len(sys.argv) != 2:
-        logger.error("Usage: python complex-cli.py 'Your research question'")
-        logger.info("\nExample:")
-        logger.info(
-            "python complex-cli.py 'What are the latest developments in quantum computing?'"
-        )
-        sys.exit(1)
 
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         logger.error("Error: OPENAI_API_KEY environment variable not set")
         sys.exit(1)
 
-    user_query = sys.argv[1]
+    user_query = args.query
 
     pipeline = FourAgentPipeline(api_key)
     results = pipeline.run_pipeline(user_query)
