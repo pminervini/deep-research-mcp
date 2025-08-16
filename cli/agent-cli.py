@@ -3,6 +3,26 @@
 
 """
 Simple CLI tool to use the Deep Research MCP server functionality.
+
+USAGE EXAMPLES:
+
+  # Basic research query
+  python cli/agent-cli.py research "What are the latest treatments for diabetes?"
+
+  # Research with specific model (recommended)
+  python cli/agent-cli.py research "Healthcare costs in the US" --model gpt-4o-mini
+
+  # Check configuration
+  python cli/agent-cli.py config
+
+  # List available models
+  python cli/agent-cli.py models
+
+EXAMPLE QUERIES:
+  - "What are the current market trends for AI in healthcare?"
+  - "Compare effectiveness of different COVID-19 vaccines"
+  - "Latest research on mental health treatments"
+  - "Economic impact of telemedicine adoption"
 """
 
 import argparse
@@ -33,7 +53,7 @@ Be analytical, avoid generalities, and ensure that each section supports data-ba
 """
 
 
-async def research(query: str, model: str = "o4-mini-deep-research-2025-06-26") -> None:
+async def research(query: str, model: str = "gpt-4o-mini") -> None:
     """Use the research functionality"""
     logger = structlog.get_logger()
 
@@ -126,8 +146,8 @@ def main():
     research_parser.add_argument("query", help="Research query")
     research_parser.add_argument(
         "--model",
-        default="o4-mini-deep-research-2025-06-26",
-        choices=["o3-deep-research-2025-06-26", "o4-mini-deep-research-2025-06-26"],
+        default="gpt-4o-mini",
+        choices=["gpt-4o-mini", "o3-deep-research-2025-06-26", "o4-mini-deep-research-2025-06-26"],
         help="Model to use for research",
     )
 

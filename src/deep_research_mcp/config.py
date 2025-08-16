@@ -19,7 +19,9 @@ def load_config_file():
                 line = line.strip()
                 if line and not line.startswith('#') and '=' in line:
                     key, value = line.split('=', 1)
-                    os.environ[key.strip()] = value.strip()
+                    # Remove inline comments
+                    value = value.split('#')[0].strip()
+                    os.environ[key.strip()] = value
 
 # Load configuration from ~/.deep_research file
 load_config_file()
