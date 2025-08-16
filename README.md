@@ -30,9 +30,8 @@ cd deep-research-mcp
 # Install dependencies
 pip install -r requirements.txt
 
-# Set up environment variables
-cp .env.example .env
-# Edit .env and add your OPENAI_API_KEY
+# Set up configuration file
+# Create ~/.deep_research and add your OPENAI_API_KEY
 ```
 
 ### Development Install
@@ -45,9 +44,9 @@ pip install -e .
 
 ## Configuration
 
-### Environment Variables
+### Configuration File
 
-Create a `.env` file in the project root:
+Create a `~/.deep_research` file in your home directory:
 
 ```bash
 # Required
@@ -60,6 +59,12 @@ POLL_INTERVAL=30  # Polling interval in seconds (default: 30)
 MAX_RETRIES=3  # Maximum retry attempts (default: 3)
 LOG_LEVEL=INFO  # Logging level (DEBUG, INFO, WARNING, ERROR)
 ```
+
+**Why ~/.deep_research instead of .env?**
+- Works regardless of current working directory
+- User-specific configuration
+- No conflicts with other .env files
+- More reliable for MCP integration
 
 ### Claude Code Integration
 
@@ -75,7 +80,7 @@ Replace `/path/to/deep-research-mcp/` with the actual path to your cloned reposi
 
 2. **Set Environment Variables**
 
-Ensure your `OPENAI_API_KEY` is available in your environment or `.env` file.
+Ensure your `OPENAI_API_KEY` is available in your `~/.deep_research` file or environment variables.
 
 3. **Use in Claude Code**:
    - The research tools will appear in Claude Code's tool palette

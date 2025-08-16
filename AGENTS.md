@@ -8,7 +8,7 @@ For detailed architecture documentation, see [ARCH.md](ARCH.md).
 
 - `src/deep_research_mcp/`: Python package.
   - `agent.py`: Orchestrates Deep Research flows.
-  - `config.py`: Pydantic settings and `.env` loading.
+  - `config.py`: Pydantic settings and `~/.deep_research` config loading.
   - `mcp_server.py`: MCP entrypoint used by Claude Code.
   - `errors.py`: Exception types.
 - Tests (expected): `tests/` alongside `src/` using `pytest`.
@@ -54,8 +54,8 @@ Development commands:
   - Checklist: tests pass, formatted, lint/type checks clean.
 
 ## Security & Configuration
-- Secrets: never commit API keys. Use `.env` and `ResearchConfig.from_env()`.
-- Example Claude Code config: point to `src/deep_research_mcp/mcp_server.py` in `~/.config/claude-code/mcp.json` and pass `OPENAI_API_KEY` via env.
+- Secrets: never commit API keys. Use `~/.deep_research` config file and `ResearchConfig.from_env()`.
+- Example Claude Code config: point to `src/deep_research_mcp/mcp_server.py` in `~/.config/claude-code/mcp.json` and configure `OPENAI_API_KEY` in `~/.deep_research`.
 - Cost: prefer the mini model for iteration.
 
 ## Architecture Notes

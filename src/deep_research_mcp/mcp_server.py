@@ -174,7 +174,7 @@ def main():
     except Exception as e:
         logger.error(f"Configuration error: {e}")
         logger.error(
-            "Please ensure OPENAI_API_KEY is set in your environment or .env file"
+            "Please ensure OPENAI_API_KEY is set in your ~/.deep_research file or environment variables"
         )
         return
 
