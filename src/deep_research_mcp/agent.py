@@ -13,7 +13,8 @@ import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from deep_research_mcp.config import ResearchConfig
-from deep_research_mcp.errors import ResearchError, RateLimitError, TaskTimeoutError
+from deep_research_mcp.errors import ResearchError, TaskTimeoutError
+from deep_research_mcp.clarification import ClarificationManager
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ class DeepResearchAgent:
         self.config = config
         self.client = OpenAI(api_key=config.api_key) if config.api_key else OpenAI()
         self.logger = logging.getLogger(__name__)
+        self.clarification_manager = ClarificationManager(config)
 
     async def research(
         self,
@@ -249,3 +251,40 @@ class DeepResearchAgent:
         except Exception as e:
             self.logger.error(f"Error checking status for task {task_id}: {e}")
             return {"task_id": task_id, "status": "error", "error": str(e)}
+
+    def start_clarification(self, user_query: str) -> Dict[str, Any]:
+        """
+        Start clarification process for a query
+        
+        Args:
+            user_query: The original research query
+            
+        Returns:
+            Dictionary with clarification status and questions, or indication to proceed
+        """
+        return self.clarification_manager.start_clarification(user_query)
+    
+    def add_clarification_answers(self, session_id: str, answers: List[str]) -> Dict[str, Any]:
+        """
+        Add answers to clarification questions
+        
+        Args:
+            session_id: Session identifier from start_clarification
+            answers: List of answers to the clarification questions
+            
+        Returns:
+            Dictionary with session status
+        """
+        return self.clarification_manager.add_answers(session_id, answers)
+    
+    def get_enriched_query(self, session_id: str) -> Optional[str]:
+        """
+        Get enriched query from clarification session
+        
+        Args:
+            session_id: Session identifier
+            
+        Returns:
+            Enriched query string or None if session not found
+        """
+        return self.clarification_manager.get_enriched_query(session_id)

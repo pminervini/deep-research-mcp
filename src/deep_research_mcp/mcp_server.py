@@ -38,6 +38,10 @@ async def deep_research(
         bool,
         "Enable code execution for data analysis, calculations, and visualizations. Useful for: statistical analysis, creating charts/graphs, processing datasets. Set to False for text-only research.",
     ] = True,
+    request_clarification: Annotated[
+        bool,
+        "When True, analyze the query and return clarifying questions instead of starting research. Use this to improve research quality for ambiguous queries.",
+    ] = False,
 ) -> str:
     """
     Performs autonomous deep research using OpenAI's Deep Research API with web search and analysis capabilities.
@@ -69,6 +73,41 @@ async def deep_research(
             return f"Failed to initialize research agent: {str(e)}"
 
     try:
+        # Handle clarification request
+        if request_clarification:
+            clarification_result = research_agent.start_clarification(query)
+            
+            if not clarification_result.get("needs_clarification", False):
+                return f"""# Query Analysis
+
+**Original Query:** {query}
+
+**Assessment:** {clarification_result.get('query_assessment', 'Query is sufficient for research')}
+
+**Recommendation:** {clarification_result.get('reasoning', 'Proceed with research directly')}
+
+You can proceed with the research using the same query."""
+            
+            # Format clarifying questions for Claude Code
+            questions = clarification_result.get("questions", [])
+            session_id = clarification_result.get("session_id", "")
+            
+            questions_formatted = "\n".join([f"{i+1}. {q}" for i, q in enumerate(questions)])
+            
+            return f"""# Clarifying Questions Needed
+
+**Original Query:** {query}
+
+**Why clarification is helpful:** {clarification_result.get('reasoning', 'Additional context will improve research quality')}
+
+**Session ID:** `{session_id}`
+
+**Please answer these questions to improve the research:**
+
+{questions_formatted}
+
+**Instructions:** Use the `research_with_context` tool with your answers and the session ID above to proceed with enhanced research."""
+
         system_prompt = (
             system_instructions
             or """
@@ -160,6 +199,123 @@ async def research_status(
     except Exception as e:
         logger.error(f"Error checking status: {e}")
         return f"Error checking status: {str(e)}"
+
+
+@mcp.tool()
+async def research_with_context(
+    session_id: Annotated[
+        str,
+        "Session ID from clarification request. Get this from the deep_research tool when request_clarification=True",
+    ],
+    answers: Annotated[
+        list[str],
+        "List of answers to the clarifying questions, in the same order as the questions were presented",
+    ],
+    system_instructions: Annotated[
+        str,
+        "Custom research approach instructions. Examples: 'Focus on peer-reviewed sources only', 'Include financial data and charts', 'Prioritize recent developments from 2024-2025'. Leave empty for balanced analysis.",
+    ] = "",
+    include_analysis: Annotated[
+        bool,
+        "Enable code execution for data analysis, calculations, and visualizations. Useful for: statistical analysis, creating charts/graphs, processing datasets. Set to False for text-only research.",
+    ] = True,
+) -> str:
+    """
+    Perform research using an enriched query based on clarification answers.
+    
+    **Use after:**
+    - Calling `deep_research` with `request_clarification=True`
+    - Receiving clarifying questions and a session ID
+    - Gathering answers from the user
+    
+    **What it does:**
+    - Takes your answers to clarifying questions
+    - Creates an enriched, more specific research query
+    - Performs comprehensive research with the enhanced query
+    
+    **Returns:** Complete research report with citations and metadata
+    """
+    global research_agent
+
+    if not research_agent:
+        try:
+            config = ResearchConfig.from_env()
+            config.validate()
+            research_agent = DeepResearchAgent(config)
+        except Exception as e:
+            return f"Failed to initialize research agent: {str(e)}"
+
+    try:
+        # Add answers to the clarification session
+        status_result = research_agent.add_clarification_answers(session_id, answers)
+        
+        if "error" in status_result:
+            return f"Error with clarification session: {status_result['error']}"
+        
+        # Get enriched query
+        enriched_query = research_agent.get_enriched_query(session_id)
+        
+        if not enriched_query:
+            return f"Could not retrieve enriched query for session {session_id}. Please check the session ID."
+        
+        logger.info(f"Using enriched query: {enriched_query}")
+        
+        # Prepare system prompt
+        system_prompt = (
+            system_instructions
+            or """
+        You are a professional researcher preparing a structured, data-driven report.
+        Requirements:
+        - Focus on data-rich insights with specific figures and statistics
+        - Include tables and visualizations when appropriate  
+        - Prioritize peer-reviewed sources and authoritative data
+        - Use inline citations throughout
+        - Be analytical and avoid generalities
+        """
+        )
+
+        # Perform research with enriched query
+        result = await research_agent.research(
+            query=enriched_query,
+            system_prompt=system_prompt,
+            include_code_interpreter=include_analysis,
+        )
+
+        if result["status"] == "completed":
+            # Format for Claude Code consumption
+            formatted_result = f"""# Enhanced Research Report
+
+**Original Query Enhanced With User Context**
+
+**Enriched Query:** {enriched_query}
+
+**User Clarifications Provided:** {len(answers)} answers
+
+---
+
+{result['final_report']}
+
+## Research Metadata
+- **Total research steps**: {result['total_steps']}
+- **Search queries executed**: {len(result['search_queries'])}
+- **Citations found**: {len(result['citations'])}
+- **Task ID**: {result['task_id']}
+- **Clarification Session**: {session_id}
+
+## Citations
+"""
+            for citation in result["citations"]:
+                formatted_result += (
+                    f"{citation['index']}. [{citation['title']}]({citation['url']})\n"
+                )
+
+            return formatted_result
+        else:
+            return f"Research failed: {result.get('message', 'Unknown error')}"
+
+    except Exception as e:
+        logger.error(f"Error in research_with_context: {e}")
+        return f"Error performing enhanced research: {str(e)}"
 
 
 def main():
