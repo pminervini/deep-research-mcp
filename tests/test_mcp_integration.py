@@ -8,13 +8,9 @@ a full Claude Code MCP integration.
 import asyncio
 import os
 import sys
-from unittest.mock import Mock, patch
 
 # Import the underlying functions from the MCP server module
 import deep_research_mcp.mcp_server as mcp_server
-
-
-
 
 async def test_research_status():
     """Test the research_status tool with a fake task ID"""
@@ -119,7 +115,7 @@ To integrate this MCP server with Claude Code:
          "args": ["{server_script}"],
          "env": {{
            "OPENAI_API_KEY": "${{OPENAI_API_KEY}}",
-           "RESEARCH_MODEL": "o3-deep-research-2025-06-26"
+           "RESEARCH_MODEL": "o4-mini-deep-research-2025-06-26"
          }}
        }}
      }}

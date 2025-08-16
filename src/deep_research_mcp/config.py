@@ -29,8 +29,8 @@ load_config_file()
 class ResearchConfig:
     """Configuration for Deep Research agent"""
 
-    api_key: str
-    model: str = "gpt-4o"
+    api_key: Optional[str] = None
+    model: str = "o4-mini-deep-research-2025-06-26"
     timeout: float = 1800.0  # 30 minutes
     poll_interval: float = 30.0
     max_retries: int = 3
@@ -39,13 +39,15 @@ class ResearchConfig:
     @classmethod
     def from_env(cls) -> "ResearchConfig":
         """Create configuration from environment variables"""
+        research_model = os.environ.get("RESEARCH_MODEL")
+        if not research_model:
+            raise ValueError("RESEARCH_MODEL is required in ~/.deep_research configuration file")
+
         api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY environment variable is required")
 
         return cls(
             api_key=api_key,
-            model=os.environ.get("RESEARCH_MODEL", cls.model),
+            model=research_model,
             timeout=float(os.environ.get("RESEARCH_TIMEOUT", cls.timeout)),
             poll_interval=float(os.environ.get("POLL_INTERVAL", cls.poll_interval)),
             max_retries=int(os.environ.get("MAX_RETRIES", cls.max_retries)),
@@ -54,7 +56,7 @@ class ResearchConfig:
 
     def validate(self) -> bool:
         """Validate configuration settings"""
-        if not self.api_key or not self.api_key.startswith("sk-"):
+        if self.api_key and not self.api_key.startswith("sk-"):
             raise ValueError("Invalid API key format")
 
         if self.timeout <= 0:
@@ -66,15 +68,16 @@ class ResearchConfig:
         if self.max_retries < 0:
             raise ValueError("Max retries must be non-negative")
 
-        # Validate model exists in OpenAI API
-        try:
-            client = OpenAI(api_key=self.api_key)
-            available_models = [model.id for model in client.models.list()]
-            if self.model not in available_models:
-                raise ValueError(f"Model '{self.model}' not available. Available models: {', '.join(available_models)}")
-        except Exception as e:
-            # If we can't check models (e.g., network issues), skip validation
-            # The actual API call will handle invalid models
-            pass
+        # Validate model exists in OpenAI API (only if we have an API key)
+        if self.api_key:
+            try:
+                client = OpenAI(api_key=self.api_key)
+                available_models = [model.id for model in client.models.list()]
+                if self.model not in available_models:
+                    raise ValueError(f"Model '{self.model}' not available. Available models: {', '.join(available_models)}")
+            except Exception as e:
+                # If we can't check models (e.g., network issues), skip validation
+                # The actual API call will handle invalid models
+                pass
 
         return True

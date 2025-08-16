@@ -23,7 +23,7 @@ class DeepResearchAgent:
 
     def __init__(self, config: ResearchConfig):
         self.config = config
-        self.client = OpenAI(api_key=config.api_key)
+        self.client = OpenAI(api_key=config.api_key) if config.api_key else OpenAI()
         self.logger = logging.getLogger(__name__)
 
     async def research(self,
