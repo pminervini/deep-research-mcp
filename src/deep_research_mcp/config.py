@@ -10,19 +10,50 @@ from pathlib import Path
 from typing import Optional
 from openai import OpenAI
 
+import toml
+
 
 def load_config_file():
-    """Load configuration from ~/.deep_research file"""
+    """Load configuration from ~/.deep_research TOML file"""
     config_file = Path.home() / ".deep_research"
     if config_file.exists():
-        with open(config_file, "r") as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    key, value = line.split("=", 1)
-                    # Remove inline comments
-                    value = value.split("#")[0].strip()
-                    os.environ[key.strip()] = value
+        if toml is None:
+            raise ImportError(
+                "TOML support requires 'toml' package. "
+                "Install with: pip install toml"
+            )
+        
+        try:
+            with open(config_file, "r") as f:
+                config = toml.load(f)
+            
+            # Flatten nested config and set environment variables
+            def set_env_vars(data, prefix=""):
+                for key, value in data.items():
+                    env_key = f"{prefix}{key}".upper()
+                    if isinstance(value, dict):
+                        set_env_vars(value, f"{prefix}{key}_")
+                    else:
+                        os.environ[env_key] = str(value)
+            
+            set_env_vars(config)
+            
+        except Exception as e:
+            # Fallback: try to parse as old-style key=value format
+            try:
+                with open(config_file, "r") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            key, value = line.split("=", 1)
+                            # Remove inline comments
+                            value = value.split("#")[0].strip()
+                            os.environ[key.strip()] = value
+            except Exception:
+                raise ValueError(
+                    f"Failed to parse ~/.deep_research file. "
+                    f"Please ensure it's valid TOML format. Error: {e}"
+                )
 
 
 # Load configuration from ~/.deep_research file

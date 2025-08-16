@@ -46,25 +46,25 @@ pip install -e .
 
 ### Configuration File
 
-Create a `~/.deep_research` file in your home directory:
+Create a `~/.deep_research` file in your home directory using TOML format:
 
-```bash
-# Required
-RESEARCH_MODEL=o4-mini-deep-research-2025-06-26  # or o3-deep-research-2025-06-26
+```toml
+# Core settings
+research_model = "o4-mini-deep-research-2025-06-26"
+openai_api_key = "sk-your-api-key-here"
 
-# Will use environment variable if not set
-OPENAI_API_KEY=sk-your-api-key-here
+[research]
+timeout = 1800
+poll_interval = 30
+max_retries = 3
 
-# Optional
-RESEARCH_TIMEOUT=1800  # Maximum time in seconds (default: 30 minutes)
-POLL_INTERVAL=30  # Polling interval in seconds (default: 30)
-MAX_RETRIES=3  # Maximum retry attempts (default: 3)
-LOG_LEVEL=INFO  # Logging level (DEBUG, INFO, WARNING, ERROR)
+[clarification]
+enable = true
+triage_model = "gpt-4o-mini"
+clarifier_model = "gpt-4o-mini"
 
-# Clarification features (optional)
-ENABLE_CLARIFICATION=true  # Enable clarifying questions (default: false)
-TRIAGE_MODEL=gpt-4o-mini  # Model for query analysis (default: gpt-4o-mini)
-CLARIFIER_MODEL=gpt-4o-mini  # Model for query enrichment (default: gpt-4o-mini)
+[logging]
+level = "INFO"
 ```
 
 ### Claude Code Integration
@@ -170,10 +170,10 @@ The agent includes an optional clarification system to improve research quality 
 ### Configuration
 
 Enable clarification in your `~/.deep_research` file:
-```bash
-ENABLE_CLARIFICATION=true
-TRIAGE_MODEL=gpt-4o-mini  # Optional, defaults to gpt-4o-mini
-CLARIFIER_MODEL=gpt-4o-mini  # Optional, defaults to gpt-4o-mini
+```toml
+enable_clarification = true
+triage_model = "gpt-4o-mini"      # Optional, defaults to gpt-4o-mini
+clarifier_model = "gpt-4o-mini"   # Optional, defaults to gpt-4o-mini
 ```
 
 ### Usage Flow
