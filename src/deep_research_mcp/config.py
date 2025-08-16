@@ -10,18 +10,20 @@ from pathlib import Path
 from typing import Optional
 from openai import OpenAI
 
+
 def load_config_file():
     """Load configuration from ~/.deep_research file"""
     config_file = Path.home() / ".deep_research"
     if config_file.exists():
-        with open(config_file, 'r') as f:
+        with open(config_file, "r") as f:
             for line in f:
                 line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)
+                if line and not line.startswith("#") and "=" in line:
+                    key, value = line.split("=", 1)
                     # Remove inline comments
-                    value = value.split('#')[0].strip()
+                    value = value.split("#")[0].strip()
                     os.environ[key.strip()] = value
+
 
 # Load configuration from ~/.deep_research file
 load_config_file()
@@ -43,7 +45,9 @@ class ResearchConfig:
         """Create configuration from environment variables"""
         research_model = os.environ.get("RESEARCH_MODEL")
         if not research_model:
-            raise ValueError("RESEARCH_MODEL is required in ~/.deep_research configuration file")
+            raise ValueError(
+                "RESEARCH_MODEL is required in ~/.deep_research configuration file"
+            )
 
         api_key = os.environ.get("OPENAI_API_KEY")
 
@@ -76,7 +80,9 @@ class ResearchConfig:
                 client = OpenAI(api_key=self.api_key)
                 available_models = [model.id for model in client.models.list()]
                 if self.model not in available_models:
-                    raise ValueError(f"Model '{self.model}' not available. Available models: {', '.join(available_models)}")
+                    raise ValueError(
+                        f"Model '{self.model}' not available. Available models: {', '.join(available_models)}"
+                    )
             except Exception as e:
                 # If we can't check models (e.g., network issues), skip validation
                 # The actual API call will handle invalid models
