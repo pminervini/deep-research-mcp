@@ -60,12 +60,6 @@ MAX_RETRIES=3  # Maximum retry attempts (default: 3)
 LOG_LEVEL=INFO  # Logging level (DEBUG, INFO, WARNING, ERROR)
 ```
 
-**Why ~/.deep_research instead of .env?**
-- Works regardless of current working directory
-- User-specific configuration
-- No conflicts with other .env files
-- More reliable for MCP integration
-
 ### Claude Code Integration
 
 1. **Configure MCP Server**
