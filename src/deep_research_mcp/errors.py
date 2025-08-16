@@ -11,11 +11,6 @@ class ResearchError(Exception):
     pass
 
 
-class RateLimitError(ResearchError):
-    """API rate limit exceeded"""
-
-    pass
-
 
 class TaskTimeoutError(ResearchError):
     """Task exceeded maximum execution time"""
