@@ -9,8 +9,7 @@ import asyncio
 import json
 import logging
 import sys
-from src.deep_research_mcp.config import ResearchConfig
-from src.deep_research_mcp.agent import DeepResearchAgent
+from deep_research_mcp import ResearchConfig, DeepResearchAgent
 
 # Configure logging
 logging.basicConfig(

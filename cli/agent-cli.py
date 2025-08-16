@@ -35,9 +35,7 @@ from pathlib import Path
 src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-from deep_research_mcp.agent import DeepResearchAgent
-from deep_research_mcp.config import ResearchConfig
-from deep_research_mcp.errors import ResearchError
+from deep_research_mcp import DeepResearchAgent, ResearchConfig, ResearchError
 
 SYSTEM_PROMPT = """
 You are a professional researcher preparing a structured, data-driven report on behalf of a global health economics team. Your task is to analyze the health question the user poses.
