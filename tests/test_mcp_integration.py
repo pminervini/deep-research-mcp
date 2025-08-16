@@ -14,19 +14,6 @@ from unittest.mock import Mock, patch
 import deep_research_mcp.mcp_server as mcp_server
 
 
-async def test_list_models():
-    """Test the list_models tool"""
-    print("Testing list_models tool...")
-    try:
-        # Get the actual function from the FastMCP decorated function
-        list_models_func = mcp_server.mcp._tools['list_models'].func
-        result = await list_models_func()
-        print("✅ list_models succeeded:")
-        print(result[:200] + "..." if len(result) > 200 else result)
-        return True
-    except Exception as e:
-        print(f"❌ list_models failed: {e}")
-        return False
 
 
 async def test_research_status():
@@ -89,7 +76,6 @@ async def test_mcp_server():
     # Run individual tests
     tests_results = []
     
-    tests_results.append(await test_list_models())
     tests_results.append(await test_research_status())
     tests_results.append(await test_deep_research_without_api())
     
@@ -164,8 +150,7 @@ To integrate this MCP server with Claude Code:
    
    The following tools will be available:
    - deep_research(): Comprehensive research with citations
-   - research_status(): Check research task status  
-   - list_models(): Show available research models
+   - research_status(): Check research task status
 
 6. **Verify Integration**
    Check Claude Code logs for MCP server startup messages.
