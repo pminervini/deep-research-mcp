@@ -6,12 +6,23 @@ Configuration management for Deep Research MCP.
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
-from dotenv import load_dotenv
 from openai import OpenAI
 
-# Load environment variables from .env file
-load_dotenv()
+def load_config_file():
+    """Load configuration from ~/.deep_research file"""
+    config_file = Path.home() / ".deep_research"
+    if config_file.exists():
+        with open(config_file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    os.environ[key.strip()] = value.strip()
+
+# Load configuration from ~/.deep_research file
+load_config_file()
 
 
 @dataclass
