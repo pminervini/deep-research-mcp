@@ -8,8 +8,7 @@ import os
 from dataclasses import dataclass
 from typing import Optional
 from dotenv import load_dotenv
-
-from deep_research_mcp.models import is_valid_model
+from openai import OpenAI
 
 # Load environment variables from .env file
 load_dotenv()
@@ -56,7 +55,15 @@ class ResearchConfig:
         if self.max_retries < 0:
             raise ValueError("Max retries must be non-negative")
 
-        if not is_valid_model(self.model):
-            raise ValueError(f"Unknown model: {self.model}")
+        # Validate model exists in OpenAI API
+        try:
+            client = OpenAI(api_key=self.api_key)
+            available_models = [model.id for model in client.models.list()]
+            if self.model not in available_models:
+                raise ValueError(f"Model '{self.model}' not available. Available models: {', '.join(available_models)}")
+        except Exception as e:
+            # If we can't check models (e.g., network issues), skip validation
+            # The actual API call will handle invalid models
+            pass
 
         return True

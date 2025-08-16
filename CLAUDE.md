@@ -2,61 +2,54 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## Project Documentation
 
-See [README.md](README.md) for a complete project description and features overview.
+For complete project overview, installation instructions, and usage examples, see [README.md](README.md).
 
-## Architecture
-
-See [ARCH.md](ARCH.md) for detailed architecture documentation including component interactions and file-by-file descriptions.
+For detailed architecture and component descriptions, see [ARCH.md](ARCH.md).
 
 ## Development Commands
 
-See [README.md](README.md) for installation instructions. Development commands:
-
+### Testing
 ```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Editable development install
-pip install -e .
-
-# Run tests
+# Run all tests
 pytest
+
+# Run with coverage
 pytest --cov=deep_research_mcp tests/
+
+# Run specific test file
 pytest tests/test_agent.py
-
-# Code quality
-black src/ tests/
-pylint src/
-mypy src/
-
-# Run MCP server locally
-python src/deep_research_mcp/mcp_server.py
 ```
 
-## Environment Configuration
+### Code Quality
+```bash
+# Format code
+black src/ tests/
 
-See [README.md](README.md) for complete configuration details.
+# Lint code
+pylint src/deep_research_mcp/
 
-## Claude Code Integration
+# Type checking
+mypy src/deep_research_mcp/
+```
 
-See [README.md](README.md) for MCP server configuration instructions.
+### Running the MCP Server
+```bash
+# Start the MCP server directly
+python src/deep_research_mcp/mcp_server.py
 
-## Code Conventions
+# Or use the installed console script
+deep-research-mcp
+```
 
-- Python 3.9+ required
-- 4-space indentation, Black formatting
-- Type hints required for public functions
-- Snake_case for functions/variables, PascalCase for classes
-- Use `structlog` for logging, avoid direct prints in library code
-- Never commit API keys or secrets
-- Never use emojis in code, comments, docstrings, or any part of the codebase
+## MCP Integration for Claude Code
 
-## Code Simplicity & Minimal Changes
+To add this MCP server to Claude Code:
+```bash
+claude mcp add deep-research python /path/to/deep-research-mcp/src/deep_research_mcp/mcp_server.py
+```
 
-- Keep code simple and clean: prefer straightforward solutions over complex ones
-- Make minimal changes: only implement what was explicitly requested, nothing more
-- Avoid adding extra functionality, features, or optimizations that weren't asked for
-- Use existing patterns and structures in the codebase rather than introducing new approaches
-- When fixing bugs, address only the specific issue without refactoring unrelated code
+The server exposes two main tools:
+- `deep_research()` - Perform autonomous research with web search and analysis
+- `research_status()` - Check status of running research tasks

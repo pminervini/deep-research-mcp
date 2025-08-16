@@ -65,7 +65,6 @@ The project is composed of three main layers:
 -   **Key Functionality**:
     -   `@mcp.tool() deep_research()`: The main tool that performs research. It initializes the `DeepResearchAgent`, calls its `research()` method, and formats the output for the client.
     -   `@mcp.tool() research_status()`: A tool to check the status of a research task.
-    -   `@mcp.tool() list_models()`: A tool to list the available Deep Research models.
     -   `main()`: The entry point for running the MCP server. It loads the configuration and starts the server.
 
 ### `src/deep_research_mcp/config.py`

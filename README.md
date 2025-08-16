@@ -54,7 +54,7 @@ Create a `.env` file in the project root:
 OPENAI_API_KEY=sk-your-api-key-here
 
 # Optional
-RESEARCH_MODEL=o3-deep-research-2025-06-26  # or o4-mini-deep-research-2025-06-26
+RESEARCH_MODEL=o4-mini-deep-research-2025-06-26  # or o3-deep-research-2025-06-26
 RESEARCH_TIMEOUT=1800  # Maximum time in seconds (default: 30 minutes)
 POLL_INTERVAL=30  # Polling interval in seconds (default: 30)
 MAX_RETRIES=3  # Maximum retry attempts (default: 3)
