@@ -61,15 +61,15 @@ The MCP server includes an optional clarification system that can ask follow-up 
 
 ### Configuration
 
-Add these settings to your `~/.deep_research` file:
+Add these settings to your `~/.deep_research` TOML file:
 
-```bash
+```toml
 # Enable/disable clarification (default: false)
-ENABLE_CLARIFICATION=true
+enable_clarification = true
 
 # Models for clarification agents (default: gpt-4o-mini for both)
-TRIAGE_MODEL=gpt-4o-mini
-CLARIFIER_MODEL=gpt-4o-mini
+triage_model = "gpt-4o-mini"
+clarifier_model = "gpt-4o-mini"
 ```
 
 ### Usage
@@ -80,23 +80,23 @@ CLARIFIER_MODEL=gpt-4o-mini
 
 ### Example Configuration File
 
-Complete `~/.deep_research` example:
+Complete `~/.deep_research` TOML example:
 
-```bash
+```toml
 # Required
-RESEARCH_MODEL=o4-mini-deep-research-2025-06-26
+research_model = "o4-mini-deep-research-2025-06-26"
 
 # Optional (will use environment variable if not set)
-OPENAI_API_KEY=sk-your-api-key-here
+openai_api_key = "sk-your-api-key-here"
 
 # Standard settings
-RESEARCH_TIMEOUT=1800
-POLL_INTERVAL=30
-MAX_RETRIES=3
-LOG_LEVEL=INFO
+research_timeout = 1800
+poll_interval = 30
+max_retries = 3
+log_level = "INFO"
 
 # Clarification settings
-ENABLE_CLARIFICATION=true
-TRIAGE_MODEL=gpt-4o-mini
-CLARIFIER_MODEL=gpt-4o-mini
+enable_clarification = true
+triage_model = "gpt-4o-mini"
+clarifier_model = "gpt-4o-mini"
 ```
