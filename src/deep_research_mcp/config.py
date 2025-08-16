@@ -8,7 +8,6 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
-from openai import OpenAI
 
 import toml
 
@@ -112,19 +111,5 @@ class ResearchConfig:
 
         if self.max_retries < 0:
             raise ValueError("Max retries must be non-negative")
-
-        # Validate model exists in OpenAI API (only if we have an API key)
-        if self.api_key:
-            try:
-                client = OpenAI(api_key=self.api_key)
-                available_models = [model.id for model in client.models.list()]
-                if self.model not in available_models:
-                    raise ValueError(
-                        f"Model '{self.model}' not available. Available models: {', '.join(available_models)}"
-                    )
-            except Exception as e:
-                # If we can't check models (e.g., network issues), skip validation
-                # The actual API call will handle invalid models
-                pass
 
         return True
