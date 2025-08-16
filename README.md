@@ -60,6 +60,11 @@ RESEARCH_TIMEOUT=1800  # Maximum time in seconds (default: 30 minutes)
 POLL_INTERVAL=30  # Polling interval in seconds (default: 30)
 MAX_RETRIES=3  # Maximum retry attempts (default: 3)
 LOG_LEVEL=INFO  # Logging level (DEBUG, INFO, WARNING, ERROR)
+
+# Clarification features (optional)
+ENABLE_CLARIFICATION=true  # Enable clarifying questions (default: false)
+TRIAGE_MODEL=gpt-4o-mini  # Model for query analysis (default: gpt-4o-mini)
+CLARIFIER_MODEL=gpt-4o-mini  # Model for query enrichment (default: gpt-4o-mini)
 ```
 
 ### Claude Code Integration
@@ -81,6 +86,7 @@ Ensure your `RESEARCH_MODEL` is set in your `~/.deep_research` file. The `OPENAI
 3. **Use in Claude Code**:
    - The research tools will appear in Claude Code's tool palette
    - Simply ask Claude to "research [your topic]" and it will use the Deep Research agent
+   - For clarified research, ask Claude to "research [topic] with clarification" to get follow-up questions
 
 ## Usage
 
@@ -146,7 +152,63 @@ result = await agent.research(
     Include specific examples and data where available.
     """
 )
+
+# With clarification (requires ENABLE_CLARIFICATION=true)
+clarification_result = agent.start_clarification("quantum computing applications")
+if clarification_result.get("needs_clarification"):
+    # Answer questions programmatically or present to user
+    answers = ["Hardware applications", "Last 5 years", "Commercial products"]
+    agent.add_clarification_answers(clarification_result["session_id"], answers)
+    enriched_query = agent.get_enriched_query(clarification_result["session_id"])
+    result = await agent.research(enriched_query)
 ```
+
+## Clarification Features
+
+The agent includes an optional clarification system to improve research quality through follow-up questions.
+
+### Configuration
+
+Enable clarification in your `~/.deep_research` file:
+```bash
+ENABLE_CLARIFICATION=true
+TRIAGE_MODEL=gpt-4o-mini  # Optional, defaults to gpt-4o-mini
+CLARIFIER_MODEL=gpt-4o-mini  # Optional, defaults to gpt-4o-mini
+```
+
+### Usage Flow
+
+1. **Start Clarification**:
+   ```python
+   result = agent.start_clarification("your research query")
+   ```
+
+2. **Check if Questions are Needed**:
+   ```python
+   if result.get("needs_clarification"):
+       questions = result["questions"]
+       session_id = result["session_id"]
+   ```
+
+3. **Provide Answers**:
+   ```python
+   answers = ["answer1", "answer2", "answer3"]
+   agent.add_clarification_answers(session_id, answers)
+   ```
+
+4. **Get Enriched Query**:
+   ```python
+   enriched_query = agent.get_enriched_query(session_id)
+   final_result = await agent.research(enriched_query)
+   ```
+
+### Claude Code Integration
+
+When using with Claude Code via MCP tools:
+
+1. **Request Clarification**: Use `deep_research()` with `request_clarification=True`
+2. **Answer Questions**: Claude will present questions to you
+3. **Enhanced Research**: Claude will automatically use `research_with_context()` with your answers
 
 ## API Reference
 
@@ -164,6 +226,18 @@ The main class for performing research operations.
   - Check the status of a research task
   - Returns: Task status information
 
+- `start_clarification(query)`
+  - Analyze query and generate clarifying questions if needed
+  - Returns: Dictionary with questions and session ID
+
+- `add_clarification_answers(session_id, answers)`
+  - Add answers to clarification questions
+  - Returns: Session status information
+
+- `get_enriched_query(session_id)`
+  - Generate enriched query from clarification session
+  - Returns: Enhanced query string
+
 ### ResearchConfig
 
 Configuration class for the research agent.
@@ -175,6 +249,9 @@ Configuration class for the research agent.
 - `timeout`: Maximum time for research in seconds (default: 1800)
 - `poll_interval`: Polling interval in seconds (default: 30)
 - `max_retries`: Maximum retry attempts (default: 3)
+- `enable_clarification`: Enable clarifying questions (default: False)
+- `triage_model`: Model for query analysis (default: gpt-4o-mini)
+- `clarifier_model`: Model for query enrichment (default: gpt-4o-mini)
 
 ## Cost Considerations
 

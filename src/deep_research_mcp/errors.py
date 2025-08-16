@@ -12,7 +12,7 @@ class ResearchError(Exception):
 
 
 class RateLimitError(ResearchError):
-    """Rate limit exceeded"""
+    """API rate limit exceeded"""
 
     pass
 

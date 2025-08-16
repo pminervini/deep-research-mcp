@@ -12,6 +12,9 @@ USAGE EXAMPLES:
   # Research with specific model (recommended)
   python cli/agent-cli.py research "Healthcare costs in the US" --model gpt-4o-mini
 
+  # Research with clarification (interactive)
+  python cli/agent-cli.py research "Quantum computing" --clarify
+
   # Check configuration
   python cli/agent-cli.py config
 
@@ -51,26 +54,61 @@ Be analytical, avoid generalities, and ensure that each section supports data-ba
 """
 
 
-async def research(query: str, model: str = "gpt-4o-mini") -> None:
+async def research(query: str, model: str = "gpt-4o-mini", clarify: bool = False) -> None:
     """Use the research functionality"""
     logger = structlog.get_logger()
 
     logger.info(f"Starting research with query: '{query}'")
     logger.info(f"Using model: {model}")
+    if clarify:
+        logger.info("Clarification mode enabled")
     logger.info("-" * 50)
 
     try:
         # Create config with specified model
         config = ResearchConfig.from_env()
         config.model = model
+        if clarify:
+            config.enable_clarification = True
         config.validate()
 
         # Initialize agent
         agent = DeepResearchAgent(config)
 
+        # Check if we should start with clarification
+        working_query = query
+        if clarify and config.enable_clarification:
+            logger.info("Starting clarification process...")
+            clarification_result = agent.start_clarification(query)
+            
+            if clarification_result.get("needs_clarification", False):
+                logger.info(f"Reasoning: {clarification_result.get('reasoning', 'No reasoning provided')}")
+                logger.info("\nPlease answer the following clarifying questions:")
+                
+                questions = clarification_result.get("questions", [])
+                answers = []
+                
+                for i, question in enumerate(questions, 1):
+                    logger.info(f"\n{i}. {question}")
+                    answer = input("Your answer (or press Enter to skip): ").strip()
+                    answers.append(answer if answer else "[No answer provided]")
+                
+                # Add answers and get enriched query
+                session_id = clarification_result.get("session_id")
+                if session_id:
+                    agent.add_clarification_answers(session_id, answers)
+                    enriched_query = agent.get_enriched_query(session_id)
+                    if enriched_query:
+                        working_query = enriched_query
+                        logger.info(f"\nEnriched query: {working_query}")
+                        logger.info("-" * 50)
+            else:
+                logger.info(f"Reasoning: {clarification_result.get('reasoning', 'Query is sufficient')}")
+                logger.info("Proceeding with original query")
+
         # Perform research
         result = await agent.research(
-            query=query, system_prompt=SYSTEM_PROMPT, include_code_interpreter=True
+            query=working_query, system_prompt=SYSTEM_PROMPT, include_code_interpreter=True
         )
 
         # Display results
@@ -153,6 +191,11 @@ def main():
         ],
         help="Model to use for research",
     )
+    research_parser.add_argument(
+        "--clarify",
+        action="store_true",
+        help="Enable interactive clarification mode to improve research quality",
+    )
 
     # List models command
     subparsers.add_parser("models", help="List available models")
@@ -167,7 +210,7 @@ def main():
         return
 
     if args.command == "research":
-        asyncio.run(research(args.query, args.model))
+        asyncio.run(research(args.query, args.model, args.clarify))
     elif args.command == "config":
         asyncio.run(check_config())
 

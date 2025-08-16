@@ -4,13 +4,17 @@
 """
 Simple command-line interface for OpenAI Deep Research API.
 
-Usage: python cli/simple-cli.py "Your research question here"
+Usage: 
+    python cli/simple-cli.py "Your research question here"
+    python cli/simple-cli.py "Your research question here" --clarify
 
 Examples:
     python cli/simple-cli.py "What are the latest developments in quantum computing?"
     python cli/simple-cli.py "How does climate change affect ocean currents?"
-    python cli/simple-cli.py "Compare the economic impact of remote work policies"
+    python cli/simple-cli.py "Compare the economic impact of remote work policies" --clarify
     python cli/simple-cli.py "What are the current trends in artificial intelligence research?"
+
+Note: For clarification features, ensure ENABLE_CLARIFICATION=true in ~/.deep_research
 """
 
 import os
@@ -23,12 +27,25 @@ from openai import OpenAI
 def main():
     parser = argparse.ArgumentParser(description="Simple OpenAI Deep Research API CLI")
     parser.add_argument("query", help="Your research question")
+    parser.add_argument(
+        "--clarify", 
+        action="store_true", 
+        help="Enable clarification mode (requires ENABLE_CLARIFICATION=true in config)"
+    )
     
     args = parser.parse_args()
     
     logger = structlog.get_logger()
 
     query = args.query
+
+    # Add clarification note if enabled
+    if args.clarify:
+        logger.info("Note: --clarify flag provided, but this simple CLI doesn't implement clarification.")
+        logger.info("For full clarification features, use:")
+        logger.info("  python cli/clarification-cli.py \"your query\"")
+        logger.info("  python cli/agent-cli.py research \"your query\" --clarify")
+        logger.info("")
 
     logger.info(f"Researching: {query}")
     logger.info("This may take a few minutes...")
