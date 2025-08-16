@@ -109,6 +109,7 @@ async def research(query: str, model: str = "gpt-4o-mini") -> None:
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
 
+
 async def check_config() -> None:
     """Check configuration"""
     logger = structlog.get_logger()
@@ -147,7 +148,11 @@ def main():
     research_parser.add_argument(
         "--model",
         default="gpt-4o-mini",
-        choices=["gpt-4o-mini", "o3-deep-research-2025-06-26", "o4-mini-deep-research-2025-06-26"],
+        choices=[
+            "gpt-4o-mini",
+            "o3-deep-research-2025-06-26",
+            "o4-mini-deep-research-2025-06-26",
+        ],
         help="Model to use for research",
     )
 
