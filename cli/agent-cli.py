@@ -33,7 +33,7 @@ Be analytical, avoid generalities, and ensure that each section supports data-ba
 """
 
 
-async def research(query: str, model: str = "o3-deep-research-2025-06-26") -> None:
+async def research(query: str, model: str = "o4-mini-deep-research-2025-06-26") -> None:
     """Use the research functionality"""
     logger = structlog.get_logger()
 
@@ -89,33 +89,6 @@ async def research(query: str, model: str = "o3-deep-research-2025-06-26") -> No
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
 
-
-async def list_models() -> None:
-    """List available models"""
-    logger = structlog.get_logger()
-
-    logger.info("Available Deep Research Models:")
-    logger.info("-" * 40)
-    models = [
-        {
-            "name": "o3-deep-research-2025-06-26",
-            "description": "Highest quality model with 200K token context",
-            "cost": "$40 per 1M output tokens",
-        },
-        {
-            "name": "o4-mini-deep-research-2025-06-26",
-            "description": "Faster, lower-cost alternative",
-            "cost": "Lower than o3 model",
-        },
-    ]
-
-    for model in models:
-        logger.info(f"• {model['name']}")
-        logger.info(f"  Description: {model['description']}")
-        logger.info(f"  Cost: {model['cost']}")
-        logger.info("")
-
-
 async def check_config() -> None:
     """Check configuration"""
     logger = structlog.get_logger()
@@ -153,7 +126,7 @@ def main():
     research_parser.add_argument("query", help="Research query")
     research_parser.add_argument(
         "--model",
-        default="o3-deep-research-2025-06-26",
+        default="o4-mini-deep-research-2025-06-26",
         choices=["o3-deep-research-2025-06-26", "o4-mini-deep-research-2025-06-26"],
         help="Model to use for research",
     )
@@ -172,8 +145,6 @@ def main():
 
     if args.command == "research":
         asyncio.run(research(args.query, args.model))
-    elif args.command == "models":
-        asyncio.run(list_models())
     elif args.command == "config":
         asyncio.run(check_config())
 

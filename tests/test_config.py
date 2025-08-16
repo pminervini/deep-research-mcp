@@ -7,18 +7,18 @@ import pytest
 from deep_research_mcp.config import ResearchConfig
 
 
-def test_from_env_requires_api_key():
-    """Test that missing API key raises error"""
-    old_key = os.environ.get("OPENAI_API_KEY")
-    if old_key:
-        del os.environ["OPENAI_API_KEY"]
+def test_from_env_requires_research_model():
+    """Test that missing RESEARCH_MODEL raises error"""
+    old_model = os.environ.get("RESEARCH_MODEL")
+    if old_model:
+        del os.environ["RESEARCH_MODEL"]
     
     try:
-        with pytest.raises(ValueError, match="OPENAI_API_KEY environment variable is required"):
+        with pytest.raises(ValueError, match="RESEARCH_MODEL is required in ~/.deep_research configuration file"):
             ResearchConfig.from_env()
     finally:
-        if old_key:
-            os.environ["OPENAI_API_KEY"] = old_key
+        if old_model:
+            os.environ["RESEARCH_MODEL"] = old_model
 
 
 def test_config_creation_with_overrides():

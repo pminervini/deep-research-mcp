@@ -31,7 +31,7 @@ cd deep-research-mcp
 pip install -r requirements.txt
 
 # Set up configuration file
-# Create ~/.deep_research and add your OPENAI_API_KEY
+# Create ~/.deep_research and add your RESEARCH_MODEL (OPENAI_API_KEY is optional)
 ```
 
 ### Development Install
@@ -50,10 +50,12 @@ Create a `~/.deep_research` file in your home directory:
 
 ```bash
 # Required
+RESEARCH_MODEL=o4-mini-deep-research-2025-06-26  # or o3-deep-research-2025-06-26
+
+# Will use environment variable if not set
 OPENAI_API_KEY=sk-your-api-key-here
 
 # Optional
-RESEARCH_MODEL=o4-mini-deep-research-2025-06-26  # or o3-deep-research-2025-06-26
 RESEARCH_TIMEOUT=1800  # Maximum time in seconds (default: 30 minutes)
 POLL_INTERVAL=30  # Polling interval in seconds (default: 30)
 MAX_RETRIES=3  # Maximum retry attempts (default: 3)
@@ -74,7 +76,7 @@ Replace `/path/to/deep-research-mcp/` with the actual path to your cloned reposi
 
 2. **Set Environment Variables**
 
-Ensure your `OPENAI_API_KEY` is available in your `~/.deep_research` file or environment variables.
+Ensure your `RESEARCH_MODEL` is set in your `~/.deep_research` file. The `OPENAI_API_KEY` can be set in the file or as an environment variable.
 
 3. **Use in Claude Code**:
    - The research tools will appear in Claude Code's tool palette
@@ -168,8 +170,8 @@ Configuration class for the research agent.
 
 #### Parameters
 
-- `api_key`: OpenAI API key (required)
-- `model`: Model to use (default: "o3-deep-research-2025-06-26")
+- `api_key`: OpenAI API key (optional, can use environment variable)
+- `model`: Model to use (required, must be set in ~/.deep_research)
 - `timeout`: Maximum time for research in seconds (default: 1800)
 - `poll_interval`: Polling interval in seconds (default: 30)
 - `max_retries`: Maximum retry attempts (default: 3)
