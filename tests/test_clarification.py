@@ -8,12 +8,7 @@ Uses real OpenAI API calls with gpt-4o-mini to keep costs low.
 import pytest
 import os
 from deep_research_mcp.config import ResearchConfig
-from deep_research_mcp.clarification import (
-    TriageAgent,
-    ClarifierAgent,
-    ClarificationManager,
-    ClarificationSession,
-)
+from deep_research_mcp.clarification import TriageAgent, ClarifierAgent, ClarificationManager, ClarificationSession
 
 
 @pytest.fixture
