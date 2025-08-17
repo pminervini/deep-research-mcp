@@ -16,31 +16,7 @@ A Python-based agent that integrates OpenAI's Deep Research API with Claude Code
 
 - Python 3.9+
 - OpenAI API key with access to Deep Research models
-- Claude Code (for MCP integration)
-
-## Installation
-
-### Quick Install
-
-```bash
-# Clone the repository
-git clone https://github.com/pminervini/deep-research-mcp.git
-cd deep-research-mcp
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Set up configuration file
-# Create ~/.deep_research and add your RESEARCH_MODEL (OPENAI_API_KEY is optional)
-```
-
-### Development Install
-
-```bash
-# Install with development dependencies
-pip install -r requirements.txt
-pip install -e .
-```
+- Claude Code, or any other assistant supporting MCP integration
 
 ## Configuration
 
@@ -174,8 +150,8 @@ The agent includes an optional clarification system to improve research quality 
 Enable clarification in your `~/.deep_research` file:
 ```toml
 enable_clarification = true
-triage_model = "gpt-4o-mini"      # Optional, defaults to gpt-4o-mini
-clarifier_model = "gpt-4o-mini"   # Optional, defaults to gpt-4o-mini
+triage_model = "gpt-5-mini"      # Optional, defaults to gpt-5-mini
+clarifier_model = "gpt-5-mini"   # Optional, defaults to gpt-5-mini
 ```
 
 ### Usage Flow
@@ -252,8 +228,8 @@ Configuration class for the research agent.
 - `poll_interval`: Polling interval in seconds (default: 30)
 - `max_retries`: Maximum retry attempts (default: 3)
 - `enable_clarification`: Enable clarifying questions (default: False)
-- `triage_model`: Model for query analysis (default: gpt-4o-mini)
-- `clarifier_model`: Model for query enrichment (default: gpt-4o-mini)
+- `triage_model`: Model for query analysis (default: gpt-5-mini)
+- `clarifier_model`: Model for query enrichment (default: gpt-5-mini)
 
 ## Cost Considerations
 

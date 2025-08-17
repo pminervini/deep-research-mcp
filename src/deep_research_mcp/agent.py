@@ -255,35 +255,37 @@ class DeepResearchAgent:
     def start_clarification(self, user_query: str) -> Dict[str, Any]:
         """
         Start clarification process for a query
-        
+
         Args:
             user_query: The original research query
-            
+
         Returns:
             Dictionary with clarification status and questions, or indication to proceed
         """
         return self.clarification_manager.start_clarification(user_query)
-    
-    def add_clarification_answers(self, session_id: str, answers: List[str]) -> Dict[str, Any]:
+
+    def add_clarification_answers(
+        self, session_id: str, answers: List[str]
+    ) -> Dict[str, Any]:
         """
         Add answers to clarification questions
-        
+
         Args:
             session_id: Session identifier from start_clarification
             answers: List of answers to the clarification questions
-            
+
         Returns:
             Dictionary with session status
         """
         return self.clarification_manager.add_answers(session_id, answers)
-    
+
     def get_enriched_query(self, session_id: str) -> Optional[str]:
         """
         Get enriched query from clarification session
-        
+
         Args:
             session_id: Session identifier
-            
+
         Returns:
             Enriched query string or None if session not found
         """

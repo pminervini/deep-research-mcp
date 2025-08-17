@@ -67,9 +67,9 @@ Add these settings to your `~/.deep_research` TOML file:
 # Enable/disable clarification (default: false)
 enable_clarification = true
 
-# Models for clarification agents (default: gpt-4o-mini for both)
-triage_model = "gpt-4o-mini"
-clarifier_model = "gpt-4o-mini"
+# Models for clarification agents (default: gpt-5-mini for both)
+triage_model = "gpt-5-mini"
+clarifier_model = "gpt-5-mini"
 ```
 
 ### Usage
@@ -97,6 +97,6 @@ log_level = "INFO"
 
 # Clarification settings
 enable_clarification = true
-triage_model = "gpt-4o-mini"
-clarifier_model = "gpt-4o-mini"
+triage_model = "gpt-5-mini"
+clarifier_model = "gpt-5-mini"
 ```
