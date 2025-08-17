@@ -51,6 +51,8 @@ Create a `~/.deep_research` file in your home directory using TOML format:
 ```toml
 # Core settings
 research_model = "o4-mini-deep-research-2025-06-26"
+
+# Will use your OPENAI_API_KEY environment variable if not set
 openai_api_key = "sk-your-api-key-here"
 
 [research]
@@ -60,8 +62,8 @@ max_retries = 3
 
 [clarification]
 enable = true
-triage_model = "gpt-4o-mini"
-clarifier_model = "gpt-4o-mini"
+triage_model = "gpt-5-mini"
+clarifier_model = "gpt-5-mini"
 
 [logging]
 level = "INFO"
