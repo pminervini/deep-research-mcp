@@ -231,23 +231,6 @@ Configuration class for the research agent.
 - `triage_model`: Model for query analysis (default: gpt-5-mini)
 - `clarifier_model`: Model for query enrichment (default: gpt-5-mini)
 
-## Cost Considerations
-
-Deep Research API pricing (as of January 2025):
-- **o3-deep-research-2025-06-26**: $40 per 1M output tokens
-- **o4-mini-deep-research-2025-06-26**: Lower cost alternative with faster processing
-
-Monitor your usage carefully as research tasks can generate substantial token usage.
-
-## Error Handling
-
-The agent includes comprehensive error handling:
-
-- **Rate Limiting**: Automatic retry with exponential backoff
-- **Timeouts**: Configurable timeout with automatic task cancellation
-- **Network Errors**: Retry logic for transient failures
-- **API Errors**: Detailed error messages and logging
-
 ## Development
 
 ### Running Tests
