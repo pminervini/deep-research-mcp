@@ -22,11 +22,22 @@ import argparse
 import structlog
 from typing import Dict, Any, Optional, List
 from openai import OpenAI
+import instructor
+from pydantic import BaseModel
+
+
+class TriageResponse(BaseModel):
+    """Structured response from triage agent"""
+    needs_clarification: bool
+    reasoning: str
+    potential_clarifications: List[str]
+    query_assessment: str
 
 
 class FourAgentPipeline:
     def __init__(self, api_key: str):
-        self.client = OpenAI(api_key=api_key)
+        openai_client = OpenAI(api_key=api_key)
+        self.client = instructor.from_openai(openai_client)
         self.conversation_history: List[Dict[str, Any]] = []
 
     def triage_agent(self, user_query: str) -> Dict[str, Any]:
@@ -45,28 +56,22 @@ class FourAgentPipeline:
         1. Is the query clear and specific enough for direct research?
         2. Are there ambiguous terms that need clarification?
         3. Would additional context help improve the research?
-        
-        Respond with a JSON object:
-        {{
-            "needs_clarification": true/false,
-            "reasoning": "explanation of your decision",
-            "potential_clarifications": ["list of questions to ask if clarification is needed"],
-            "query_assessment": "brief assessment of the query quality"
-        }}
         """
 
-        response = self.client.chat.completions.create(
-            model="gpt-5-mini",
-            messages=[{"role": "user", "content": triage_prompt}],
-            temperature=0.3,
-        )
-
         try:
-            result = json.loads(response.choices[0].message.content)
+            response = self.client.chat.completions.create(
+                model="gpt-5-mini",
+                messages=[{"role": "user", "content": triage_prompt}],
+                temperature=0.3,
+                response_model=TriageResponse,
+            )
+
+            result = response.model_dump()
             logger.info(f"Assessment: {result['query_assessment']}")
             return result
-        except json.JSONDecodeError:
-            # Fallback if JSON parsing fails
+        except Exception as e:
+            # Fallback if structured generation fails
+            logger.warning(f"Triage agent error: {e}, proceeding without clarification")
             return {
                 "needs_clarification": False,
                 "reasoning": "Could not parse triage response, proceeding with original query",
