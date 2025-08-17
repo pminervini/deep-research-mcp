@@ -11,7 +11,6 @@ class ResearchError(Exception):
     pass
 
 
-
 class TaskTimeoutError(ResearchError):
     """Task exceeded maximum execution time"""
 

@@ -32,7 +32,7 @@ def test_config_creation_with_overrides():
 
     config = ResearchConfig(
         api_key=api_key,
-        model="gpt-4o-mini",
+        model="gpt-5-mini",
         timeout=120.0,
         poll_interval=5.0,
         max_retries=7,
@@ -40,7 +40,7 @@ def test_config_creation_with_overrides():
     )
 
     assert config.api_key == api_key
-    assert config.model == "gpt-4o-mini"
+    assert config.model == "gpt-5-mini"
     assert config.timeout == 120.0
     assert config.poll_interval == 5.0
     assert config.max_retries == 7
@@ -53,7 +53,7 @@ def test_validate_with_valid_model():
     if not api_key:
         pytest.skip("OPENAI_API_KEY not set")
 
-    config = ResearchConfig(api_key=api_key, model="gpt-4o-mini")
+    config = ResearchConfig(api_key=api_key, model="gpt-5-mini")
     assert config.validate() is True
 
 

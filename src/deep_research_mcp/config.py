@@ -21,11 +21,11 @@ def load_config_file():
                 "TOML support requires 'toml' package. "
                 "Install with: pip install toml"
             )
-        
+
         try:
             with open(config_file, "r") as f:
                 config = toml.load(f)
-            
+
             # Flatten nested config and set environment variables
             def set_env_vars(data, prefix=""):
                 for key, value in data.items():
@@ -34,9 +34,9 @@ def load_config_file():
                         set_env_vars(value, f"{prefix}{key}_")
                     else:
                         os.environ[env_key] = str(value)
-            
+
             set_env_vars(config)
-            
+
         except Exception as e:
             # Fallback: try to parse as old-style key=value format
             try:
@@ -69,11 +69,11 @@ class ResearchConfig:
     poll_interval: float = 30.0
     max_retries: int = 3
     log_level: str = "INFO"
-    
+
     # Clarification settings
     enable_clarification: bool = False
-    triage_model: str = "gpt-4o-mini"
-    clarifier_model: str = "gpt-4o-mini"
+    triage_model: str = "gpt-5-mini"
+    clarifier_model: str = "gpt-5-mini"
 
     @classmethod
     def from_env(cls) -> "ResearchConfig":
@@ -93,7 +93,8 @@ class ResearchConfig:
             poll_interval=float(os.environ.get("POLL_INTERVAL", cls.poll_interval)),
             max_retries=int(os.environ.get("MAX_RETRIES", cls.max_retries)),
             log_level=os.environ.get("LOG_LEVEL", cls.log_level),
-            enable_clarification=os.environ.get("ENABLE_CLARIFICATION", "false").lower() in ("true", "1", "yes"),
+            enable_clarification=os.environ.get("ENABLE_CLARIFICATION", "false").lower()
+            in ("true", "1", "yes"),
             triage_model=os.environ.get("TRIAGE_MODEL", cls.triage_model),
             clarifier_model=os.environ.get("CLARIFIER_MODEL", cls.clarifier_model),
         )

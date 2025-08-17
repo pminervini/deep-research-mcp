@@ -10,7 +10,7 @@ USAGE EXAMPLES:
   python cli/agent-cli.py research "What are the latest treatments for diabetes?"
 
   # Research with specific model (recommended)
-  python cli/agent-cli.py research "Healthcare costs in the US" --model gpt-4o-mini
+  python cli/agent-cli.py research "Healthcare costs in the US" --model gpt-5-mini
 
   # Research with clarification (interactive)
   python cli/agent-cli.py research "Quantum computing" --clarify
@@ -54,7 +54,7 @@ Be analytical, avoid generalities, and ensure that each section supports data-ba
 """
 
 
-async def research(query: str, model: str = "gpt-4o-mini", clarify: bool = False) -> None:
+async def research(query: str, model: str = "gpt-5-mini", clarify: bool = False) -> None:
     """Use the research functionality"""
     logger = structlog.get_logger()
 
@@ -183,9 +183,9 @@ def main():
     research_parser.add_argument("query", help="Research query")
     research_parser.add_argument(
         "--model",
-        default="gpt-4o-mini",
+        default="gpt-5-mini",
         choices=[
-            "gpt-4o-mini",
+            "gpt-5-mini",
             "o3-deep-research-2025-06-26",
             "o4-mini-deep-research-2025-06-26",
         ],

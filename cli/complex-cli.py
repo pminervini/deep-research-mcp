@@ -56,7 +56,7 @@ class FourAgentPipeline:
         """
 
         response = self.client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5-mini",
             messages=[{"role": "user", "content": triage_prompt}],
             temperature=0.3,
         )
@@ -107,7 +107,7 @@ class FourAgentPipeline:
         """
 
         response = self.client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5-mini",
             messages=[{"role": "user", "content": enrichment_prompt}],
             temperature=0.2,
         )
@@ -142,7 +142,7 @@ class FourAgentPipeline:
         """
 
         response = self.client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5-mini",
             messages=[{"role": "user", "content": instruction_prompt}],
             temperature=0.2,
         )

@@ -76,7 +76,7 @@ async def deep_research(
         # Handle clarification request
         if request_clarification:
             clarification_result = research_agent.start_clarification(query)
-            
+
             if not clarification_result.get("needs_clarification", False):
                 return f"""# Query Analysis
 
@@ -87,13 +87,15 @@ async def deep_research(
 **Recommendation:** {clarification_result.get('reasoning', 'Proceed with research directly')}
 
 You can proceed with the research using the same query."""
-            
+
             # Format clarifying questions for Claude Code
             questions = clarification_result.get("questions", [])
             session_id = clarification_result.get("session_id", "")
-            
-            questions_formatted = "\n".join([f"{i+1}. {q}" for i, q in enumerate(questions)])
-            
+
+            questions_formatted = "\n".join(
+                [f"{i+1}. {q}" for i, q in enumerate(questions)]
+            )
+
             return f"""# Clarifying Questions Needed
 
 **Original Query:** {query}
@@ -222,17 +224,17 @@ async def research_with_context(
 ) -> str:
     """
     Perform research using an enriched query based on clarification answers.
-    
+
     **Use after:**
     - Calling `deep_research` with `request_clarification=True`
     - Receiving clarifying questions and a session ID
     - Gathering answers from the user
-    
+
     **What it does:**
     - Takes your answers to clarifying questions
     - Creates an enriched, more specific research query
     - Performs comprehensive research with the enhanced query
-    
+
     **Returns:** Complete research report with citations and metadata
     """
     global research_agent
@@ -248,18 +250,18 @@ async def research_with_context(
     try:
         # Add answers to the clarification session
         status_result = research_agent.add_clarification_answers(session_id, answers)
-        
+
         if "error" in status_result:
             return f"Error with clarification session: {status_result['error']}"
-        
+
         # Get enriched query
         enriched_query = research_agent.get_enriched_query(session_id)
-        
+
         if not enriched_query:
             return f"Could not retrieve enriched query for session {session_id}. Please check the session ID."
-        
+
         logger.info(f"Using enriched query: {enriched_query}")
-        
+
         # Prepare system prompt
         system_prompt = (
             system_instructions
