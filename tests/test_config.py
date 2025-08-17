@@ -69,3 +69,47 @@ def test_validate_with_invalid_model():
     # But our current implementation is graceful, so it won't raise
     # The actual research call will handle the invalid model
     assert config.validate() is True
+
+
+def test_config_with_custom_endpoint():
+    """Test config creation with custom OpenAI endpoint"""
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        pytest.skip("OPENAI_API_KEY not set")
+
+    custom_endpoint = "https://api.custom-provider.com/v1"
+    config = ResearchConfig(
+        api_key=api_key,
+        base_url=custom_endpoint,
+        model="gpt-5-mini",
+    )
+
+    assert config.api_key == api_key
+    assert config.base_url == custom_endpoint
+    assert config.model == "gpt-5-mini"
+    assert config.validate() is True
+
+
+def test_from_env_with_base_url():
+    """Test loading base_url from environment variables"""
+    old_model = os.environ.get("RESEARCH_MODEL")
+    old_base_url = os.environ.get("OPENAI_BASE_URL")
+    
+    os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
+    os.environ["OPENAI_BASE_URL"] = "https://api.custom-provider.com/v1"
+
+    try:
+        config = ResearchConfig.from_env()
+        assert config.base_url == "https://api.custom-provider.com/v1"
+        assert config.model == "gpt-5-mini"
+    finally:
+        if old_model:
+            os.environ["RESEARCH_MODEL"] = old_model
+        else:
+            del os.environ["RESEARCH_MODEL"]
+        
+        if old_base_url:
+            os.environ["OPENAI_BASE_URL"] = old_base_url
+        else:
+            if "OPENAI_BASE_URL" in os.environ:
+                del os.environ["OPENAI_BASE_URL"]

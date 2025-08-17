@@ -31,7 +31,16 @@ class TriageAgent:
 
     def __init__(self, config: ResearchConfig):
         self.config = config
-        openai_client = OpenAI(api_key=config.api_key) if config.api_key else OpenAI()
+        
+        # Initialize OpenAI client with custom endpoint if provided
+        if config.api_key and config.base_url:
+            openai_client = OpenAI(api_key=config.api_key, base_url=config.base_url)
+        elif config.api_key:
+            openai_client = OpenAI(api_key=config.api_key)
+        elif config.base_url:
+            openai_client = OpenAI(base_url=config.base_url)
+        else:
+            openai_client = OpenAI()
         self.client = instructor.from_openai(openai_client)
 
     def analyze_query(self, user_query: str) -> Dict[str, Any]:
@@ -92,7 +101,16 @@ class ClarifierAgent:
 
     def __init__(self, config: ResearchConfig):
         self.config = config
-        openai_client = OpenAI(api_key=config.api_key) if config.api_key else OpenAI()
+        
+        # Initialize OpenAI client with custom endpoint if provided
+        if config.api_key and config.base_url:
+            openai_client = OpenAI(api_key=config.api_key, base_url=config.base_url)
+        elif config.api_key:
+            openai_client = OpenAI(api_key=config.api_key)
+        elif config.base_url:
+            openai_client = OpenAI(base_url=config.base_url)
+        else:
+            openai_client = OpenAI()
         self.client = instructor.from_openai(openai_client)
 
     def enrich_query(self, user_query: str, qa_pairs: List[Dict[str, str]]) -> str:
