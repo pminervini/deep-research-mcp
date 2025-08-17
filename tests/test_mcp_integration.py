@@ -5,95 +5,47 @@ This script tests the deep research MCP server tools without requiring
 a full Claude Code MCP integration.
 """
 
-import asyncio
+import pytest
 import os
-import sys
 
 # Import the underlying functions from the MCP server module
 import deep_research_mcp.mcp_server as mcp_server
 
 
+@pytest.mark.asyncio
 async def test_research_status():
     """Test the research_status tool with a fake task ID"""
-    print("\nTesting research_status tool...")
-    try:
-        # Get the actual function from the FastMCP decorated function
-        research_status_func = mcp_server.mcp._tools["research_status"].func
-        result = await research_status_func("fake-task-id")
-        print("research_status handled invalid task ID:")
-        print(result)
-        return True
-    except Exception as e:
-        print(f"research_status failed: {e}")
-        return False
+    # Access the function through the tool's fn attribute
+    result = await mcp_server.research_status.fn("fake-task-id")
+    assert result is not None
+    assert isinstance(result, str)
 
 
+@pytest.mark.asyncio
 async def test_deep_research_without_api():
     """Test deep_research tool initialization (without actual API call)"""
-    print("\nTesting deep_research tool initialization...")
-    try:
-        # Get the actual function from the FastMCP decorated function
-        deep_research_func = mcp_server.mcp._tools["deep_research"].func
+    # Access the function through the tool's fn attribute
+    result = await mcp_server.deep_research.fn(
+        query="Test query for MCP integration",
+        system_instructions="This is just a test",
+        include_analysis=False,
+    )
 
-        # This should fail gracefully if API key is not set
-        result = await deep_research_func(
-            query="Test query for MCP integration",
-            system_instructions="This is just a test",
-            include_analysis=False,
-        )
-
-        # Check if it's an API key error or other expected error
-        if (
-            "Failed to initialize research agent" in result
-            or "API key" in result.lower()
-        ):
-            print("deep_research correctly detected missing/invalid API configuration")
-            return True
-        else:
-            print(f"deep_research returned result: {result[:200]}...")
-            return True
-
-    except Exception as e:
-        print(f"deep_research failed unexpectedly: {e}")
-        return False
+    assert result is not None
+    assert isinstance(result, str)
 
 
-async def test_mcp_server():
-    """Run all MCP server tests"""
-    print("=" * 60)
-    print("MCP SERVER INTEGRATION TEST")
-    print("=" * 60)
-
-    # Check if OPENAI_API_KEY is set
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if api_key:
-        print(f"OPENAI_API_KEY is configured (length: {len(api_key)})")
-    else:
-        print("OPENAI_API_KEY not set - some tests may show API configuration errors")
-
-    print()
-
-    # Run individual tests
-    tests_results = []
-
-    tests_results.append(await test_research_status())
-    tests_results.append(await test_deep_research_without_api())
-
-    # Summary
-    print("\n" + "=" * 60)
-    print("TEST RESULTS SUMMARY")
-    print("=" * 60)
-
-    passed = sum(tests_results)
-    total = len(tests_results)
-
-    if passed == total:
-        print(f"ALL TESTS PASSED ({passed}/{total})")
-        print(
-            "\nMCP server is working correctly and ready for Claude Code integration!"
-        )
-        return True
-    else:
-        print(f"SOME TESTS FAILED ({passed}/{total})")
-        print("\nPlease check the errors above and fix any issues.")
-        return False
+def test_mcp_server():
+    """Test that MCP server structure is correct"""
+    # Check that the MCP instance exists
+    assert hasattr(mcp_server, "mcp"), "MCP server missing FastMCP instance"
+    
+    # Check that the tool objects exist
+    assert hasattr(mcp_server, "research_status"), "Missing research_status tool"
+    assert hasattr(mcp_server, "deep_research"), "Missing deep_research tool"
+    
+    # Check that tools have callable functions
+    assert hasattr(mcp_server.research_status, "fn"), "research_status missing fn attribute"
+    assert hasattr(mcp_server.deep_research, "fn"), "deep_research missing fn attribute"
+    assert callable(mcp_server.research_status.fn)
+    assert callable(mcp_server.deep_research.fn)

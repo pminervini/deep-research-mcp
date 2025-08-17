@@ -10,10 +10,20 @@ import logging
 import uuid
 from typing import Dict, Any, List, Optional
 from openai import OpenAI
+import instructor
+from pydantic import BaseModel
 
 from deep_research_mcp.config import ResearchConfig
 
 logger = logging.getLogger(__name__)
+
+
+class TriageResponse(BaseModel):
+    """Structured response from triage agent"""
+    needs_clarification: bool
+    reasoning: str
+    potential_clarifications: List[str]
+    query_assessment: str
 
 
 class TriageAgent:
@@ -21,7 +31,8 @@ class TriageAgent:
 
     def __init__(self, config: ResearchConfig):
         self.config = config
-        self.client = OpenAI(api_key=config.api_key) if config.api_key else OpenAI()
+        openai_client = OpenAI(api_key=config.api_key) if config.api_key else OpenAI()
+        self.client = instructor.from_openai(openai_client)
 
     def analyze_query(self, user_query: str) -> Dict[str, Any]:
         """
@@ -49,14 +60,6 @@ class TriageAgent:
         - Specific aspects or subtopics to focus on
         - Comparison criteria (if comparing things)
         
-        Respond with a JSON object:
-        {{
-            "needs_clarification": true/false,
-            "reasoning": "explanation of your decision",
-            "potential_clarifications": ["list of 2-4 specific questions to ask if clarification is needed"],
-            "query_assessment": "brief assessment of the query quality and specificity"
-        }}
-        
         Only suggest clarification if it would meaningfully improve the research quality.
         """
 
@@ -65,25 +68,15 @@ class TriageAgent:
                 model=self.config.triage_model,
                 messages=[{"role": "user", "content": triage_prompt}],
                 temperature=0.3,
+                response_model=TriageResponse,
             )
 
-            result = json.loads(response.choices[0].message.content)
+            result = response.model_dump()
             logger.info(
                 f"Triage assessment: {result.get('query_assessment', 'No assessment')}"
             )
             return result
 
-        except json.JSONDecodeError:
-            # Fallback if JSON parsing fails
-            logger.warning(
-                "Failed to parse triage response, proceeding without clarification"
-            )
-            return {
-                "needs_clarification": False,
-                "reasoning": "Could not parse triage response, proceeding with original query",
-                "potential_clarifications": [],
-                "query_assessment": "Unable to assess",
-            }
         except Exception as e:
             logger.error(f"Triage agent error: {e}")
             return {
@@ -99,7 +92,8 @@ class ClarifierAgent:
 
     def __init__(self, config: ResearchConfig):
         self.config = config
-        self.client = OpenAI(api_key=config.api_key) if config.api_key else OpenAI()
+        openai_client = OpenAI(api_key=config.api_key) if config.api_key else OpenAI()
+        self.client = instructor.from_openai(openai_client)
 
     def enrich_query(self, user_query: str, qa_pairs: List[Dict[str, str]]) -> str:
         """
