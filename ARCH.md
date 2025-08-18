@@ -2,7 +2,7 @@
 
 This document provides a detailed overview of the `deep-research-mcp` project architecture, including component interactions and file-by-file descriptions.
 
-## Architectural Diagram (Mermaid)
+## Architectural Diagram
 
 ```mermaid
 graph TD

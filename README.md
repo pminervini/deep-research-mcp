@@ -57,14 +57,64 @@ claude mcp add deep-research python /path/to/deep-research-mcp/src/deep_research
 
 Replace `/path/to/deep-research-mcp/` with the actual path to your cloned repository.
 
-2. **Set Environment Variables**
-
-Ensure your `RESEARCH_MODEL` is set in your `~/.deep_research` file. The `OPENAI_API_KEY` can be set in the file or as an environment variable.
-
-3. **Use in Claude Code**:
+2. **Use in Claude Code**:
    - The research tools will appear in Claude Code's tool palette
    - Simply ask Claude to "research [your topic]" and it will use the Deep Research agent
    - For clarified research, ask Claude to "research [topic] with clarification" to get follow-up questions
+
+### OpenAI Codex Integration
+
+1. **Configure MCP Server**
+
+Add the MCP server configuration to your `~/.codex/config.toml` file:
+
+```toml
+[mcp_servers.deep-research]
+command = "python"
+args = ["/path/to/deep-research-mcp/src/deep_research_mcp/mcp_server.py"]
+env = { "OPENAI_API_KEY" = "$OPENAI_API_KEY" }
+```
+
+Replace `/path/to/deep-research-mcp/` with the actual path to your cloned repository.
+
+2. **Use in OpenAI Codex**:
+   - The research tools will be available automatically when you start Codex
+   - Ask Codex to "research [your topic]" and it will use the Deep Research MCP server
+   - For clarified research, ask for "research [topic] with clarification"
+
+### Gemini CLI Integration
+
+1. **Configure MCP Server**
+
+Add the MCP server using Gemini CLI's built-in command:
+
+```bash
+gemini mcp add deep-research python /path/to/deep-research-mcp/src/deep_research_mcp/mcp_server.py
+```
+
+Or manually add to your `~/.gemini/settings.json` file:
+
+```json
+{
+  "mcpServers": {
+    "deep-research": {
+      "command": "python",
+      "args": ["/path/to/deep-research-mcp/src/deep_research_mcp/mcp_server.py"],
+      "env": {
+        "OPENAI_API_KEY": "$OPENAI_API_KEY"
+      }
+    }
+  }
+}
+```
+
+Replace `/path/to/deep-research-mcp/` with the actual path to your cloned repository.
+
+2. **Use in Gemini CLI**:
+   - Start Gemini CLI with `gemini`
+   - The research tools will be available automatically
+   - Ask Gemini to "research [your topic]" and it will use the Deep Research MCP server
+   - Use `/mcp` command to view server status and available tools
 
 ## Usage
 
