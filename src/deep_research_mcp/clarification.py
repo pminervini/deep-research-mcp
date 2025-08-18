@@ -33,14 +33,12 @@ class TriageAgent:
         self.config = config
         
         # Initialize OpenAI client with custom endpoint if provided
-        if config.api_key and config.base_url:
-            openai_client = OpenAI(api_key=config.api_key, base_url=config.base_url)
-        elif config.api_key:
-            openai_client = OpenAI(api_key=config.api_key)
-        elif config.base_url:
-            openai_client = OpenAI(base_url=config.base_url)
-        else:
-            openai_client = OpenAI()
+        kwargs = {}
+        if config.api_key:
+            kwargs['api_key'] = config.api_key
+        if config.base_url:
+            kwargs['base_url'] = config.base_url
+        openai_client = OpenAI(**kwargs)
         self.client = instructor.from_openai(openai_client)
 
     def analyze_query(self, user_query: str) -> Dict[str, Any]:
@@ -103,14 +101,12 @@ class ClarifierAgent:
         self.config = config
         
         # Initialize OpenAI client with custom endpoint if provided
-        if config.api_key and config.base_url:
-            openai_client = OpenAI(api_key=config.api_key, base_url=config.base_url)
-        elif config.api_key:
-            openai_client = OpenAI(api_key=config.api_key)
-        elif config.base_url:
-            openai_client = OpenAI(base_url=config.base_url)
-        else:
-            openai_client = OpenAI()
+        openai_kwargs = {}
+        if config.api_key:
+            openai_kwargs['api_key'] = config.api_key
+        if config.base_url:
+            openai_kwargs['base_url'] = config.base_url
+        openai_client = OpenAI(**openai_kwargs)
         self.client = instructor.from_openai(openai_client)
 
     def enrich_query(self, user_query: str, qa_pairs: List[Dict[str, str]]) -> str:
