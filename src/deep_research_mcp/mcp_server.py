@@ -130,7 +130,6 @@ You can proceed with the research using the same query."""
         )
 
         if result["status"] == "completed":
-            # Format for Claude Code consumption
             formatted_result = f"""# Research Report: {query}
 
 {result['final_report']}
