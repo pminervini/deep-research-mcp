@@ -220,13 +220,13 @@ clarifier_model = "gpt-5-mini"   # Optional, defaults to gpt-5-mini
    final_result = await agent.research(enriched_query)
    ```
 
-### Claude Code Integration
+### Integration with AI Asssitants
 
-When using with Claude Code via MCP tools:
+When using with AI Assistants via MCP tools:
 
 1. **Request Clarification**: Use `deep_research()` with `request_clarification=True`
-2. **Answer Questions**: Claude will present questions to you
-3. **Enhanced Research**: Claude will automatically use `research_with_context()` with your answers
+2. **Answer Questions**: The AI Assistant will present questions to you
+3. **Deep Research**: The AI Asssitant will automatically use `research_with_context()` with your answers
 
 ## API Reference
 
