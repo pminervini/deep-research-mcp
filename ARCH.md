@@ -126,3 +126,173 @@ The project is composed of four main layers:
 -   **Key Functionality**:
     -   Defines the package version (`__version__`).
     -   Exports the main classes and exceptions for easy importing.
+
+## MCP Server Methods
+
+The MCP server exposes three main tools to clients like Claude Code. Each tool accepts specific arguments and returns structured data.
+
+### `deep_research()`
+
+**Purpose**: Performs autonomous deep research using OpenAI's Deep Research API.
+
+**Arguments**:
+- `query` (string, required): Research question or topic to investigate
+- `system_instructions` (string, optional): Custom research approach instructions
+- `include_analysis` (boolean, optional, default=True): Enable code execution for data analysis and visualizations  
+- `request_clarification` (boolean, optional, default=False): Return clarifying questions instead of starting research
+
+**Returns**: String containing formatted markdown report
+
+**Return Structure**: When `request_clarification=False` (normal research):
+```
+# Research Report: [query]
+
+[final_report content]
+
+## Research Metadata
+- **Total research steps**: [number]
+- **Search queries executed**: [number]
+- **Citations found**: [number]
+- **Task ID**: [uuid]
+
+## Citations
+1. [Title](URL)
+2. [Title](URL)
+...
+```
+
+**Return Structure**: When `request_clarification=True`:
+```
+# Clarifying Questions Needed
+
+**Original Query:** [query]
+**Why clarification is helpful:** [reasoning]
+**Session ID:** `[session_id]`
+
+**Please answer these questions to improve the research:**
+
+1. [Question 1]
+2. [Question 2]
+...
+
+**Instructions:** Use the `research_with_context` tool with your answers and the session ID above.
+```
+
+**Example Successful Response Dictionary** (internal format before string formatting):
+```python
+{
+    "status": "completed",
+    "final_report": "# Introduction\nThis report examines...",
+    "citations": [
+        {"index": 1, "title": "Example Title", "url": "https://example.com"}
+    ],
+    "reasoning_steps": 5,
+    "search_queries": ["quantum computing 2024", "latest breakthroughs"],
+    "total_steps": 12,
+    "task_id": "abc123-def456-ghi789"
+}
+```
+
+### `research_status()`
+
+**Purpose**: Check the status of a running research task.
+
+**Arguments**:
+- `task_id` (string, required): UUID returned by `deep_research()` tool
+
+**Returns**: String containing task status information
+
+**Return Structure**:
+```
+Task [task_id] status: [status]
+Created at: [timestamp]
+Completed at: [timestamp]  # Only if completed
+```
+
+**Example Response Dictionary** (internal format):
+```python
+{
+    "task_id": "abc123-def456-ghi789",
+    "status": "completed",  # or "running", "failed", "error"
+    "created_at": "2025-01-15T10:30:00Z",
+    "completed_at": "2025-01-15T10:35:00Z"
+}
+```
+
+### `research_with_context()`
+
+**Purpose**: Perform research using enriched queries from clarification sessions.
+
+**Arguments**:
+- `session_id` (string, required): Session ID from `deep_research()` with `request_clarification=True`
+- `answers` (list[string], required): Answers to clarifying questions in order
+- `system_instructions` (string, optional): Custom research approach instructions
+- `include_analysis` (boolean, optional, default=True): Enable code execution for analysis
+
+**Returns**: String containing formatted markdown report with enhanced context
+
+**Return Structure**:
+```
+# Enhanced Research Report
+
+**Original Query Enhanced With User Context**
+
+**Enriched Query:** [enhanced_query]
+**User Clarifications Provided:** [number] answers
+
+---
+
+[final_report content]
+
+## Research Metadata
+- **Total research steps**: [number]
+- **Search queries executed**: [number] 
+- **Citations found**: [number]
+- **Task ID**: [uuid]
+- **Clarification Session**: [session_id]
+
+## Citations
+1. [Title](URL)
+2. [Title](URL)
+...
+```
+
+**Example Response Dictionary** (internal format, same as `deep_research()`):
+```python
+{
+    "status": "completed",
+    "final_report": "# Enhanced Analysis\nBased on your clarifications...",
+    "citations": [
+        {"index": 1, "title": "Specific Source", "url": "https://specific.com"}
+    ],
+    "reasoning_steps": 7,
+    "search_queries": ["enhanced query terms", "specific context"],
+    "total_steps": 15,
+    "task_id": "def456-ghi789-jkl012"
+}
+```
+
+## Clarification System Return Types
+
+The clarification system uses several internal dictionary structures:
+
+**Triage Result** (from `TriageAgent.analyze_query()`):
+```python
+{
+    "needs_clarification": True,  # boolean
+    "reasoning": "Query would benefit from...",  # string
+    "potential_clarifications": ["What time period?", "Which region?"],  # list[str]
+    "query_assessment": "Query is too broad for optimal research"  # string
+}
+```
+
+**Clarification Session Status** (from `add_clarification_answers()`):
+```python
+{
+    "session_id": "session_abc123",  # string
+    "status": "answers_recorded",  # string
+    "total_questions": 3,  # int
+    "answered_questions": 3,  # int  
+    "is_complete": True  # boolean
+}
+```
