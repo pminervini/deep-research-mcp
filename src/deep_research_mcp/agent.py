@@ -24,13 +24,13 @@ class DeepResearchAgent:
 
     def __init__(self, config: ResearchConfig):
         self.config = config
-        
+
         # Initialize OpenAI client with custom endpoint if provided
         kwargs = {}
         if config.api_key:
-            kwargs['api_key'] = config.api_key
+            kwargs["api_key"] = config.api_key
         if config.base_url:
-            kwargs['base_url'] = config.base_url
+            kwargs["base_url"] = config.base_url
         self.client = OpenAI(**kwargs)
         self.logger = logging.getLogger(__name__)
         self.clarification_manager = ClarificationManager(config)

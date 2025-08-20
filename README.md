@@ -15,24 +15,25 @@ A Python-based agent that integrates OpenAI's Deep Research API with Claude Code
 Create a `~/.deep_research` file in your home directory using TOML format:
 
 ```toml
-# Core settings
-research_model = "o4-mini-deep-research-2025-06-26"
-
-# Will use your OPENAI_API_KEY environment variable if not set
-api_key = "sk-your-api-key-here"
-
-# Optional - Custom OpenAI-compatible endpoint
-base_url = "https://api.openai.com/v1"  # Default OpenAI endpoint
-
 [research]
-timeout = 1800
-poll_interval = 30
-max_retries = 3
+# Core settings
+research_model = "o4-mini-deep-research-2025-06-26"  # Research model to use
+api_key = "sk-your-api-key-here"                     # Will use your OPENAI_API_KEY environment variable if not set
+base_url = "https://api.openai.com/v1"               # Optional - Custom OpenAI-compatible endpoint for the research model
+
+
+# Deep Research API settings
+timeout = 1800      # Request timeout in seconds (30 minutes)
+poll_interval = 30  # Polling interval for status checks in seconds
+max_retries = 3     # Maximum number of retry attempts for failed requests
 
 [clarification]
-enable = true
-triage_model = "gpt-5-mini"
-clarifier_model = "gpt-5-mini"
+# Clarification system settings
+enable_clarification = true                           # Enable/disable the clarification pipeline
+clarification_api_key = "sk-your-clarification-api-key-here"  # Optional custom API key for clarification agents
+clarification_base_url = "https://api.openai.com/v1"  # Optional custom OpenAI-compatible endpoint for clarification agents
+triage_model = "gpt-5-mini"                           # Model used for analyzing if queries need clarification
+clarifier_model = "gpt-5-mini"                        # Model used for enriching queries with user responses
 
 [logging]
 level = "INFO"
@@ -195,6 +196,8 @@ Enable clarification in your `~/.deep_research` file:
 enable_clarification = true
 triage_model = "gpt-5-mini"      # Optional, defaults to gpt-5-mini
 clarifier_model = "gpt-5-mini"   # Optional, defaults to gpt-5-mini
+clarification_api_key = "sk-your-clarification-api-key-here"  # Optional custom API key for clarification models
+clarification_base_url = "https://custom-api.example.com/v1"  # Optional custom endpoint for clarification models
 ```
 
 ### Usage Flow
@@ -274,6 +277,8 @@ Configuration class for the research agent.
 - `enable_clarification`: Enable clarifying questions (default: False)
 - `triage_model`: Model for query analysis (default: gpt-5-mini)
 - `clarifier_model`: Model for query enrichment (default: gpt-5-mini)
+- `clarification_api_key`: Custom API key for clarification models (optional, defaults to api_key)
+- `clarification_base_url`: Custom API endpoint for clarification models (optional, defaults to base_url)
 
 ## Development
 
