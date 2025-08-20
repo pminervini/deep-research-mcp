@@ -94,7 +94,7 @@ def test_from_env_with_base_url():
     """Test loading base_url from environment variables"""
     old_model = os.environ.get("RESEARCH_MODEL")
     old_base_url = os.environ.get("OPENAI_BASE_URL")
-    
+
     os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
     os.environ["OPENAI_BASE_URL"] = "https://api.custom-provider.com/v1"
 
@@ -107,9 +107,95 @@ def test_from_env_with_base_url():
             os.environ["RESEARCH_MODEL"] = old_model
         else:
             del os.environ["RESEARCH_MODEL"]
-        
+
         if old_base_url:
             os.environ["OPENAI_BASE_URL"] = old_base_url
         else:
             if "OPENAI_BASE_URL" in os.environ:
                 del os.environ["OPENAI_BASE_URL"]
+
+
+def test_config_with_clarification_base_url():
+    """Test config with separate clarification base URL"""
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        pytest.skip("OPENAI_API_KEY not set")
+
+    clarification_endpoint = "https://api.clarification.com/v1"
+    config = ResearchConfig(
+        api_key=api_key,
+        model="gpt-5-mini",
+        enable_clarification=True,
+        clarification_base_url=clarification_endpoint,
+    )
+
+    assert config.api_key == api_key
+    assert config.clarification_base_url == clarification_endpoint
+    assert config.enable_clarification is True
+    assert config.validate() is True
+
+
+def test_from_env_with_clarification_base_url():
+    """Test loading clarification_base_url from environment variables"""
+    old_model = os.environ.get("RESEARCH_MODEL")
+    old_clarification_base_url = os.environ.get("CLARIFICATION_BASE_URL")
+
+    os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
+    os.environ["CLARIFICATION_BASE_URL"] = "https://api.clarification.com/v1"
+
+    try:
+        config = ResearchConfig.from_env()
+        assert config.clarification_base_url == "https://api.clarification.com/v1"
+        assert config.model == "gpt-5-mini"
+    finally:
+        if old_model:
+            os.environ["RESEARCH_MODEL"] = old_model
+        else:
+            del os.environ["RESEARCH_MODEL"]
+
+        if old_clarification_base_url:
+            os.environ["CLARIFICATION_BASE_URL"] = old_clarification_base_url
+        else:
+            if "CLARIFICATION_BASE_URL" in os.environ:
+                del os.environ["CLARIFICATION_BASE_URL"]
+
+
+def test_config_with_clarification_api_key():
+    """Test config with separate clarification API key"""
+    clarification_api_key = "sk-clarification-test-key"
+    config = ResearchConfig(
+        api_key="sk-main-test-key",
+        model="gpt-5-mini",
+        enable_clarification=True,
+        clarification_api_key=clarification_api_key,
+    )
+
+    assert config.api_key == "sk-main-test-key"
+    assert config.clarification_api_key == clarification_api_key
+    assert config.enable_clarification is True
+    assert config.validate() is True
+
+
+def test_from_env_with_clarification_api_key():
+    """Test loading clarification_api_key from environment variables"""
+    old_model = os.environ.get("RESEARCH_MODEL")
+    old_clarification_api_key = os.environ.get("CLARIFICATION_API_KEY")
+
+    os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
+    os.environ["CLARIFICATION_API_KEY"] = "sk-clarification-env-key"
+
+    try:
+        config = ResearchConfig.from_env()
+        assert config.clarification_api_key == "sk-clarification-env-key"
+        assert config.model == "gpt-5-mini"
+    finally:
+        if old_model:
+            os.environ["RESEARCH_MODEL"] = old_model
+        else:
+            del os.environ["RESEARCH_MODEL"]
+
+        if old_clarification_api_key:
+            os.environ["CLARIFICATION_API_KEY"] = old_clarification_api_key
+        else:
+            if "CLARIFICATION_API_KEY" in os.environ:
+                del os.environ["CLARIFICATION_API_KEY"]

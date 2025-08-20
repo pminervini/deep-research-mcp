@@ -111,7 +111,7 @@ def test_mcp_server_imports():
         assert hasattr(mcp_server, "deep_research")
         assert hasattr(mcp_server, "research_with_context")
         assert hasattr(mcp_server, "research_status")
-        
+
         # Check that the FastMCP instance exists
         assert hasattr(mcp_server, "mcp"), "MCP server missing FastMCP instance"
 
@@ -157,4 +157,3 @@ def test_config_clarification_enabled():
         del os.environ["TRIAGE_MODEL"]
     if "CLARIFIER_MODEL" in os.environ:
         del os.environ["CLARIFIER_MODEL"]
-

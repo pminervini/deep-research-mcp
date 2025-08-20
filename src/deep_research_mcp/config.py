@@ -53,6 +53,8 @@ class ResearchConfig:
     enable_clarification: bool = False
     triage_model: str = "gpt-5-mini"
     clarifier_model: str = "gpt-5-mini"
+    clarification_base_url: Optional[str] = None
+    clarification_api_key: Optional[str] = None
 
     @classmethod
     def from_env(cls) -> "ResearchConfig":
@@ -78,6 +80,8 @@ class ResearchConfig:
             in ("true", "1", "yes"),
             triage_model=os.environ.get("TRIAGE_MODEL", cls.triage_model),
             clarifier_model=os.environ.get("CLARIFIER_MODEL", cls.clarifier_model),
+            clarification_base_url=os.environ.get("CLARIFICATION_BASE_URL"),
+            clarification_api_key=os.environ.get("CLARIFICATION_API_KEY"),
         )
 
     def validate(self) -> bool:

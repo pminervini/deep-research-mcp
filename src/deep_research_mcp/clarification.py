@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 class TriageResponse(BaseModel):
     """Structured response from triage agent"""
+
     needs_clarification: bool
     reasoning: str
     potential_clarifications: List[str]
@@ -31,13 +32,19 @@ class TriageAgent:
 
     def __init__(self, config: ResearchConfig):
         self.config = config
-        
+
         # Initialize OpenAI client with custom endpoint if provided
         kwargs = {}
-        if config.api_key:
-            kwargs['api_key'] = config.api_key
-        if config.base_url:
-            kwargs['base_url'] = config.base_url
+        # Use clarification-specific API key if provided, otherwise fall back to general api_key
+        if config.clarification_api_key:
+            kwargs["api_key"] = config.clarification_api_key
+        elif config.api_key:
+            kwargs["api_key"] = config.api_key
+        # Use clarification-specific base URL if provided, otherwise fall back to general base_url
+        if config.clarification_base_url:
+            kwargs["base_url"] = config.clarification_base_url
+        elif config.base_url:
+            kwargs["base_url"] = config.base_url
         openai_client = OpenAI(**kwargs)
         self.client = instructor.from_openai(openai_client)
 
@@ -99,13 +106,19 @@ class ClarifierAgent:
 
     def __init__(self, config: ResearchConfig):
         self.config = config
-        
+
         # Initialize OpenAI client with custom endpoint if provided
         openai_kwargs = {}
-        if config.api_key:
-            openai_kwargs['api_key'] = config.api_key
-        if config.base_url:
-            openai_kwargs['base_url'] = config.base_url
+        # Use clarification-specific API key if provided, otherwise fall back to general api_key
+        if config.clarification_api_key:
+            openai_kwargs["api_key"] = config.clarification_api_key
+        elif config.api_key:
+            openai_kwargs["api_key"] = config.api_key
+        # Use clarification-specific base URL if provided, otherwise fall back to general base_url
+        if config.clarification_base_url:
+            openai_kwargs["base_url"] = config.clarification_base_url
+        elif config.base_url:
+            openai_kwargs["base_url"] = config.base_url
         openai_client = OpenAI(**openai_kwargs)
         self.client = instructor.from_openai(openai_client)
 

@@ -9,7 +9,12 @@ a full Claude Code MCP integration.
 import pytest
 
 # Import the underlying functions directly
-from deep_research_mcp.mcp_server import deep_research, research_status, research_with_context, mcp
+from deep_research_mcp.mcp_server import (
+    deep_research,
+    research_status,
+    research_with_context,
+    mcp,
+)
 
 
 @pytest.mark.asyncio
@@ -21,7 +26,7 @@ async def test_research_status():
     assert "Research agent not initialized" in result
 
 
-@pytest.mark.asyncio  
+@pytest.mark.asyncio
 async def test_deep_research_without_api():
     """Test deep_research tool initialization (without actual API call)"""
     result = await deep_research.fn(
@@ -33,7 +38,9 @@ async def test_deep_research_without_api():
     assert result is not None
     assert isinstance(result, str)
     # Should either work with valid config or show error without API keys
-    assert ("Research Report:" in result or "Failed to initialize research agent" in result)
+    assert (
+        "Research Report:" in result or "Failed to initialize research agent" in result
+    )
 
 
 @pytest.mark.asyncio
@@ -45,11 +52,14 @@ async def test_research_with_context():
         system_instructions="Test instructions",
         include_analysis=False,
     )
-    
+
     assert result is not None
     assert isinstance(result, str)
     # Should contain error about session not found or initialization failure
-    assert ("Session fake-session-id not found" in result or "Failed to initialize research agent" in result)
+    assert (
+        "Session fake-session-id not found" in result
+        or "Failed to initialize research agent" in result
+    )
 
 
 def test_mcp_server_structure():
@@ -57,11 +67,11 @@ def test_mcp_server_structure():
     # Check that the MCP instance exists
     assert mcp is not None
     assert mcp.name == "deep-research"
-    
+
     # Check that the tool wrapper functions exist and have callable .fn attributes
-    assert hasattr(deep_research, 'fn')
-    assert hasattr(research_status, 'fn')
-    assert hasattr(research_with_context, 'fn')
+    assert hasattr(deep_research, "fn")
+    assert hasattr(research_status, "fn")
+    assert hasattr(research_with_context, "fn")
     assert callable(deep_research.fn)
     assert callable(research_status.fn)
     assert callable(research_with_context.fn)
