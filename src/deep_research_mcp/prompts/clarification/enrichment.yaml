@@ -1,0 +1,21 @@
+name: "query_enrichment"
+description: "Enriches research queries based on user clarification responses"
+template: |
+  Original Query: "{user_query}"
+  
+  Additional Context from User:
+  {enriched_context}
+  
+  Based on the original query and the additional context, create an enriched, more specific research query that incorporates the user's clarifications. 
+  
+  Guidelines:
+  - Keep the core intent of the original query
+  - Make it more precise and actionable
+  - Incorporate the user's specified preferences and constraints
+  - Maintain natural language flow
+  - Don't over-complicate - aim for clarity and focus
+  
+  Return only the enriched query, nothing else.
+variables:
+  - user_query
+  - enriched_context
