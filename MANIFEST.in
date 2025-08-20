@@ -1,0 +1,3 @@
+# Include prompt YAML files in the package
+recursive-include src/deep_research_mcp/prompts *.yaml
+include src/deep_research_mcp/prompts/__init__.py

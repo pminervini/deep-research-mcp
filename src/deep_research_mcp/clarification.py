@@ -14,6 +14,7 @@ import instructor
 from pydantic import BaseModel
 
 from deep_research_mcp.config import ResearchConfig
+from deep_research_mcp.prompts import PromptManager
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +31,9 @@ class TriageResponse(BaseModel):
 class TriageAgent:
     """Analyzes queries to determine if clarification is needed"""
 
-    def __init__(self, config: ResearchConfig):
+    def __init__(self, config: ResearchConfig, prompt_manager: Optional[PromptManager] = None):
         self.config = config
+        self.prompt_manager = prompt_manager or PromptManager()
 
         # Initialize OpenAI client with custom endpoint if provided
         kwargs = {}
@@ -57,25 +59,7 @@ class TriageAgent:
         """
         logger.info("TriageAgent: Analyzing query for clarification needs")
 
-        triage_prompt = f"""
-        You are a Triage Agent. Your job is to analyze the user's research query and decide if it needs clarification.
-        
-        User Query: "{user_query}"
-        
-        Analyze this query and determine:
-        1. Is the query clear and specific enough for direct research?
-        2. Are there ambiguous terms that need clarification?
-        3. Would additional context help improve the research?
-        
-        Consider these factors:
-        - Time scope (if relevant but not specified)
-        - Geographic scope (if relevant but not specified)  
-        - Technical depth/audience level
-        - Specific aspects or subtopics to focus on
-        - Comparison criteria (if comparing things)
-        
-        Only suggest clarification if it would meaningfully improve the research quality.
-        """
+        triage_prompt = self.prompt_manager.get_triage_prompt(user_query=user_query)
 
         try:
             response = self.client.chat.completions.create(
@@ -104,8 +88,9 @@ class TriageAgent:
 class ClarifierAgent:
     """Enriches queries based on user responses to clarifying questions"""
 
-    def __init__(self, config: ResearchConfig):
+    def __init__(self, config: ResearchConfig, prompt_manager: Optional[PromptManager] = None):
         self.config = config
+        self.prompt_manager = prompt_manager or PromptManager()
 
         # Initialize OpenAI client with custom endpoint if provided
         openai_kwargs = {}
@@ -145,23 +130,10 @@ class ClarifierAgent:
                     f"Q: {qa['question']}\nA: [No specific preference provided]"
                 )
 
-        enrichment_prompt = f"""
-        Original Query: "{user_query}"
-        
-        Additional Context from User:
-        {chr(10).join(enriched_context)}
-        
-        Based on the original query and the additional context, create an enriched, more specific research query that incorporates the user's clarifications. 
-        
-        Guidelines:
-        - Keep the core intent of the original query
-        - Make it more precise and actionable
-        - Incorporate the user's specified preferences and constraints
-        - Maintain natural language flow
-        - Don't over-complicate - aim for clarity and focus
-        
-        Return only the enriched query, nothing else.
-        """
+        enrichment_prompt = self.prompt_manager.get_enrichment_prompt(
+            user_query=user_query, 
+            enriched_context=chr(10).join(enriched_context)
+        )
 
         try:
             response = self.client.chat.completions.create(
@@ -206,10 +178,11 @@ class ClarificationSession:
 class ClarificationManager:
     """Manages the complete clarification pipeline"""
 
-    def __init__(self, config: ResearchConfig):
+    def __init__(self, config: ResearchConfig, prompt_manager: Optional[PromptManager] = None):
         self.config = config
-        self.triage_agent = TriageAgent(config)
-        self.clarifier_agent = ClarifierAgent(config)
+        self.prompt_manager = prompt_manager or PromptManager()
+        self.triage_agent = TriageAgent(config, self.prompt_manager)
+        self.clarifier_agent = ClarifierAgent(config, self.prompt_manager)
         self._sessions: Dict[str, ClarificationSession] = {}
 
     def start_clarification(self, user_query: str) -> Dict[str, Any]:
