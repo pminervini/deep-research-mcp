@@ -4,24 +4,17 @@
 Tests for TOML configuration loading.
 """
 
-import pytest
 import os
-import sys
+import toml
+import io
+
 from deep_research_mcp.config import ResearchConfig
 
 
 def test_toml_functionality():
     """Test TOML loading works properly"""
-    # Test basic TOML import
-    try:
-        import toml
-    except ImportError:
-        pytest.skip("toml library not available for testing")
-
     # Test simple TOML parsing
     test_toml = 'research_model = "gpt-5-mini"\nenable_clarification = true'
-
-    import io
 
     config = toml.load(io.StringIO(test_toml))
 

@@ -1,4 +1,5 @@
-#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
 Test script to verify the core deep research functionality.
 This tests the underlying components that the MCP server uses.
@@ -6,6 +7,7 @@ This tests the underlying components that the MCP server uses.
 
 import pytest
 import os
+
 from deep_research_mcp.config import ResearchConfig
 from deep_research_mcp.agent import DeepResearchAgent
 

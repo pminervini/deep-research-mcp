@@ -1,4 +1,5 @@
-#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
 Test script to verify MCP server integration functionality.
 This script tests the deep research MCP server tools without requiring
@@ -6,10 +7,10 @@ a full Claude Code MCP integration.
 """
 
 import pytest
-import os
 
 # Import the underlying functions from the MCP server module
-import deep_research_mcp.mcp_server as mcp_server
+from deep_research_mcp.mcp_server import mcp_server
+
 
 
 @pytest.mark.asyncio
