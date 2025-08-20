@@ -21,7 +21,6 @@ research_model = "o4-mini-deep-research-2025-06-26"  # Research model to use
 api_key = "sk-your-api-key-here"                     # Will use your OPENAI_API_KEY environment variable if not set
 base_url = "https://api.openai.com/v1"               # Optional - Custom OpenAI-compatible endpoint for the research model
 
-
 # Deep Research API settings
 timeout = 1800      # Request timeout in seconds (30 minutes)
 poll_interval = 30  # Polling interval for status checks in seconds
