@@ -278,7 +278,7 @@ Configuration class for the research agent.
 - `triage_model`: Model for query analysis (default: gpt-5-mini)
 - `clarifier_model`: Model for query enrichment (default: gpt-5-mini)
 - `clarification_api_key`: Custom API key for clarification models (optional, defaults to api_key)
-- `clarification_base_url`: Custom API endpoint for clarification models (optional, defaults to base_url)
+- `clarification_base_url`: Custom OpenAI-compatible endpoint for clarification models (optional, defaults to base_url)
 
 ## Development
 
