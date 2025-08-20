@@ -27,7 +27,6 @@ poll_interval = 30  # Polling interval for status checks in seconds
 max_retries = 3     # Maximum number of retry attempts for failed requests
 
 [clarification]
-# Clarification system settings
 enable_clarification = true                           # Enable/disable the clarification pipeline
 clarification_api_key = "sk-your-clarification-api-key-here"  # Optional custom API key for clarification agents
 clarification_base_url = "https://api.openai.com/v1"  # Optional custom OpenAI-compatible endpoint for clarification agents
