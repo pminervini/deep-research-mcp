@@ -98,7 +98,7 @@ The project is composed of four main layers:
 
 -   **Purpose**: Manages the application's configuration.
 -   **Key Functionality**:
-    -   `ResearchConfig` (dataclass): Defines the configuration parameters for the agent, such as API key, model name, timeout, poll interval, and clarification settings.
+    -   `ResearchConfig` (dataclass): Defines the configuration parameters for the agent, such as API key, model name, base URL, timeout, poll interval, and clarification settings.
     -   `from_env()`: A class method to load configuration from environment variables. Configuration is loaded from a `~/.deep_research` TOML file that sets environment variables. This allows for easy configuration without hardcoding values. Now includes clarification settings.
     -   `validate()`: A method to validate the configuration to ensure that the provided values are valid.
 
