@@ -7,6 +7,7 @@ Uses real OpenAI API calls with gpt-5-mini to keep costs low.
 
 import pytest
 import os
+
 from deep_research_mcp.config import ResearchConfig
 from deep_research_mcp.clarification import (
     TriageAgent,
