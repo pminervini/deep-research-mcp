@@ -19,7 +19,10 @@ Create a `~/.deep_research` file in your home directory using TOML format:
 research_model = "o4-mini-deep-research-2025-06-26"
 
 # Will use your OPENAI_API_KEY environment variable if not set
-openai_api_key = "sk-your-api-key-here"
+api_key = "sk-your-api-key-here"
+
+# Optional - Custom OpenAI-compatible endpoint
+base_url = "https://api.openai.com/v1"  # Default OpenAI endpoint
 
 [research]
 timeout = 1800
@@ -264,6 +267,7 @@ Configuration class for the research agent.
 
 - `api_key`: OpenAI API key (optional, can use environment variable)
 - `model`: Model to use (required, must be set in ~/.deep_research)
+- `base_url`: Custom OpenAI-compatible API endpoint (optional, defaults to OpenAI)
 - `timeout`: Maximum time for research in seconds (default: 1800)
 - `poll_interval`: Polling interval in seconds (default: 30)
 - `max_retries`: Maximum retry attempts (default: 3)
