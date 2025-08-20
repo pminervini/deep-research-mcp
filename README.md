@@ -268,17 +268,17 @@ Configuration class for the research agent.
 
 #### Parameters
 
-- `api_key`: OpenAI API key (optional, can use environment variable)
-- `model`: Model to use (required, must be set in ~/.deep_research)
-- `base_url`: Custom OpenAI-compatible API endpoint (optional, defaults to OpenAI)
+- `model`: Model to use (required, must be set in `~/.deep_research`)
+- `api_key`: OpenAI API key (optional, can use the `OPENAI_API_KEY` environment variable)
+- `base_url`: Custom OpenAI-compatible API endpoint (optional, defaults to the standard OpenAI endpoint)
 - `timeout`: Maximum time for research in seconds (default: 1800)
 - `poll_interval`: Polling interval in seconds (default: 30)
 - `max_retries`: Maximum retry attempts (default: 3)
 - `enable_clarification`: Enable clarifying questions (default: False)
-- `triage_model`: Model for query analysis (default: gpt-5-mini)
-- `clarifier_model`: Model for query enrichment (default: gpt-5-mini)
-- `clarification_api_key`: Custom API key for clarification models (optional, defaults to api_key)
-- `clarification_base_url`: Custom OpenAI-compatible endpoint for clarification models (optional, defaults to base_url)
+- `triage_model`: Model for query analysis (default: `gpt-5-mini`)
+- `clarifier_model`: Model for query enrichment (default: `gpt-5-mini`)
+- `clarification_api_key`: Custom API key for clarification models (optional, defaults to `api_key`)
+- `clarification_base_url`: Custom OpenAI-compatible endpoint for clarification models (optional, defaults to `base_url`)
 
 ## Development
 
