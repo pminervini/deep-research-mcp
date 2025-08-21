@@ -37,8 +37,8 @@ class DeepResearchAgent:
         self.clarification_manager = ClarificationManager(config)
         self.prompt_manager = PromptManager()
 
-        # Initialize instruction builder client with clarification settings if available
-        self.instruction_client = self._create_instruction_client()
+        # Initialize instruction builder client only if clarification is enabled
+        self.instruction_client = self._create_instruction_client() if config.enable_clarification else None
 
     async def research(
         self,
@@ -60,8 +60,11 @@ class DeepResearchAgent:
             Dictionary with final report, citations, and metadata
         """
 
-        # Build enhanced research instruction using instruction builder model
-        enhanced_query = self.build_research_instruction(query)
+        # Build enhanced research instruction using instruction builder model only if clarification is enabled
+        if self.config.enable_clarification:
+            enhanced_query = self.build_research_instruction(query)
+        else:
+            enhanced_query = query
 
         # Prepare input messages
         input_messages = []
@@ -339,6 +342,10 @@ class DeepResearchAgent:
         Returns:
             Enhanced research instruction string
         """
+        # If instruction client is not available (clarification disabled), return original query
+        if not self.instruction_client:
+            return query
+            
         try:
             # Get the instruction builder prompt template
             instruction_prompt = self.prompt_manager.get_instruction_builder_prompt(

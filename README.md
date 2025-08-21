@@ -32,7 +32,7 @@ clarification_api_key = "sk-your-clarification-api-key-here"  # Optional custom 
 clarification_base_url = "https://api.openai.com/v1"  # Optional custom OpenAI-compatible endpoint for clarification agents
 triage_model = "gpt-5-mini"                           # Model used for analyzing if queries need clarification
 clarifier_model = "gpt-5-mini"                        # Model used for enriching queries with user responses
-instruction_builder_model = "gpt-5-mini"              # Model used for building detailed research instructions
+instruction_builder_model = "gpt-5-mini"              # Model used for building detailed research instructions (only when clarification is enabled)
 
 [logging]
 level = "INFO"

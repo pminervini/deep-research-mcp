@@ -171,7 +171,27 @@ def test_instruction_builder_agent_initialization(test_agent):
     assert hasattr(test_agent, "prompt_manager")
     assert hasattr(test_agent, "instruction_client")
     assert test_agent.prompt_manager is not None
-    assert test_agent.instruction_client is not None
+    # instruction_client should only be initialized when clarification is enabled
+    if test_agent.config.enable_clarification:
+        assert test_agent.instruction_client is not None
+    else:
+        assert test_agent.instruction_client is None
+
+
+def test_instruction_builder_with_clarification_enabled():
+    """Test that instruction client is initialized when clarification is enabled"""
+    os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
+    os.environ["ENABLE_CLARIFICATION"] = "true"
+    os.environ["INSTRUCTION_BUILDER_MODEL"] = "gpt-5-mini"
+    
+    config = ResearchConfig.from_env()
+    agent = DeepResearchAgent(config)
+    
+    assert agent.config.enable_clarification == True
+    assert agent.instruction_client is not None
+    
+    # Clean up environment
+    del os.environ["ENABLE_CLARIFICATION"]
 
 
 def test_instruction_builder_prompt_loading(test_agent):
