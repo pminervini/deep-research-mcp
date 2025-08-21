@@ -30,6 +30,7 @@ def test_config_with_environment_variables():
         "ENABLE_CLARIFICATION",
         "TRIAGE_MODEL",
         "CLARIFIER_MODEL",
+        "INSTRUCTION_BUILDER_MODEL",
     ]
     original_values = {}
     for var in env_vars:
@@ -43,6 +44,7 @@ def test_config_with_environment_variables():
         os.environ["ENABLE_CLARIFICATION"] = "true"
         os.environ["TRIAGE_MODEL"] = "gpt-5-mini"
         os.environ["CLARIFIER_MODEL"] = "gpt-5-mini"
+        os.environ["INSTRUCTION_BUILDER_MODEL"] = "gpt-4o-mini"
 
         # Test config creation
         config = ResearchConfig.from_env()
@@ -51,6 +53,7 @@ def test_config_with_environment_variables():
         assert config.enable_clarification == True
         assert config.triage_model == "gpt-5-mini"
         assert config.clarifier_model == "gpt-5-mini"
+        assert config.instruction_builder_model == "gpt-4o-mini"
 
     finally:
         # Restore original environment
@@ -137,6 +140,7 @@ def test_config_defaults():
         "ENABLE_CLARIFICATION",
         "TRIAGE_MODEL",
         "CLARIFIER_MODEL",
+        "INSTRUCTION_BUILDER_MODEL",
         "RESEARCH_TIMEOUT",
         "POLL_INTERVAL",
         "MAX_RETRIES",
@@ -157,6 +161,7 @@ def test_config_defaults():
         assert config.enable_clarification == False  # Default should be False
         assert config.triage_model == "gpt-5-mini"  # Default
         assert config.clarifier_model == "gpt-5-mini"  # Default
+        assert config.instruction_builder_model == "gpt-5-mini"  # Default
         assert config.timeout == 1800.0  # Default
         assert config.poll_interval == 30.0  # Default
         assert config.max_retries == 3  # Default

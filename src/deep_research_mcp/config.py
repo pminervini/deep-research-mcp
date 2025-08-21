@@ -56,6 +56,9 @@ class ResearchConfig:
     clarification_base_url: Optional[str] = None
     clarification_api_key: Optional[str] = None
 
+    # Instruction builder settings
+    instruction_builder_model: str = "gpt-5-mini"
+
     @classmethod
     def from_env(cls) -> "ResearchConfig":
         """Create configuration from environment variables"""
@@ -82,6 +85,9 @@ class ResearchConfig:
             clarifier_model=os.environ.get("CLARIFIER_MODEL", cls.clarifier_model),
             clarification_base_url=os.environ.get("CLARIFICATION_BASE_URL"),
             clarification_api_key=os.environ.get("CLARIFICATION_API_KEY"),
+            instruction_builder_model=os.environ.get(
+                "INSTRUCTION_BUILDER_MODEL", cls.instruction_builder_model
+            ),
         )
 
     def validate(self) -> bool:
