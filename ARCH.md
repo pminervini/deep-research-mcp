@@ -91,7 +91,7 @@ The project is composed of four main layers:
 -   **Purpose**: Contains the `DeepResearchAgent` class, which is the core component responsible for interacting with the OpenAI Deep Research API.
 -   **Key Functionality**:
     -   `research()`: The main method that orchestrates the research process. It builds enhanced instructions, prepares the input, creates a research task, polls for completion, and formats the results.
-    -   `build_research_instruction()`: Converts basic queries into detailed research briefs using the instruction builder model (always enabled).
+    -   `build_research_instruction()`: Converts basic queries into detailed research briefs using the instruction builder model (only when clarification is enabled).
     -   `_create_instruction_client()`: Creates OpenAI client for instruction builder using clarification settings or default config.
     -   `_create_research_task()`: Sends the initial request to the OpenAI API to start a research task. It includes retry logic using the `tenacity` library.
     -   `_wait_for_completion()`: Polls the API for the status of a research task until it is completed, fails, or times out.
@@ -152,7 +152,7 @@ The project is composed of four main layers:
 -   **Purpose**: Contains the YAML prompt template for converting research queries into detailed research briefs.
 -   **Key Functionality**:
     -   Defines the instruction builder prompt that guides the instruction builder model to create comprehensive research instructions.
-    -   Always used by the research process to enhance basic queries before sending to the Deep Research API.
+    -   Used by the research process to enhance basic queries before sending to the Deep Research API only when clarification is enabled (`enable_clarification = true`).
 
 ### `src/deep_research_mcp/__init__.py`
 
