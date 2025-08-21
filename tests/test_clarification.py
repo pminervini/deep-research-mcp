@@ -122,7 +122,9 @@ def test_triage_agent_error_handling(config):
     original_key = os.environ.get("OPENAI_API_KEY")
     try:
         os.environ["OPENAI_API_KEY"] = "invalid-key"
-        agent = TriageAgent(config)
+        # Create a new config with the invalid API key
+        error_config = ResearchConfig.from_env()
+        agent = TriageAgent(error_config)
         result = agent.analyze_query("test query")
 
         # Should handle error gracefully
