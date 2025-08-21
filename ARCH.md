@@ -28,10 +28,16 @@ graph TD
         G3[ClarificationManager]
         G4[ClarificationSession]
     end
+    
+    subgraph Instruction System
+        J[InstructionBuilder]
+        K[PromptManager]
+    end
 
     subgraph External Services
         H[OpenAI Deep Research API]
         I[OpenAI Chat API for Clarification]
+        L[OpenAI Chat API for Instruction Builder]
     end
 
     A -- "Makes tool calls (deep_research, research_with_context)" --> B
@@ -40,6 +46,7 @@ graph TD
     D -- "Uses configuration from" --> E
     D -- "Handles" --> F
     D -- "Uses clarification from" --> G
+    D -- "Uses instruction builder from" --> J
     D -- "Makes API calls to" --> H
     
     G --> G1
@@ -48,6 +55,10 @@ graph TD
     G3 --> G4
     G1 -- "Analyzes queries" --> I
     G2 -- "Enriches queries" --> I
+    
+    D --> J
+    J -- "Uses prompts from" --> K
+    J -- "Builds instructions via" --> L
 ```
 
 ## Component Descriptions
@@ -67,7 +78,11 @@ The project is composed of four main layers:
     *   `ClarificationManager` orchestrates the complete clarification workflow.
     *   `ClarificationSession` manages state for individual clarification sessions.
 
-4.  **External Services**: This layer represents the external APIs the project interacts with, including the OpenAI Deep Research API and OpenAI Chat API (for clarification agents).
+4.  **Instruction System (`agent.py`, `prompts.py`)**: This layer handles the mandatory instruction building process to enhance research queries.
+    *   `InstructionBuilder` (in `agent.py`) converts basic queries into detailed research briefs using the instruction builder model.
+    *   `PromptManager` manages loading and formatting of YAML-based prompt templates, including the instruction builder prompt.
+
+5.  **External Services**: This layer represents the external APIs the project interacts with, including the OpenAI Deep Research API, OpenAI Chat API (for clarification agents), and OpenAI Chat API (for instruction builder).
 
 ## File-by-File Breakdown
 
@@ -75,7 +90,9 @@ The project is composed of four main layers:
 
 -   **Purpose**: Contains the `DeepResearchAgent` class, which is the core component responsible for interacting with the OpenAI Deep Research API.
 -   **Key Functionality**:
-    -   `research()`: The main method that orchestrates the research process. It prepares the input, creates a research task, polls for completion, and formats the results.
+    -   `research()`: The main method that orchestrates the research process. It builds enhanced instructions, prepares the input, creates a research task, polls for completion, and formats the results.
+    -   `build_research_instruction()`: Converts basic queries into detailed research briefs using the instruction builder model (always enabled).
+    -   `_create_instruction_client()`: Creates OpenAI client for instruction builder using clarification settings or default config.
     -   `_create_research_task()`: Sends the initial request to the OpenAI API to start a research task. It includes retry logic using the `tenacity` library.
     -   `_wait_for_completion()`: Polls the API for the status of a research task until it is completed, fails, or times out.
     -   `_send_completion_callback()`: Sends a notification to a callback URL when the research is complete.
@@ -98,8 +115,8 @@ The project is composed of four main layers:
 
 -   **Purpose**: Manages the application's configuration.
 -   **Key Functionality**:
-    -   `ResearchConfig` (dataclass): Defines the configuration parameters for the agent, such as API key, model name, base URL, timeout, poll interval, and clarification settings.
-    -   `from_env()`: A class method to load configuration from environment variables. Configuration is loaded from a `~/.deep_research` TOML file that sets environment variables. This allows for easy configuration without hardcoding values. Now includes clarification settings.
+    -   `ResearchConfig` (dataclass): Defines the configuration parameters for the agent, such as API key, model name, base URL, timeout, poll interval, clarification settings, and instruction builder model.
+    -   `from_env()`: A class method to load configuration from environment variables. Configuration is loaded from a `~/.deep_research` TOML file that sets environment variables. This allows for easy configuration without hardcoding values. Now includes clarification and instruction builder settings.
     -   `validate()`: A method to validate the configuration to ensure that the provided values are valid.
 
 ### `src/deep_research_mcp/errors.py`
@@ -119,6 +136,23 @@ The project is composed of four main layers:
     -   `ClarifierAgent`: Takes user responses to questions and enriches the original query with additional context and specificity.
     -   `ClarificationSession`: Manages state for individual clarification sessions, including questions, answers, and session metadata.
     -   `ClarificationManager`: Orchestrates the complete workflow from triage through query enrichment, managing sessions and coordinating between agents.
+
+### `src/deep_research_mcp/prompts/prompts.py`
+
+-   **Purpose**: Implements the prompt management system for loading and formatting YAML-based prompt templates.
+-   **Key Functionality**:
+    -   `PromptManager`: Manages loading and formatting of YAML-based prompt templates with auto-discovery and package resource support.
+    -   `get_instruction_builder_prompt()`: Loads and formats the instruction builder prompt template with query substitution.
+    -   `get_triage_prompt()`: Loads and formats the triage analysis prompt for clarification.
+    -   `get_enrichment_prompt()`: Loads and formats the query enrichment prompt for clarification.
+    -   `list_available_prompts()`: Lists all available prompts by category for debugging and documentation.
+
+### `src/deep_research_mcp/prompts/research/instruction_builder.yaml`
+
+-   **Purpose**: Contains the YAML prompt template for converting research queries into detailed research briefs.
+-   **Key Functionality**:
+    -   Defines the instruction builder prompt that guides the instruction builder model to create comprehensive research instructions.
+    -   Always used by the research process to enhance basic queries before sending to the Deep Research API.
 
 ### `src/deep_research_mcp/__init__.py`
 

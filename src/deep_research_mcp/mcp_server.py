@@ -24,8 +24,8 @@ mcp = FastMCP("deep-research")
 research_agent: Optional[DeepResearchAgent] = None
 
 
-@mcp.tool()
-async def deep_research(
+# Define the actual async functions that will be wrapped by FastMCP
+async def _deep_research_impl(
     query: Annotated[
         str,
         "Specific research question or topic. Examples: 'Latest quantum computing breakthroughs in 2024', 'Compare renewable energy adoption rates globally', 'Analyze Tesla's financial performance vs competitors'",
@@ -159,8 +159,7 @@ You can proceed with the research using the same query."""
         return f"Unexpected error: {str(e)}"
 
 
-@mcp.tool()
-async def research_status(
+async def _research_status_impl(
     task_id: Annotated[
         str,
         "Research task ID returned by deep_research tool. Format: UUID string like 'abc123-def456-ghi789'",
@@ -202,8 +201,7 @@ async def research_status(
         return f"Error checking status: {str(e)}"
 
 
-@mcp.tool()
-async def research_with_context(
+async def _research_with_context_impl(
     session_id: Annotated[
         str,
         "Session ID from clarification request. Get this from the deep_research tool when request_clarification=True",
@@ -317,6 +315,17 @@ async def research_with_context(
     except Exception as e:
         logger.error(f"Error in research_with_context: {e}")
         return f"Error performing enhanced research: {str(e)}"
+
+
+# Register the functions with FastMCP
+_deep_research_tool = mcp.tool()(_deep_research_impl)
+_research_status_tool = mcp.tool()(_research_status_impl)
+_research_with_context_tool = mcp.tool()(_research_with_context_impl)
+
+# Export the actual callable functions for direct use (Claude Code expects these to be callable)
+deep_research = _deep_research_impl
+research_status = _research_status_impl
+research_with_context = _research_with_context_impl
 
 
 def main():

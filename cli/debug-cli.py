@@ -22,7 +22,7 @@ async def main():
     try:
         # Create config with gpt-4o model
         config = ResearchConfig.from_env()
-        config.model = "gpt-4o"  # Override to use gpt-4o
+        config.model = "gpt-5-mini"
         config.timeout = 300.0   # 5 minutes for debugging
         config.validate()
         
@@ -30,7 +30,7 @@ async def main():
         agent = DeepResearchAgent(config)
         
         # Test query - something that requires web search
-        query = "What are the latest developments in artificial intelligence announced in January 2025?"
+        query = "what's 2+2?"
         
         print(f"Starting research with query: {query}")
         print(f"Using model: {config.model}")

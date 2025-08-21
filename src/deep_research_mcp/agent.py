@@ -15,6 +15,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from deep_research_mcp.config import ResearchConfig
 from deep_research_mcp.errors import ResearchError, TaskTimeoutError
 from deep_research_mcp.clarification import ClarificationManager
+from deep_research_mcp.prompts.prompts import PromptManager
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,10 @@ class DeepResearchAgent:
         self.client = OpenAI(**kwargs)
         self.logger = logging.getLogger(__name__)
         self.clarification_manager = ClarificationManager(config)
+        self.prompt_manager = PromptManager()
+
+        # Initialize instruction builder client with clarification settings if available
+        self.instruction_client = self._create_instruction_client()
 
     async def research(
         self,
@@ -55,6 +60,9 @@ class DeepResearchAgent:
             Dictionary with final report, citations, and metadata
         """
 
+        # Build enhanced research instruction using instruction builder model
+        enhanced_query = self.build_research_instruction(query)
+
         # Prepare input messages
         input_messages = []
         if system_prompt:
@@ -66,7 +74,10 @@ class DeepResearchAgent:
             )
 
         input_messages.append(
-            {"role": "user", "content": [{"type": "input_text", "text": query}]}
+            {
+                "role": "user",
+                "content": [{"type": "input_text", "text": enhanced_query}],
+            }
         )
 
         # Configure tools
@@ -297,3 +308,57 @@ class DeepResearchAgent:
             Enriched query string or None if session not found
         """
         return self.clarification_manager.get_enriched_query(session_id)
+
+    def _create_instruction_client(self) -> OpenAI:
+        """
+        Create OpenAI client for instruction builder using clarification settings or default config
+        """
+        kwargs = {}
+
+        # Use clarification API key if available, otherwise fall back to main API key
+        if self.config.clarification_api_key:
+            kwargs["api_key"] = self.config.clarification_api_key
+        elif self.config.api_key:
+            kwargs["api_key"] = self.config.api_key
+
+        # Use clarification base URL if available, otherwise fall back to main base URL
+        if self.config.clarification_base_url:
+            kwargs["base_url"] = self.config.clarification_base_url
+        elif self.config.base_url:
+            kwargs["base_url"] = self.config.base_url
+
+        return OpenAI(**kwargs)
+
+    def build_research_instruction(self, query: str) -> str:
+        """
+        Convert a research query into a precise, comprehensive research brief using instruction builder model
+
+        Args:
+            query: Original research query to enhance
+
+        Returns:
+            Enhanced research instruction string
+        """
+        try:
+            # Get the instruction builder prompt template
+            instruction_prompt = self.prompt_manager.get_instruction_builder_prompt(
+                query
+            )
+
+            # Call the instruction builder model
+            response = self.instruction_client.chat.completions.create(
+                model=self.config.instruction_builder_model,
+                messages=[{"role": "user", "content": instruction_prompt}]
+            )
+
+            enhanced_instruction = response.choices[0].message.content.strip()
+            self.logger.info(
+                f"Enhanced research instruction created for query: {query[:50]}..."
+            )
+
+            return enhanced_instruction
+
+        except Exception as e:
+            self.logger.warning(f"Failed to build research instruction: {e}")
+            # Fallback to original query if instruction building fails
+            return query

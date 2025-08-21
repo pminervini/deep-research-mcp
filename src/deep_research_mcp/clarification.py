@@ -31,7 +31,9 @@ class TriageResponse(BaseModel):
 class TriageAgent:
     """Analyzes queries to determine if clarification is needed"""
 
-    def __init__(self, config: ResearchConfig, prompt_manager: Optional[PromptManager] = None):
+    def __init__(
+        self, config: ResearchConfig, prompt_manager: Optional[PromptManager] = None
+    ):
         self.config = config
         self.prompt_manager = prompt_manager or PromptManager()
 
@@ -65,7 +67,6 @@ class TriageAgent:
             response = self.client.chat.completions.create(
                 model=self.config.triage_model,
                 messages=[{"role": "user", "content": triage_prompt}],
-                temperature=0.3,
                 response_model=TriageResponse,
             )
 
@@ -88,7 +89,9 @@ class TriageAgent:
 class ClarifierAgent:
     """Enriches queries based on user responses to clarifying questions"""
 
-    def __init__(self, config: ResearchConfig, prompt_manager: Optional[PromptManager] = None):
+    def __init__(
+        self, config: ResearchConfig, prompt_manager: Optional[PromptManager] = None
+    ):
         self.config = config
         self.prompt_manager = prompt_manager or PromptManager()
 
@@ -131,15 +134,13 @@ class ClarifierAgent:
                 )
 
         enrichment_prompt = self.prompt_manager.get_enrichment_prompt(
-            user_query=user_query, 
-            enriched_context=chr(10).join(enriched_context)
+            user_query=user_query, enriched_context=chr(10).join(enriched_context)
         )
 
         try:
             response = self.client.chat.completions.create(
                 model=self.config.clarifier_model,
                 messages=[{"role": "user", "content": enrichment_prompt}],
-                temperature=0.2,
             )
 
             enriched_query = response.choices[0].message.content.strip()
@@ -178,7 +179,9 @@ class ClarificationSession:
 class ClarificationManager:
     """Manages the complete clarification pipeline"""
 
-    def __init__(self, config: ResearchConfig, prompt_manager: Optional[PromptManager] = None):
+    def __init__(
+        self, config: ResearchConfig, prompt_manager: Optional[PromptManager] = None
+    ):
         self.config = config
         self.prompt_manager = prompt_manager or PromptManager()
         self.triage_agent = TriageAgent(config, self.prompt_manager)

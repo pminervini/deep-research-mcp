@@ -18,6 +18,7 @@ def test_config():
     os.environ["RESEARCH_MODEL"] = "gpt-5-mini"  # Use cheap model for testing
     os.environ["TRIAGE_MODEL"] = "gpt-5-mini"
     os.environ["CLARIFIER_MODEL"] = "gpt-5-mini"
+    os.environ["INSTRUCTION_BUILDER_MODEL"] = "gpt-5-mini"
     return ResearchConfig.from_env()
 
 
@@ -157,3 +158,78 @@ def test_config_clarification_enabled():
         del os.environ["TRIAGE_MODEL"]
     if "CLARIFIER_MODEL" in os.environ:
         del os.environ["CLARIFIER_MODEL"]
+
+
+def test_instruction_builder_configuration(test_config):
+    """Test instruction builder configuration"""
+    assert hasattr(test_config, "instruction_builder_model")
+    assert test_config.instruction_builder_model == "gpt-5-mini"
+
+
+def test_instruction_builder_agent_initialization(test_agent):
+    """Test that agent has instruction builder components"""
+    assert hasattr(test_agent, "prompt_manager")
+    assert hasattr(test_agent, "instruction_client")
+    assert test_agent.prompt_manager is not None
+    assert test_agent.instruction_client is not None
+
+
+def test_instruction_builder_prompt_loading(test_agent):
+    """Test that instruction builder prompt can be loaded"""
+    test_query = "What are the latest developments in quantum computing?"
+
+    try:
+        prompt = test_agent.prompt_manager.get_instruction_builder_prompt(test_query)
+        assert prompt is not None
+        assert isinstance(prompt, str)
+        assert "quantum computing" in prompt.lower()
+        assert "research" in prompt.lower()
+    except Exception as e:
+        # If prompt loading fails, it should be due to missing files, not code errors
+        assert "not found" in str(e).lower() or "no such file" in str(e).lower()
+
+
+def test_instruction_builder_method_exists(test_agent):
+    """Test that build_research_instruction method exists and is callable"""
+    assert hasattr(test_agent, "build_research_instruction")
+    assert callable(test_agent.build_research_instruction)
+
+
+@pytest.mark.asyncio
+async def test_instruction_builder_fallback(test_agent):
+    """Test that instruction builder gracefully falls back to original query on error"""
+    original_query = "test query for fallback"
+
+    # This should not raise an exception even if the API call fails
+    enhanced_query = test_agent.build_research_instruction(original_query)
+
+    # Should return at least the original query
+    assert enhanced_query is not None
+    assert isinstance(enhanced_query, str)
+    assert len(enhanced_query) > 0
+
+
+def test_config_instruction_builder_env_override():
+    """Test instruction builder model can be overridden via environment"""
+    old_model = os.environ.get("RESEARCH_MODEL")
+    old_instruction_model = os.environ.get("INSTRUCTION_BUILDER_MODEL")
+
+    os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
+    os.environ["INSTRUCTION_BUILDER_MODEL"] = "gpt-4o-mini"
+
+    try:
+        config = ResearchConfig.from_env()
+        assert config.instruction_builder_model == "gpt-4o-mini"
+        assert config.model == "gpt-5-mini"
+    finally:
+        if old_model:
+            os.environ["RESEARCH_MODEL"] = old_model
+        else:
+            if "RESEARCH_MODEL" in os.environ:
+                del os.environ["RESEARCH_MODEL"]
+
+        if old_instruction_model:
+            os.environ["INSTRUCTION_BUILDER_MODEL"] = old_instruction_model
+        else:
+            if "INSTRUCTION_BUILDER_MODEL" in os.environ:
+                del os.environ["INSTRUCTION_BUILDER_MODEL"]

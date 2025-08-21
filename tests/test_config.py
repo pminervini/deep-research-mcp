@@ -199,3 +199,57 @@ def test_from_env_with_clarification_api_key():
         else:
             if "CLARIFICATION_API_KEY" in os.environ:
                 del os.environ["CLARIFICATION_API_KEY"]
+
+
+def test_config_with_instruction_builder_model():
+    """Test config with instruction builder model"""
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        pytest.skip("OPENAI_API_KEY not set")
+
+    config = ResearchConfig(
+        api_key=api_key,
+        model="gpt-5-mini",
+        instruction_builder_model="gpt-4o-mini",
+    )
+
+    assert config.api_key == api_key
+    assert config.instruction_builder_model == "gpt-4o-mini"
+    assert config.validate() is True
+
+
+def test_from_env_with_instruction_builder_model():
+    """Test loading instruction_builder_model from environment variables"""
+    old_model = os.environ.get("RESEARCH_MODEL")
+    old_instruction_builder_model = os.environ.get("INSTRUCTION_BUILDER_MODEL")
+
+    os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
+    os.environ["INSTRUCTION_BUILDER_MODEL"] = "gpt-4o-mini"
+
+    try:
+        config = ResearchConfig.from_env()
+        assert config.instruction_builder_model == "gpt-4o-mini"
+        assert config.model == "gpt-5-mini"
+    finally:
+        if old_model:
+            os.environ["RESEARCH_MODEL"] = old_model
+        else:
+            del os.environ["RESEARCH_MODEL"]
+
+        if old_instruction_builder_model:
+            os.environ["INSTRUCTION_BUILDER_MODEL"] = old_instruction_builder_model
+        else:
+            if "INSTRUCTION_BUILDER_MODEL" in os.environ:
+                del os.environ["INSTRUCTION_BUILDER_MODEL"]
+
+
+def test_instruction_builder_model_defaults():
+    """Test that instruction_builder_model has correct default"""
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        pytest.skip("OPENAI_API_KEY not set")
+
+    config = ResearchConfig(api_key=api_key, model="gpt-5-mini")
+
+    assert config.instruction_builder_model == "gpt-5-mini"
+    assert config.validate() is True
