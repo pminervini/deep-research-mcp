@@ -20,7 +20,7 @@ from deep_research_mcp.mcp_server import (
 @pytest.mark.asyncio
 async def test_research_status():
     """Test the research_status tool with a fake task ID"""
-    result = await research_status.fn("fake-task-id")
+    result = await research_status("fake-task-id")
     assert result is not None
     assert isinstance(result, str)
     assert "Research agent not initialized" in result
@@ -29,7 +29,7 @@ async def test_research_status():
 @pytest.mark.asyncio
 async def test_deep_research_without_api():
     """Test deep_research tool initialization (without actual API call)"""
-    result = await deep_research.fn(
+    result = await deep_research(
         query="Test query for MCP integration",
         system_instructions="This is just a test",
         include_analysis=False,
@@ -46,7 +46,7 @@ async def test_deep_research_without_api():
 @pytest.mark.asyncio
 async def test_research_with_context():
     """Test the research_with_context tool"""
-    result = await research_with_context.fn(
+    result = await research_with_context(
         session_id="fake-session-id",
         answers=["Answer 1", "Answer 2"],
         system_instructions="Test instructions",
@@ -68,10 +68,7 @@ def test_mcp_server_structure():
     assert mcp is not None
     assert mcp.name == "deep-research"
 
-    # Check that the tool wrapper functions exist and have callable .fn attributes
-    assert hasattr(deep_research, "fn")
-    assert hasattr(research_status, "fn")
-    assert hasattr(research_with_context, "fn")
-    assert callable(deep_research.fn)
-    assert callable(research_status.fn)
-    assert callable(research_with_context.fn)
+    # Check that the exported functions are callable
+    assert callable(deep_research)
+    assert callable(research_status)
+    assert callable(research_with_context)
