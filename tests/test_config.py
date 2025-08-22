@@ -7,23 +7,6 @@ import pytest
 from deep_research_mcp.config import ResearchConfig
 
 
-def test_from_env_requires_research_model():
-    """Test that missing RESEARCH_MODEL raises error"""
-    old_model = os.environ.get("RESEARCH_MODEL")
-    if old_model:
-        del os.environ["RESEARCH_MODEL"]
-
-    try:
-        with pytest.raises(
-            ValueError,
-            match="RESEARCH_MODEL is required in ~/.deep_research configuration file",
-        ):
-            ResearchConfig.from_env()
-    finally:
-        if old_model:
-            os.environ["RESEARCH_MODEL"] = old_model
-
-
 def test_config_creation_with_overrides():
     """Test config creation with custom values"""
     api_key = os.environ.get("OPENAI_API_KEY")

@@ -5,13 +5,13 @@ Clarification agents for enhancing research queries.
 Based on the four-agent pipeline pattern.
 """
 
-import json
 import logging
 import uuid
 from typing import Dict, Any, List, Optional
 from openai import OpenAI
 import instructor
 from pydantic import BaseModel
+
 
 from deep_research_mcp.config import ResearchConfig
 from deep_research_mcp.prompts import PromptManager
