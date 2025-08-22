@@ -16,7 +16,7 @@ Create a `~/.deep_research` file in your home directory using TOML format:
 
 ```toml
 [research] # Core Deep Research settings
-provider = "openai"                         # Research provider (default: "openai")
+provider = "openai"                         # Research provider (currently only "openai" is supported)
 model = "o4-mini-deep-research-2025-06-26"  # Research model to use
 api_key = "sk-your-api-key-here"            # Optional - Will use your OPENAI_API_KEY environment variable if not set
 base_url = "https://api.openai.com/v1"      # Optional - Custom OpenAI-compatible endpoint
@@ -269,7 +269,7 @@ Configuration class for the research agent.
 
 #### Parameters
 
-- `provider`: Research provider (default: "openai")
+- `provider`: Research provider (default: "openai", currently only "openai" is supported)
 - `model`: Model to use (required, must be set in `~/.deep_research`)
 - `api_key`: OpenAI API key (optional, can use the `OPENAI_API_KEY` environment variable)
 - `base_url`: Custom OpenAI-compatible API endpoint (optional, defaults to the standard OpenAI endpoint)
