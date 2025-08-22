@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from deep_research_mcp.errors import ConfigurationError
+
 import toml
 
 
@@ -63,14 +65,24 @@ class ResearchConfig:
     @classmethod
     def from_env(cls) -> "ResearchConfig":
         """Create configuration from environment variables"""
-        research_model = os.environ.get("RESEARCH_MODEL")
-        if not research_model:
-            raise ValueError(
-                "RESEARCH_MODEL is required in ~/.deep_research configuration file"
-            )
+        provider = os.environ.get("PROVIDER", cls.provider)
+        
+        # Set different defaults based on provider
+        default_model = default_base_url = None
+        if provider in {"open-deep-research"}:
+            # For open-deep-research, model is the LLM model to use
+            default_model = "openai/qwen/qwen3-coder-30b"
+            default_base_url = "http://localhost:1234/v1"
+        elif provider in {"openai"}:
+            # For OpenAI, model is the Deep Research model
+            default_model = "gpt-5-mini"
+        else:
+            raise ConfigurationError(f"Provider '{provider}' is not supported")
+        
+        research_model = os.environ.get("RESEARCH_MODEL", default_model)
 
         api_key = os.environ.get("OPENAI_API_KEY")
-        base_url = os.environ.get("OPENAI_BASE_URL")
+        base_url = os.environ.get("OPENAI_BASE_URL", default_base_url)
 
         return cls(
             api_key=api_key,
@@ -94,16 +106,17 @@ class ResearchConfig:
 
     def validate(self) -> bool:
         """Validate configuration settings"""
-        if self.api_key and not self.api_key.startswith("sk-"):
-            raise ValueError("Invalid API key format")
+        if self.provider in {"openai"}:
+            if self.api_key and not self.api_key.startswith("sk-"):
+                raise ConfigurationError("Invalid API key format")
 
         if self.timeout <= 0:
-            raise ValueError("Timeout must be positive")
+            raise ConfigurationError("Timeout must be positive")
 
         if self.poll_interval <= 0:
-            raise ValueError("Poll interval must be positive")
+            raise ConfigurationError("Poll interval must be positive")
 
         if self.max_retries < 0:
-            raise ValueError("Max retries must be non-negative")
+            raise ConfigurationError("Max retries must be non-negative")
 
         return True

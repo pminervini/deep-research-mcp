@@ -13,7 +13,7 @@ import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from deep_research_mcp.config import ResearchConfig
-from deep_research_mcp.errors import ResearchError, TaskTimeoutError
+from deep_research_mcp.errors import ResearchError, TaskTimeoutError, ConfigurationError
 from deep_research_mcp.clarification import ClarificationManager
 from deep_research_mcp.prompts.prompts import PromptManager
 
@@ -26,19 +26,148 @@ class DeepResearchAgent:
     def __init__(self, config: ResearchConfig):
         self.config = config
 
-        # Initialize OpenAI client with custom endpoint if provided
-        kwargs = {}
-        if config.api_key:
-            kwargs["api_key"] = config.api_key
-        if config.base_url:
-            kwargs["base_url"] = config.base_url
-        self.client = OpenAI(**kwargs)
+        if self.config.provider in {"openai"}:
+            # Initialize OpenAI client with custom endpoint if provided
+            kwargs = {}
+            if config.api_key:
+                kwargs["api_key"] = config.api_key
+            if config.base_url:
+                kwargs["base_url"] = config.base_url
+            self.client = OpenAI(**kwargs)
+
+        elif self.config.provider in {"open-deep-research"}:
+            self._init_open_deep_research()
+        
+        else:
+            raise ConfigurationError(f"Provider '{self.config.provider}' is not supported")
+
         self.logger = logging.getLogger(__name__)
         self.clarification_manager = ClarificationManager(config)
         self.prompt_manager = PromptManager()
 
         # Initialize instruction builder client only if clarification is enabled
         self.instruction_client = self._create_instruction_client() if config.enable_clarification else None
+
+    def _init_open_deep_research(self):
+        """Initialize open-deep-research components"""
+        import os
+        from dotenv import load_dotenv
+        from huggingface_hub import login
+        from smolagents import (
+            CodeAgent,
+            ToolCallingAgent,
+            LiteLLMModel,
+            GoogleSearchTool,
+            DuckDuckGoSearchTool,
+            WikipediaSearchTool,
+        )
+        from open_deep_research.text_inspector_tool import TextInspectorTool
+        from open_deep_research.text_web_browser import (
+            SimpleTextBrowser,
+            VisitTool,
+            PageUpTool,
+            PageDownTool,
+            FinderTool,
+            FindNextTool,
+            ArchiveSearchTool,
+        )
+        from open_deep_research.visual_qa import visualizer
+        
+        # Load environment variables
+        load_dotenv(override=True)
+        if os.getenv("HF_TOKEN"):
+            login(os.getenv("HF_TOKEN"))
+        
+        # Setup browser configuration
+        user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 Edg/119.0.0.0"
+        self.browser_config = {
+            "viewport_size": 1024 * 5,
+            "downloads_folder": "downloads_folder",
+            "request_kwargs": {
+                "headers": {"User-Agent": user_agent},
+                "timeout": 300,
+            },
+            "serpapi_key": os.getenv("SERPAPI_API_KEY"),
+        }
+        os.makedirs(f"./{self.browser_config['downloads_folder']}", exist_ok=True)
+        
+        # Create model for open-deep-research
+        model_params = {
+            "model_id": self.config.model or "Qwen/Qwen2.5-Coder-32B-Instruct",
+            "custom_role_conversions": {"tool-call": "assistant", "tool-response": "user"},
+            "max_completion_tokens": 8192,
+        }
+        
+        if self.config.base_url:
+            model_params["api_base"] = self.config.base_url
+        if self.config.api_key:
+            model_params["api_key"] = self.config.api_key
+        
+        self.odr_model = LiteLLMModel(**model_params)
+        
+        # Initialize browser and tools
+        self.browser = SimpleTextBrowser(**self.browser_config)
+        text_limit = 100000
+        
+        # Setup web tools
+        search_tools = []
+        
+        # Try to add Google search if API key is available
+        if os.getenv("SERPAPI_API_KEY") or os.getenv("SERPER_API_KEY"):
+            try:
+                search_tools.append(GoogleSearchTool(provider="serper" if os.getenv("SERPER_API_KEY") else "serpapi"))
+            except:
+                pass
+        
+        # Always add DuckDuckGo as fallback
+        search_tools.append(DuckDuckGoSearchTool())
+        
+        # Add Wikipedia search
+        search_tools.append(WikipediaSearchTool(user_agent="OpenDeepResearch/1.0"))
+        
+        # Build complete web tools list
+        self.web_tools = search_tools + [
+            VisitTool(self.browser),
+            PageUpTool(self.browser),
+            PageDownTool(self.browser),
+            FinderTool(self.browser),
+            FindNextTool(self.browser),
+            ArchiveSearchTool(self.browser),
+            TextInspectorTool(self.odr_model, text_limit),
+        ]
+        
+        # Create search agent
+        self.search_agent = ToolCallingAgent(
+            model=self.odr_model,
+            tools=self.web_tools,
+            max_steps=20,
+            verbosity_level=2,
+            planning_interval=4,
+            name="search_agent",
+            description="""A team member that will search the internet to answer your question.
+Ask him for all your questions that require browsing the web.
+Provide him as much context as possible, in particular if you need to search on a specific timeframe!
+And don't hesitate to provide him with a complex search task, like finding a difference between two webpages.
+Your request must be a real sentence, not a google search! Like "Find me this information (...)" rather than a few keywords.
+""",
+            provide_run_summary=True,
+        )
+        
+        # Add custom prompt for search agent
+        self.search_agent.prompt_templates["managed_agent"]["task"] += """You can navigate to .txt online files.
+If a non-html page is in another format, especially .pdf or a Youtube video, use tool 'inspect_file_as_text' to inspect it.
+Additionally, if after some searching you find out that you need more information to answer the question, you can use `final_answer` with your request for clarification as argument to request for more information."""
+        
+        # Create manager agent
+        self.manager_agent = CodeAgent(
+            model=self.odr_model,
+            tools=[visualizer, TextInspectorTool(self.odr_model, text_limit)],
+            max_steps=12,
+            verbosity_level=2,
+            planning_interval=4,
+            managed_agents=[self.search_agent],
+            additional_authorized_imports=["*"],
+        )
 
     async def research(
         self,
@@ -66,24 +195,24 @@ class DeepResearchAgent:
         else:
             enhanced_query = query
 
-        # Prepare input messages
-        input_messages = []
-        if system_prompt:
+        if self.config.provider in {"openai"}:
+            # Prepare input messages for OpenAI
+            input_messages = []
+            if system_prompt:
+                input_messages.append(
+                    {
+                        "role": "developer",
+                        "content": [{"type": "input_text", "text": system_prompt}],
+                    }
+                )
+
             input_messages.append(
                 {
-                    "role": "developer",
-                    "content": [{"type": "input_text", "text": system_prompt}],
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": enhanced_query}],
                 }
             )
-
-        input_messages.append(
-            {
-                "role": "user",
-                "content": [{"type": "input_text", "text": enhanced_query}],
-            }
-        )
-
-        if self.config.provider in {"openai"}:
+        
             # Configure tools
             tools = [{"type": "web_search_preview"}]
             if include_code_interpreter:
@@ -96,6 +225,9 @@ class DeepResearchAgent:
 
             # Start background research task
             response = await self._create_openai_research_task(input_messages, tools)
+        elif self.config.provider in {"open-deep-research"}:
+            # Use open-deep-research agent
+            return await self._run_open_deep_research(enhanced_query, system_prompt)
         else:
             raise ResearchError(f"Provider '{self.config.provider}' is not supported yet")
 
@@ -110,7 +242,82 @@ class DeepResearchAgent:
         if callback_url and final_response.get("status") == "completed":
             await self._send_completion_callback(callback_url, final_response)
 
-        return self._extract_results(final_response)
+        return self._extract_openai_results(final_response)
+
+    async def _run_open_deep_research(self, query: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
+        """Run open-deep-research agent asynchronously"""
+        import uuid
+        from datetime import datetime
+        
+        # Combine system prompt with query if provided
+        augmented_query = query
+        if system_prompt:
+            augmented_query = f"{system_prompt}\n\n{query}"
+        
+        # Record start time
+        task_id = str(uuid.uuid4())
+        start_time = time.time()
+        
+        try:
+            # Run the agent synchronously in an executor to avoid blocking
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None,
+                self.manager_agent.run,
+                augmented_query
+            )
+            
+            # Extract citations from the agent's memory/search results
+            citations = []
+            search_queries = []
+            
+            # Try to extract search queries and citations from agent memory
+            if hasattr(self.manager_agent, 'memory') and hasattr(self.manager_agent.memory, 'steps'):
+                for step in self.manager_agent.memory.steps:
+                    # Extract search queries
+                    if hasattr(step, 'tool_calls'):
+                        for tool_call in step.tool_calls:
+                            if 'search' in tool_call.get('name', '').lower():
+                                search_queries.append(tool_call.get('arguments', {}).get('query', ''))
+                    
+                    # Extract citations from visited pages
+                    if hasattr(step, 'observations') and step.observations:
+                        for obs in step.observations:
+                            if isinstance(obs, str) and 'http' in obs:
+                                # Extract URLs from the observation
+                                import re
+                                urls = re.findall(r'https?://[^\s\)]+', obs)
+                                for i, url in enumerate(urls):
+                                    citations.append({
+                                        "index": len(citations) + 1,
+                                        "title": f"Source {len(citations) + 1}",
+                                        "url": url.rstrip('.,;:'),
+                                        "start_char": 0,
+                                        "end_char": 0
+                                    })
+            
+            # Get total steps
+            total_steps = len(self.manager_agent.memory.steps) if hasattr(self.manager_agent, 'memory') else 0
+            
+            return {
+                "status": "completed",
+                "final_report": str(result),
+                "citations": citations,
+                "reasoning_steps": total_steps,
+                "search_queries": search_queries,
+                "total_steps": total_steps,
+                "task_id": task_id,
+                "execution_time": time.time() - start_time
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Open Deep Research error: {e}")
+            return {
+                "status": "failed",
+                "message": str(e),
+                "task_id": task_id,
+                "execution_time": time.time() - start_time
+            }
 
     @retry(
         stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)
@@ -118,7 +325,7 @@ class DeepResearchAgent:
     async def _create_openai_research_task(
         self, input_messages: List[Dict], tools: List[Dict]
     ) -> Dict[str, Any]:
-        """Create research task with retry logic"""
+        """Create research task with retry logic (OpenAI)"""
         try:
             response: Dict[str, Any] = self.client.responses.create(
                 model=self.config.model,
@@ -196,8 +403,8 @@ class DeepResearchAgent:
         except Exception as e:
             self.logger.error(f"Failed to send callback to {callback_url}: {e}")
 
-    def _extract_results(self, response) -> Dict[str, Any]:
-        """Extract and structure final results"""
+    def _extract_openai_results(self, response) -> Dict[str, Any]:
+        """Extract and structure final results (OpenAI)"""
         # Handle failed responses
         if response.status == "failed":
             error_details = getattr(response, "error", None)
@@ -264,17 +471,27 @@ class DeepResearchAgent:
 
     async def get_task_status(self, task_id: str) -> Dict[str, Any]:
         """Check the status of a research task"""
-        try:
-            response = self.client.responses.retrieve(task_id)
+        if self.config.provider in {"openai"}:
+            try:
+                response = self.client.responses.retrieve(task_id)
+                return {
+                    "task_id": task_id,
+                    "status": response.status,
+                    "created_at": getattr(response, "created_at", None),
+                    "completed_at": getattr(response, "completed_at", None),
+                }
+            except Exception as e:
+                self.logger.error(f"Error checking status for task {task_id}: {e}")
+                return {"task_id": task_id, "status": "error", "error": str(e)}
+        elif self.config.provider in {"open-deep-research"}:
+            # For open-deep-research, we don't have persistent task tracking
             return {
                 "task_id": task_id,
-                "status": response.status,
-                "created_at": getattr(response, "created_at", None),
-                "completed_at": getattr(response, "completed_at", None),
+                "status": "unknown",
+                "message": "Task status tracking not available for open-deep-research provider"
             }
-        except Exception as e:
-            self.logger.error(f"Error checking status for task {task_id}: {e}")
-            return {"task_id": task_id, "status": "error", "error": str(e)}
+        else:
+            return {"task_id": task_id, "status": "error", "error": f"Provider {self.config.provider} not supported"}
 
     def start_clarification(self, user_query: str) -> Dict[str, Any]:
         """
