@@ -35,9 +35,10 @@ graph TD
     end
 
     subgraph External Services
-        H[OpenAI Deep Research API]
+        H[OpenAI Responses API (web+code tools)]
         I[OpenAI Chat API for Clarification]
         L[OpenAI Chat API for Instruction Builder]
+        M[Open Deep Research (smolagents + text browser)]
     end
 
     A -- "Makes tool calls (deep_research, research_with_context)" --> B
@@ -48,6 +49,7 @@ graph TD
     D -- "Uses clarification from" --> G
     D -- "Uses instruction builder from" --> J
     D -- "Makes API calls to" --> H
+    D -- "Orchestrates agents via" --> M
     
     G --> G1
     G --> G2
@@ -68,7 +70,7 @@ The project is composed of four main layers:
 1.  **MCP Server (`mcp_server.py`)**: This is the entry point for external clients like Claude Code. It uses the `fastmcp` library to expose the core research functionality as tools. It handles incoming requests, initializes the `DeepResearchAgent`, and formats the results for the client. Now includes three tools: `deep_research()`, `research_with_context()`, and `research_status()`.
 
 2.  **Core Logic (`agent.py`, `config.py`, `errors.py`)**: This layer contains the main business logic of the application.
-    *   `agent.py` is the heart of the project, managing provider-based research interactions and coordinating clarification workflows. Currently supports OpenAI Deep Research API when provider is "openai".
+    *   `agent.py` is the heart of the project, managing provider-based research interactions and coordinating clarification workflows. Supports OpenAI (Responses API) when provider is `"openai"` and Open Deep Research (smolagents) when provider is `"open-deep-research"`.
     *   `config.py` handles loading and validating configuration from environment variables, including provider selection and clarification settings.
     *   `errors.py` defines custom exception classes for better error handling.
 
@@ -82,7 +84,9 @@ The project is composed of four main layers:
     *   `InstructionBuilder` (in `agent.py`) converts basic queries into detailed research briefs using the instruction builder model.
     *   `PromptManager` manages loading and formatting of YAML-based prompt templates, including the instruction builder prompt.
 
-5.  **External Services**: This layer represents the external APIs the project interacts with. When provider is "openai", uses the OpenAI Deep Research API, OpenAI Chat API (for clarification agents), and OpenAI Chat API (for instruction builder). Other providers will use different external services.
+5.  **External Services**: This layer represents the external systems used:
+    * Provider `openai`: OpenAI Responses API (web search + code interpreter tools), OpenAI Chat API for clarification agents and instruction builder.
+    * Provider `open-deep-research`: smolagents stack with a text browser and search tools; optional OpenAI-compatible LLM endpoint via LiteLLM.
 
 ## File-by-File Breakdown
 
@@ -90,13 +94,15 @@ The project is composed of four main layers:
 
 -   **Purpose**: Contains the `DeepResearchAgent` class, which is the core component responsible for interacting with research providers based on configuration.
 -   **Key Functionality**:
-    -   `research()`: The main method that orchestrates the research process. It builds enhanced instructions, prepares the input, and conditionally creates a research task based on the configured provider (currently only supports "openai").
+    -   `research()`: Orchestrates the research process. Builds enhanced instructions (if clarification enabled), then routes to OpenAI or Open Deep Research based on `config.provider`.
     -   `build_research_instruction()`: Converts basic queries into detailed research briefs using the instruction builder model (only when clarification is enabled).
     -   `_create_instruction_client()`: Creates OpenAI client for instruction builder using clarification settings or default config.
-    -   `_create_openai_research_task()`: Sends the initial request to the OpenAI API to start a research task. It includes retry logic using the `tenacity` library. Only called when provider is "openai".
+    -   `_create_openai_research_task()`: Starts an OpenAI background research task (Responses API) with retry logic.
+    -   `_init_open_deep_research()`: Initializes smolagents model, browser, and tools for Open Deep Research.
+    -   `_run_open_deep_research()`: Executes the ODR manager/search agents and extracts a structured result.
     -   `_wait_for_completion()`: Polls the API for the status of a research task until it is completed, fails, or times out.
     -   `_send_completion_callback()`: Sends a notification to a callback URL when the research is complete.
-    -   `_extract_results()`: Parses the final response from the API and extracts the report, citations, and other metadata.
+    -   `_extract_openai_results()`: Parses final OpenAI response and extracts report, citations, and metadata.
     -   `get_task_status()`: Allows checking the status of a running research task.
     -   `start_clarification()`: Initiates the clarification process using the ClarificationManager.
     -   `add_clarification_answers()`: Adds user answers to clarification questions.
@@ -152,7 +158,7 @@ The project is composed of four main layers:
 -   **Purpose**: Contains the YAML prompt template for converting research queries into detailed research briefs.
 -   **Key Functionality**:
     -   Defines the instruction builder prompt that guides the instruction builder model to create comprehensive research instructions.
-    -   Used by the research process to enhance basic queries before sending to the Deep Research API only when clarification is enabled (`enable_clarification = true`).
+    -   Used by the research process to enhance basic queries before sending to the configured provider (only when clarification is enabled: `enable_clarification = true`).
 
 ### `src/deep_research_mcp/__init__.py`
 
@@ -167,7 +173,7 @@ The MCP server exposes three main tools to clients like Claude Code. Each tool a
 
 ### `deep_research()`
 
-**Purpose**: Performs autonomous deep research using OpenAI's Deep Research API.
+**Purpose**: Performs autonomous deep research using the configured provider (OpenAI Responses API or Open Deep Research).
 
 **Arguments**:
 - `query` (string, required): Research question or topic to investigate

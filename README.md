@@ -1,42 +1,75 @@
 # Deep Research MCP
 
-A Python-based agent that integrates OpenAI's Deep Research API with Claude Code through the Model Context Protocol (MCP). This enables Claude Code to perform comprehensive, autonomous research tasks with web search, code execution, and citation management capabilities.
+A Python-based agent that integrates research providers with Claude Code through the Model Context Protocol (MCP). It supports both OpenAI (Responses API with web search and code interpreter) and the open-source Open Deep Research stack (smolagents + text browser), enabling autonomous research with web search, optional code execution, and citation management.
 
 ## Prerequisites
 
 - Python 3.9+
-- OpenAI API key with access to Deep Research models
+- One of:
+  - OpenAI API access (Responses API models, e.g., `gpt-5-mini`)
+  - Open Deep Research dependencies (installed via `requirements.txt`)
 - Claude Code, or any other assistant supporting MCP integration
 
 ## Configuration
 
 ### Configuration File
 
-Create a `~/.deep_research` file in your home directory using TOML format:
+Create a `~/.deep_research` file in your home directory using TOML format.
+
+Common settings:
 
 ```toml
-[research] # Core Deep Research settings
-provider = "openai"                         # Research provider (currently only "openai" is supported)
-model = "o4-mini-deep-research-2025-06-26"  # Research model to use
-api_key = "sk-your-api-key-here"            # Optional - Will use your OPENAI_API_KEY environment variable if not set
-base_url = "https://api.openai.com/v1"      # Optional - Custom OpenAI-compatible endpoint
+[research]
+provider = "openai"          # or "open-deep-research"
+model = "gpt-5-mini"         # OpenAI: Responses model; ODR: LLM identifier
+api_key = "sk-your-api-key"  # Optional; falls back to env OPENAI_API_KEY
+base_url = "https://api.openai.com/v1"  # Optional; env OPENAI_BASE_URL
 
-# Deep Research API settings
-timeout = 1800      # Request timeout in seconds (30 minutes)
-poll_interval = 30  # Polling interval for status checks in seconds
-max_retries = 3     # Maximum number of retry attempts for failed requests
+# Task behavior
+timeout = 1800
+poll_interval = 30
+max_retries = 3
 
-[clarification] # Clarification settings (optional)
-enable_clarification = false                          # Enable/disable the clarification pipeline
-clarification_api_key = "sk-your-clarification-api-key-here"  # Optional custom API key for clarification agents
-clarification_base_url = "https://api.openai.com/v1"  # Optional custom OpenAI-compatible endpoint for clarification agents
-triage_model = "gpt-5-mini"                           # Model used for analyzing if queries need clarification
-clarifier_model = "gpt-5-mini"                        # Model used for enriching queries with user responses
-instruction_builder_model = "gpt-5-mini"              # Model used for building detailed research instructions
+[clarification]                 # Optional
+enable_clarification = false
+triage_model = "gpt-5-mini"
+clarifier_model = "gpt-5-mini"
+instruction_builder_model = "gpt-5-mini"
+clarification_api_key = ""     # Optional, overrides api_key
+clarification_base_url = ""    # Optional, overrides base_url
 
 [logging]
 level = "INFO"
 ```
+
+OpenAI provider example:
+
+```toml
+[research]
+provider = "openai"
+model = "gpt-5-mini"                 # Pick a Responses API model
+api_key = "sk-..."                   # Or rely on env OPENAI_API_KEY
+base_url = "https://api.openai.com/v1"
+timeout = 1800
+poll_interval = 30
+max_retries = 3
+```
+
+Open Deep Research provider example:
+
+```toml
+[research]
+provider = "open-deep-research"
+model = "openai/qwen/qwen3-coder-30b"  # Any LiteLLM-compatible model id
+base_url = "http://localhost:1234/v1"  # OpenAI-compatible endpoint (local or remote)
+api_key = ""                           # Optional if endpoint requires it
+timeout = 1800
+```
+
+Optional env variables for Open Deep Research tools:
+
+- `SERPAPI_API_KEY` or `SERPER_API_KEY`: enable Google-style search
+- `HF_TOKEN`: optional, logs into Hugging Face Hub for gated models
 
 ### Claude Code Integration
 
@@ -227,7 +260,7 @@ clarification_base_url = "https://custom-api.example.com/v1"  # Optional custom 
    final_result = await agent.research(enriched_query)
    ```
 
-### Integration with AI Asssitants
+### Integration with AI Assistants
 
 When using with AI Assistants via MCP tools:
 
@@ -269,10 +302,12 @@ Configuration class for the research agent.
 
 #### Parameters
 
-- `provider`: Research provider (default: "openai", currently only "openai" is supported)
-- `model`: Model to use (required, must be set in `~/.deep_research`)
-- `api_key`: OpenAI API key (optional, can use the `OPENAI_API_KEY` environment variable)
-- `base_url`: Custom OpenAI-compatible API endpoint (optional, defaults to the standard OpenAI endpoint)
+- `provider`: Research provider (`openai` or `open-deep-research`; default: `openai`)
+- `model`: Model identifier
+  - OpenAI: Responses model (e.g., `gpt-5-mini`)
+  - Open Deep Research: LiteLLM model id (e.g., `openai/qwen/qwen3-coder-30b`)
+- `api_key`: API key for the configured endpoint (optional). Defaults to env `OPENAI_API_KEY`.
+- `base_url`: OpenAI-compatible API base URL (optional). Defaults to env `OPENAI_BASE_URL`.
 - `timeout`: Maximum time for research in seconds (default: 1800)
 - `poll_interval`: Polling interval in seconds (default: 30)
 - `max_retries`: Maximum retry attempts (default: 3)
