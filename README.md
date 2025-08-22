@@ -20,9 +20,9 @@ Common settings:
 
 ```toml
 [research]
-provider = "openai"          # Available options: "openai", "open-deep-research" -- defaults to "openai"
-model = "gpt-5-mini"         # OpenAI: model identifier; ODR: LiteLLM model identifier, e.g., openai/qwen/qwen3-coder-30b
-api_key = "sk-your-api-key"  # API key, optional
+provider = "openai"                                # Available options: "openai", "open-deep-research" -- defaults to "openai"
+model = "o4-mini-deep-research-2025-06-26"         # OpenAI: model identifier; ODR: LiteLLM model identifier, e.g., openai/qwen/qwen3-coder-30b
+api_key = "sk-your-api-key"             # API key, optional
 base_url = "https://api.openai.com/v1"  # OpenAI: OpenAI-compatible endpoint; ODR: LiteLLM-compatible endpoint, e.g., http://localhost:1234/v1
 
 # Task behavior
@@ -47,9 +47,9 @@ OpenAI provider example:
 ```toml
 [research]
 provider = "openai"
-model = "gpt-5-mini"                   # OpenAI model
-api_key = "sk-..."                     # Defaults to OPENAI_API_KEY
-base_url = "https://api.openai.com/v1" # OpenAI-compatible endpoint
+model = "o4-mini-deep-research-2025-06-26"  # OpenAI model
+api_key = "sk-..."                          # Defaults to OPENAI_API_KEY
+base_url = "https://api.openai.com/v1"      # OpenAI-compatible endpoint
 timeout = 1800
 poll_interval = 30
 max_retries = 3
