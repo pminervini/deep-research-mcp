@@ -95,7 +95,7 @@ class DeepResearchAgent:
                 )
 
             # Start background research task
-            response = await self._create_research_task(input_messages, tools)
+            response = await self._create_openai_research_task(input_messages, tools)
         else:
             raise ResearchError(f"Provider '{self.config.provider}' is not supported yet")
 
@@ -115,7 +115,7 @@ class DeepResearchAgent:
     @retry(
         stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)
     )
-    async def _create_research_task(
+    async def _create_openai_research_task(
         self, input_messages: List[Dict], tools: List[Dict]
     ) -> Dict[str, Any]:
         """Create research task with retry logic"""
