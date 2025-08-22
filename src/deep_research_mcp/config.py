@@ -43,6 +43,7 @@ class ResearchConfig:
 
     api_key: Optional[str] = None
     base_url: Optional[str] = None
+    provider: str = "openai"
     model: str = "o4-mini-deep-research-2025-06-26"
     timeout: float = 1800.0  # 30 minutes
     poll_interval: float = 30.0
@@ -74,6 +75,7 @@ class ResearchConfig:
         return cls(
             api_key=api_key,
             base_url=base_url,
+            provider=os.environ.get("PROVIDER", cls.provider),
             model=research_model,
             timeout=float(os.environ.get("RESEARCH_TIMEOUT", cls.timeout)),
             poll_interval=float(os.environ.get("POLL_INTERVAL", cls.poll_interval)),
