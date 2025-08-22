@@ -68,8 +68,8 @@ The project is composed of four main layers:
 1.  **MCP Server (`mcp_server.py`)**: This is the entry point for external clients like Claude Code. It uses the `fastmcp` library to expose the core research functionality as tools. It handles incoming requests, initializes the `DeepResearchAgent`, and formats the results for the client. Now includes three tools: `deep_research()`, `research_with_context()`, and `research_status()`.
 
 2.  **Core Logic (`agent.py`, `config.py`, `errors.py`)**: This layer contains the main business logic of the application.
-    *   `agent.py` is the heart of the project, managing the interaction with the OpenAI Deep Research API and coordinating clarification workflows.
-    *   `config.py` handles loading and validating configuration from environment variables, including clarification settings.
+    *   `agent.py` is the heart of the project, managing provider-based research interactions and coordinating clarification workflows. Currently supports OpenAI Deep Research API when provider is "openai".
+    *   `config.py` handles loading and validating configuration from environment variables, including provider selection and clarification settings.
     *   `errors.py` defines custom exception classes for better error handling.
 
 3.  **Clarification System (`clarification.py`)**: This layer handles the optional clarification workflow to improve research quality through follow-up questions.
@@ -88,12 +88,12 @@ The project is composed of four main layers:
 
 ### `src/deep_research_mcp/agent.py`
 
--   **Purpose**: Contains the `DeepResearchAgent` class, which is the core component responsible for interacting with the OpenAI Deep Research API.
+-   **Purpose**: Contains the `DeepResearchAgent` class, which is the core component responsible for interacting with research providers based on configuration.
 -   **Key Functionality**:
-    -   `research()`: The main method that orchestrates the research process. It builds enhanced instructions, prepares the input, creates a research task, polls for completion, and formats the results.
+    -   `research()`: The main method that orchestrates the research process. It builds enhanced instructions, prepares the input, and conditionally creates a research task based on the configured provider (currently only supports "openai").
     -   `build_research_instruction()`: Converts basic queries into detailed research briefs using the instruction builder model (only when clarification is enabled).
     -   `_create_instruction_client()`: Creates OpenAI client for instruction builder using clarification settings or default config.
-    -   `_create_research_task()`: Sends the initial request to the OpenAI API to start a research task. It includes retry logic using the `tenacity` library.
+    -   `_create_research_task()`: Sends the initial request to the OpenAI API to start a research task. It includes retry logic using the `tenacity` library. Only called when provider is "openai".
     -   `_wait_for_completion()`: Polls the API for the status of a research task until it is completed, fails, or times out.
     -   `_send_completion_callback()`: Sends a notification to a callback URL when the research is complete.
     -   `_extract_results()`: Parses the final response from the API and extracts the report, citations, and other metadata.
