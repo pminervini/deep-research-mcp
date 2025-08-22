@@ -15,8 +15,7 @@ A Python-based agent that integrates OpenAI's Deep Research API with Claude Code
 Create a `~/.deep_research` file in your home directory using TOML format:
 
 ```toml
-[research]
-# Core settings
+[research] # Core Deep Research settings
 model = "o4-mini-deep-research-2025-06-26"  # Research model to use
 api_key = "sk-your-api-key-here"            # Optional - Will use your OPENAI_API_KEY environment variable if not set
 base_url = "https://api.openai.com/v1"      # Optional - Custom OpenAI-compatible endpoint
@@ -26,8 +25,7 @@ timeout = 1800      # Request timeout in seconds (30 minutes)
 poll_interval = 30  # Polling interval for status checks in seconds
 max_retries = 3     # Maximum number of retry attempts for failed requests
 
-[clarification]
-# Clarification settings (optional)
+[clarification] # Clarification settings (optional)
 enable_clarification = false                          # Enable/disable the clarification pipeline
 clarification_api_key = "sk-your-clarification-api-key-here"  # Optional custom API key for clarification agents
 clarification_base_url = "https://api.openai.com/v1"  # Optional custom OpenAI-compatible endpoint for clarification agents
