@@ -47,9 +47,9 @@ OpenAI provider example:
 ```toml
 [research]
 provider = "openai"
-model = "gpt-5-mini"                 # Pick a Responses API model
-api_key = "sk-..."                   # Or rely on env OPENAI_API_KEY
-base_url = "https://api.openai.com/v1"
+model = "gpt-5-mini"                   # OpenAI model
+api_key = "sk-..."                     # Defaults to OPENAI_API_KEY
+base_url = "https://api.openai.com/v1" # OpenAI-compatible endpoint
 timeout = 1800
 poll_interval = 30
 max_retries = 3
@@ -60,8 +60,8 @@ Open Deep Research provider example:
 ```toml
 [research]
 provider = "open-deep-research"
-model = "openai/qwen/qwen3-coder-30b"  # Any LiteLLM-compatible model id
-base_url = "http://localhost:1234/v1"  # OpenAI-compatible endpoint (local or remote)
+model = "openai/qwen/qwen3-coder-30b"  # LiteLLM-compatible model id
+base_url = "http://localhost:1234/v1"  # LiteLLM-compatible endpoint (local or remote)
 api_key = ""                           # Optional if endpoint requires it
 timeout = 1800
 ```
