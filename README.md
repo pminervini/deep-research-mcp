@@ -17,9 +17,9 @@ Create a `~/.deep_research` file in your home directory using TOML format:
 ```toml
 [research]
 # Core settings
-research_model = "o4-mini-deep-research-2025-06-26"  # Research model to use
-api_key = "sk-your-api-key-here"                     # Will use your OPENAI_API_KEY environment variable if not set
-base_url = "https://api.openai.com/v1"               # Optional - Custom OpenAI-compatible endpoint for the research model
+model = "o4-mini-deep-research-2025-06-26"  # Research model to use
+# api_key = "sk-your-api-key-here"          # Will use your OPENAI_API_KEY environment variable if not set
+# base_url = "https://api.openai.com/v1"    # Optional - Custom OpenAI-compatible endpoint
 
 # Deep Research API settings
 timeout = 1800      # Request timeout in seconds (30 minutes)
@@ -27,12 +27,13 @@ poll_interval = 30  # Polling interval for status checks in seconds
 max_retries = 3     # Maximum number of retry attempts for failed requests
 
 [clarification]
+# Clarification settings (optional)
 enable_clarification = false                          # Enable/disable the clarification pipeline
 clarification_api_key = "sk-your-clarification-api-key-here"  # Optional custom API key for clarification agents
 clarification_base_url = "https://api.openai.com/v1"  # Optional custom OpenAI-compatible endpoint for clarification agents
 triage_model = "gpt-5-mini"                           # Model used for analyzing if queries need clarification
 clarifier_model = "gpt-5-mini"                        # Model used for enriching queries with user responses
-instruction_builder_model = "gpt-5-mini"              # Model used for building detailed research instructions (only when clarification is enabled)
+instruction_builder_model = "gpt-5-mini"              # Model used for building detailed research instructions
 
 [logging]
 level = "INFO"
@@ -134,7 +135,7 @@ async def main():
     # Print results
     print(f"Report: {result['final_report']}")
     print(f"Citations: {result['citations']}")
-    print(f"Research steps: {result['total_steps']}")
+    print(f"Research steps: {result['reasoning_steps']}")
 
 # Run the research
 asyncio.run(main())
@@ -192,9 +193,11 @@ The agent includes an optional clarification system to improve research quality 
 
 Enable clarification in your `~/.deep_research` file:
 ```toml
+[clarification]
 enable_clarification = true
-triage_model = "gpt-5-mini"      # Optional, defaults to gpt-5-mini
-clarifier_model = "gpt-5-mini"   # Optional, defaults to gpt-5-mini
+triage_model = "gpt-5-mini"                                    # Optional, defaults to gpt-5-mini
+clarifier_model = "gpt-5-mini"                                 # Optional, defaults to gpt-5-mini
+instruction_builder_model = "gpt-5-mini"                       # Optional, defaults to gpt-5-mini
 clarification_api_key = "sk-your-clarification-api-key-here"  # Optional custom API key for clarification models
 clarification_base_url = "https://custom-api.example.com/v1"  # Optional custom endpoint for clarification models
 ```
