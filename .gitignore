@@ -211,3 +211,6 @@ GEMINI.md
 CLAUDE.md
 .gemini/
 handbooks/
+
+# Research output files
+digest.txt
