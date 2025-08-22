@@ -82,7 +82,7 @@ The project is composed of four main layers:
     *   `InstructionBuilder` (in `agent.py`) converts basic queries into detailed research briefs using the instruction builder model.
     *   `PromptManager` manages loading and formatting of YAML-based prompt templates, including the instruction builder prompt.
 
-5.  **External Services**: This layer represents the external APIs the project interacts with, including the OpenAI Deep Research API, OpenAI Chat API (for clarification agents), and OpenAI Chat API (for instruction builder).
+5.  **External Services**: This layer represents the external APIs the project interacts with. When provider is "openai", uses the OpenAI Deep Research API, OpenAI Chat API (for clarification agents), and OpenAI Chat API (for instruction builder). Other providers will use different external services.
 
 ## File-by-File Breakdown
 
@@ -93,7 +93,7 @@ The project is composed of four main layers:
     -   `research()`: The main method that orchestrates the research process. It builds enhanced instructions, prepares the input, and conditionally creates a research task based on the configured provider (currently only supports "openai").
     -   `build_research_instruction()`: Converts basic queries into detailed research briefs using the instruction builder model (only when clarification is enabled).
     -   `_create_instruction_client()`: Creates OpenAI client for instruction builder using clarification settings or default config.
-    -   `_create_research_task()`: Sends the initial request to the OpenAI API to start a research task. It includes retry logic using the `tenacity` library. Only called when provider is "openai".
+    -   `_create_openai_research_task()`: Sends the initial request to the OpenAI API to start a research task. It includes retry logic using the `tenacity` library. Only called when provider is "openai".
     -   `_wait_for_completion()`: Polls the API for the status of a research task until it is completed, fails, or times out.
     -   `_send_completion_callback()`: Sends a notification to a callback URL when the research is complete.
     -   `_extract_results()`: Parses the final response from the API and extracts the report, citations, and other metadata.
