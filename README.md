@@ -18,8 +18,8 @@ Create a `~/.deep_research` file in your home directory using TOML format:
 [research]
 # Core settings
 model = "o4-mini-deep-research-2025-06-26"  # Research model to use
-# api_key = "sk-your-api-key-here"          # Will use your OPENAI_API_KEY environment variable if not set
-# base_url = "https://api.openai.com/v1"    # Optional - Custom OpenAI-compatible endpoint
+api_key = "sk-your-api-key-here"            # Optional - Will use your OPENAI_API_KEY environment variable if not set
+base_url = "https://api.openai.com/v1"      # Optional - Custom OpenAI-compatible endpoint
 
 # Deep Research API settings
 timeout = 1800      # Request timeout in seconds (30 minutes)
