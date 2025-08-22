@@ -83,18 +83,21 @@ class DeepResearchAgent:
             }
         )
 
-        # Configure tools
-        tools = [{"type": "web_search_preview"}]
-        if include_code_interpreter:
-            tools.append(
-                {
-                    "type": "code_interpreter",
-                    "container": {"type": "auto", "file_ids": []},
-                }
-            )
+        if self.config.provider in {"openai"}:
+            # Configure tools
+            tools = [{"type": "web_search_preview"}]
+            if include_code_interpreter:
+                tools.append(
+                    {
+                        "type": "code_interpreter",
+                        "container": {"type": "auto", "file_ids": []},
+                    }
+                )
 
-        # Start background research task
-        response = await self._create_research_task(input_messages, tools)
+            # Start background research task
+            response = await self._create_research_task(input_messages, tools)
+        else:
+            raise ResearchError(f"Provider '{self.config.provider}' is not supported yet")
 
         # Poll for completion with timeout
         try:
