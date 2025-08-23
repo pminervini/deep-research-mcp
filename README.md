@@ -19,11 +19,11 @@ Create a `~/.deep_research` file in your home directory using TOML format.
 Common settings:
 
 ```toml
-[research] # Core Deep Research functionality
+[research]                                         # Core Deep Research functionality
 provider = "openai"                                # Available options: "openai", "open-deep-research" -- defaults to "openai"
 model = "o4-mini-deep-research-2025-06-26"         # OpenAI: model identifier; ODR: LiteLLM model identifier, e.g., openai/qwen/qwen3-coder-30b
-api_key = "sk-your-api-key"             # API key, optional
-base_url = "https://api.openai.com/v1"  # OpenAI: OpenAI-compatible endpoint; ODR: LiteLLM-compatible endpoint, e.g., http://localhost:1234/v1
+api_key = "sk-your-api-key"                        # API key, optional
+base_url = "https://api.openai.com/v1"             # OpenAI: OpenAI-compatible endpoint; ODR: LiteLLM-compatible endpoint, e.g., http://localhost:1234/v1
 
 # Task behavior
 timeout = 1800
@@ -31,13 +31,13 @@ poll_interval = 30
 max_retries = 3
 
 # Largely based on https://cookbook.openai.com/examples/deep_research_api/introduction_to_deep_research_api_agents
-[clarification] # Optional query clarification component
+[clarification]                                         # Optional query clarification component
 enable_clarification = false
 triage_model = "gpt-5-mini"
 clarifier_model = "gpt-5-mini"
 instruction_builder_model = "gpt-5-mini"
-# clarification_api_key = "sk-your-api-key"               # Optional, overrides api_key
-# clarification_base_url = "https://api.openai.com/v1"    # Optional, overrides base_url
+clarification_api_key = "sk-your-api-key"               # Optional, overrides api_key
+clarification_base_url = "https://api.openai.com/v1"    # Optional, overrides base_url
 
 [logging]
 level = "INFO"
