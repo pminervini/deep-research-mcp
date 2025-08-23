@@ -19,7 +19,7 @@ Create a `~/.deep_research` file in your home directory using TOML format.
 Common settings:
 
 ```toml
-[research] # Core Deep Research functionalitys
+[research] # Core Deep Research functionality
 provider = "openai"                                # Available options: "openai", "open-deep-research" -- defaults to "openai"
 model = "o4-mini-deep-research-2025-06-26"         # OpenAI: model identifier; ODR: LiteLLM model identifier, e.g., openai/qwen/qwen3-coder-30b
 api_key = "sk-your-api-key"             # API key, optional
