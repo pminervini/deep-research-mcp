@@ -35,13 +35,13 @@ graph TD
     end
 
     subgraph External Services
-        H[OpenAI Responses API (web+code tools)]
+        H[OpenAI Responses API web+code tools]
         I[OpenAI Chat API for Clarification]
         L[OpenAI Chat API for Instruction Builder]
-        M[Open Deep Research (smolagents + text browser)]
+        M[Open Deep Research smolagents + text browser]
     end
 
-    A -- "Makes tool calls (deep_research, research_with_context)" --> B
+    A -- "Makes tool calls deep_research, research_with_context" --> B
     B -- "Uses" --> C
     B -- "Instantiates and uses" --> D
     D -- "Uses configuration from" --> E
