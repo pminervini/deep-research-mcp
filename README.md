@@ -19,7 +19,7 @@ Create a `~/.deep_research` file in your home directory using TOML format.
 Common settings:
 
 ```toml
-[research]
+[research] # Core Deep Research functionalitys
 provider = "openai"                                # Available options: "openai", "open-deep-research" -- defaults to "openai"
 model = "o4-mini-deep-research-2025-06-26"         # OpenAI: model identifier; ODR: LiteLLM model identifier, e.g., openai/qwen/qwen3-coder-30b
 api_key = "sk-your-api-key"             # API key, optional
@@ -30,7 +30,7 @@ timeout = 1800
 poll_interval = 30
 max_retries = 3
 
-[clarification]                 # Optional
+[clarification] # Optional
 enable_clarification = false
 triage_model = "gpt-5-mini"
 clarifier_model = "gpt-5-mini"
