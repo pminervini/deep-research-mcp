@@ -2,8 +2,8 @@
 
 """
 Tests that the MCP server entrypoints run for real with both providers.
-No mocking/stubbing of classes. For the openai provider, we ONLY use
-`gpt-5-mini` as requested.
+For the openai provider, we ONLY use `gpt-5-mini` since it's WAY cheaper
+than o4-mini-deep-research-2025-06-26 and o3-deep-research-2025-06-26.
 """
 
 import os
