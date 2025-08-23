@@ -30,6 +30,7 @@ timeout = 1800
 poll_interval = 30
 max_retries = 3
 
+# Largely based on https://cookbook.openai.com/examples/deep_research_api/introduction_to_deep_research_api_agents
 [clarification] # Optional query clarification component
 enable_clarification = false
 triage_model = "gpt-5-mini"
