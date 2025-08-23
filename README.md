@@ -1,12 +1,12 @@
 # Deep Research MCP
 
-A Python-based agent that integrates research providers with Claude Code through the Model Context Protocol (MCP). It supports both OpenAI (Responses API with web search and code interpreter) and the open-source Open Deep Research stack (smolagents + text browser), enabling autonomous research with web search, optional code execution, and citation management.
+A Python-based agent that integrates research providers with Claude Code through the Model Context Protocol (MCP). It supports both OpenAI (Responses API with web search and code interpreter) and the open-source Open Deep Research stack (based on smolagents).
 
 ## Prerequisites
 
 - Python 3.9+
 - One of:
-  - OpenAI API access (Responses API models, e.g., `gpt-5-mini`)
+  - OpenAI API access (Responses API models, e.g., `o4-mini-deep-research-2025-06-26`)
   - Open Deep Research dependencies (installed via `requirements.txt`)
 - Claude Code, or any other assistant supporting MCP integration
 
