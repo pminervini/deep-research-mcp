@@ -30,7 +30,7 @@ timeout = 1800
 poll_interval = 30
 max_retries = 3
 
-[clarification] # Optional
+[clarification] # Optional query clarification component
 enable_clarification = false
 triage_model = "gpt-5-mini"
 clarifier_model = "gpt-5-mini"
