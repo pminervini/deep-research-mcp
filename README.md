@@ -231,8 +231,8 @@ enable_clarification = true
 triage_model = "gpt-5-mini"                                    # Optional, defaults to gpt-5-mini
 clarifier_model = "gpt-5-mini"                                 # Optional, defaults to gpt-5-mini
 instruction_builder_model = "gpt-5-mini"                       # Optional, defaults to gpt-5-mini
-clarification_api_key = "sk-your-clarification-api-key-here"  # Optional custom API key for clarification models
-clarification_base_url = "https://custom-api.example.com/v1"  # Optional custom endpoint for clarification models
+clarification_api_key = "sk-your-clarification-api-key-here"   # Optional custom API key for clarification models
+clarification_base_url = "https://custom-api.example.com/v1"   # Optional custom endpoint for clarification models
 ```
 
 ### Usage Flow
