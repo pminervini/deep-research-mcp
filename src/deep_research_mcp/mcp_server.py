@@ -2,7 +2,26 @@
 # -*- coding: utf-8 -*-
 
 """
-MCP Server implementation for Claude Code integration.
+MCP Server for Deep Research Agent
+
+This module provides an MCP (Model Context Protocol) server interface for the Deep Research Agent.
+It exposes research capabilities through standardized MCP tools that can be used by AI assistants
+and other MCP-compatible clients.
+
+Features:
+- Deep research with multiple backend providers (OpenAI Responses API, Open Deep Research)
+- Clarification workflows to improve research quality
+- Task status monitoring for long-running research
+- Configurable research parameters and system instructions
+- Support for data analysis and visualization capabilities
+
+The server exposes the following tools:
+- deep_research: Main research tool with optional clarification
+- research_with_context: Research using clarification answers
+- check_research_status: Monitor task progress
+
+Based on the deep research patterns from:
+https://cookbook.openai.com/examples/deep_research_api/introduction_to_deep_research_api_agents
 """
 
 import logging
