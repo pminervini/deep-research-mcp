@@ -327,7 +327,7 @@ Configuration class for the research agent.
 pytest
 
 # Run with coverage
-pytest --cov=deep_research_mcp tests/
+pytest --cov=deep-research-mcp tests/
 
 # Run specific test file
 pytest tests/test_agent.py
