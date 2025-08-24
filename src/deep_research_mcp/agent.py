@@ -1,8 +1,13 @@
 # -*- coding: utf-8 -*-
 
 """
-Deep Research Agent implementation for OpenAI's Deep Research API.
+Deep Research MCP Agent
+
+This module provides a provider-aware research agent that can work with multiple
+research backends (OpenAI Responses API and Open Deep Research) to perform
+deep research tasks with optional clarification workflows.
 """
+
 
 import asyncio
 import time

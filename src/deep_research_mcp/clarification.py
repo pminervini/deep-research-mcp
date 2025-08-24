@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
 """
-Clarification agents for enhancing research queries.
-Based on the four-agent pipeline pattern.
+Clarification agents for improving research queries.
+Based on https://cookbook.openai.com/examples/deep_research_api/introduction_to_deep_research_api_agents
 """
 
 import logging
