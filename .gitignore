@@ -209,7 +209,7 @@ __marimo__/
 # Local documentation files
 AGENTS.md
 GEMINI.md
-CLAUDE.md
+# CLAUDE.md
 .gemini/
 handbooks/
 
