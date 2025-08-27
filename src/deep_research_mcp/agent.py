@@ -43,6 +43,9 @@ class DeepResearchAgent:
         elif self.config.provider in {"open-deep-research"}:
             self._init_open_deep_research()
         
+        elif self.config.provider in {"anthropic"}:
+            self._init_anthropic()
+            
         else:
             raise ConfigurationError(f"Provider '{self.config.provider}' is not supported")
 
@@ -174,6 +177,67 @@ Additionally, if after some searching you find out that you need more informatio
             additional_authorized_imports=["*"],
         )
 
+    def _init_anthropic(self):
+        """Initialize Anthropic client and tools"""
+        try:
+            import anthropic
+        except ImportError:
+            raise ConfigurationError(
+                "Anthropic client not installed. Install with: pip install anthropic"
+            )
+        
+        # Initialize Anthropic client
+        kwargs = {}
+        if self.config.api_key:
+            kwargs["api_key"] = self.config.api_key
+        if self.config.base_url:
+            kwargs["base_url"] = self.config.base_url
+        
+        self.anthropic_client = anthropic.Anthropic(**kwargs)
+        
+        # Configure web search tools for Anthropic
+        self.search_tools = self._init_web_search_tools()
+    
+    def _init_web_search_tools(self):
+        """Initialize web search tools for Anthropic backend"""
+        import os
+        
+        tools = []
+        
+        # Add search capability descriptions for function calling
+        search_tool = {
+            "name": "web_search",
+            "description": "Search the web for information on a given query",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The search query to execute"
+                    }
+                },
+                "required": ["query"]
+            }
+        }
+        
+        browse_tool = {
+            "name": "browse_webpage",
+            "description": "Browse and extract content from a specific webpage",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "The URL to browse and extract content from"
+                    }
+                },
+                "required": ["url"]
+            }
+        }
+        
+        tools.extend([search_tool, browse_tool])
+        return tools
+
     async def research(
         self,
         query: str,
@@ -233,6 +297,9 @@ Additionally, if after some searching you find out that you need more informatio
         elif self.config.provider in {"open-deep-research"}:
             # Use open-deep-research agent
             return await self._run_open_deep_research(enhanced_query, system_prompt)
+        elif self.config.provider in {"anthropic"}:
+            # Use Anthropic agent
+            return await self._run_anthropic_research(enhanced_query, system_prompt, include_code_interpreter)
         else:
             raise ResearchError(f"Provider '{self.config.provider}' is not supported yet")
 
@@ -323,6 +390,277 @@ Additionally, if after some searching you find out that you need more informatio
                 "task_id": task_id,
                 "execution_time": time.time() - start_time
             }
+
+    async def _run_anthropic_research(
+        self, query: str, system_prompt: Optional[str] = None, include_code_interpreter: bool = True
+    ) -> Dict[str, Any]:
+        """Run Anthropic research agent asynchronously"""
+        import uuid
+        import requests
+        from datetime import datetime
+        from bs4 import BeautifulSoup
+        import json
+        import os
+        
+        # Record start time
+        task_id = str(uuid.uuid4())
+        start_time = time.time()
+        
+        try:
+            # Prepare system message with research instructions
+            system_message = """You are a deep research agent. Your task is to conduct comprehensive research on the given query using web search and content analysis.
+
+For each research task:
+1. Break down the query into searchable components
+2. Search for relevant information using web_search
+3. Browse important pages using browse_webpage to get detailed content
+4. Synthesize findings into a comprehensive report
+5. Include proper citations and sources
+
+Always provide detailed, well-sourced information with references to your sources."""
+            
+            if system_prompt:
+                system_message = f"{system_prompt}\n\n{system_message}"
+            
+            # Combine system prompt with query if provided
+            user_message = query
+            
+            messages = [
+                {"role": "user", "content": user_message}
+            ]
+            
+            # Execute research with function calling
+            search_queries = []
+            citations = []
+            reasoning_steps = []
+            total_steps = 0
+            
+            # Initialize conversation loop for iterative research
+            max_iterations = 10
+            iteration = 0
+            
+            while iteration < max_iterations:
+                total_steps += 1
+                
+                try:
+                    # Call Anthropic API with function calling
+                    response = self.anthropic_client.messages.create(
+                        model=self.config.model,
+                        max_tokens=4096,
+                        system=system_message,
+                        messages=messages,
+                        tools=self.search_tools,
+                        tool_choice={"type": "auto"}
+                    )
+                    
+                    # Process response
+                    assistant_message = {"role": "assistant", "content": []}
+                    
+                    for content_block in response.content:
+                        if content_block.type == "text":
+                            assistant_message["content"].append({
+                                "type": "text", 
+                                "text": content_block.text
+                            })
+                            reasoning_steps.append(content_block.text[:200] + "..." if len(content_block.text) > 200 else content_block.text)
+                            
+                        elif content_block.type == "tool_use":
+                            # Handle tool calls
+                            tool_name = content_block.name
+                            tool_input = content_block.input
+                            tool_use_id = content_block.id
+                            
+                            assistant_message["content"].append({
+                                "type": "tool_use",
+                                "id": tool_use_id,
+                                "name": tool_name,
+                                "input": tool_input
+                            })
+                            
+                            # Execute the tool
+                            tool_result = await self._execute_anthropic_tool(tool_name, tool_input)
+                            
+                            # Track search queries and citations
+                            if tool_name == "web_search":
+                                search_queries.append(tool_input.get("query", ""))
+                            elif tool_name == "browse_webpage":
+                                url = tool_input.get("url", "")
+                                if url:
+                                    citations.append({
+                                        "index": len(citations) + 1,
+                                        "title": f"Source {len(citations) + 1}",
+                                        "url": url,
+                                        "start_char": 0,
+                                        "end_char": 0
+                                    })
+                            
+                            # Add tool result to messages
+                            messages.append(assistant_message)
+                            messages.append({
+                                "role": "user",
+                                "content": [{
+                                    "type": "tool_result",
+                                    "tool_use_id": tool_use_id,
+                                    "content": tool_result
+                                }]
+                            })
+                            
+                            break  # Continue to next iteration
+                    else:
+                        # No tool calls, we're done
+                        final_response_text = ""
+                        for content_block in response.content:
+                            if content_block.type == "text":
+                                final_response_text += content_block.text
+                        
+                        return {
+                            "status": "completed",
+                            "final_report": final_response_text,
+                            "citations": citations,
+                            "reasoning_steps": len(reasoning_steps),
+                            "search_queries": search_queries,
+                            "total_steps": total_steps,
+                            "task_id": task_id,
+                            "execution_time": time.time() - start_time
+                        }
+                
+                except Exception as e:
+                    self.logger.error(f"Error in Anthropic research iteration {iteration}: {e}")
+                    if iteration == 0:
+                        # If first iteration fails, return error
+                        raise e
+                    else:
+                        # If later iteration fails, return what we have so far
+                        break
+                
+                iteration += 1
+                
+                # Prevent infinite loops
+                if iteration >= max_iterations:
+                    break
+            
+            # If we exit the loop, compile final response from last assistant message
+            final_report = "Research completed with available information."
+            if messages and messages[-2]["role"] == "assistant":
+                for content in messages[-2]["content"]:
+                    if content.get("type") == "text":
+                        final_report = content["text"]
+                        break
+            
+            return {
+                "status": "completed",
+                "final_report": final_report,
+                "citations": citations,
+                "reasoning_steps": len(reasoning_steps),
+                "search_queries": search_queries,
+                "total_steps": total_steps,
+                "task_id": task_id,
+                "execution_time": time.time() - start_time
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Anthropic research error: {e}")
+            return {
+                "status": "failed",
+                "message": str(e),
+                "task_id": task_id,
+                "execution_time": time.time() - start_time
+            }
+    
+    async def _execute_anthropic_tool(self, tool_name: str, tool_input: Dict[str, Any]) -> str:
+        """Execute a tool call for Anthropic research"""
+        import requests
+        from bs4 import BeautifulSoup
+        
+        try:
+            if tool_name == "web_search":
+                query = tool_input.get("query", "")
+                # Use DuckDuckGo search as a simple implementation
+                return await self._simple_web_search(query)
+                
+            elif tool_name == "browse_webpage":
+                url = tool_input.get("url", "")
+                # Simple webpage content extraction
+                return await self._simple_webpage_browse(url)
+                
+            else:
+                return f"Unknown tool: {tool_name}"
+                
+        except Exception as e:
+            self.logger.error(f"Tool execution error: {e}")
+            return f"Tool execution failed: {str(e)}"
+    
+    async def _simple_web_search(self, query: str) -> str:
+        """Simple DuckDuckGo search implementation"""
+        import requests
+        from bs4 import BeautifulSoup
+        
+        try:
+            # Use DuckDuckGo instant answers API
+            search_url = f"https://api.duckduckgo.com/?q={query}&format=json&no_html=1"
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.get(search_url, timeout=10)
+                data = response.json()
+                
+                results = []
+                
+                # Get instant answer if available
+                if data.get("Abstract"):
+                    results.append(f"Summary: {data['Abstract']}")
+                
+                # Get related topics
+                if data.get("RelatedTopics"):
+                    results.append("Related information:")
+                    for topic in data["RelatedTopics"][:3]:
+                        if isinstance(topic, dict) and topic.get("Text"):
+                            results.append(f"- {topic['Text']}")
+                            if topic.get("FirstURL"):
+                                results.append(f"  Source: {topic['FirstURL']}")
+                
+                if not results:
+                    results.append(f"Search performed for: {query}")
+                    results.append("Please try browsing specific URLs for more detailed information.")
+                
+                return "\n".join(results)
+                
+        except Exception as e:
+            return f"Search failed: {str(e)}"
+    
+    async def _simple_webpage_browse(self, url: str) -> str:
+        """Simple webpage content extraction"""
+        from bs4 import BeautifulSoup
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                }
+                response = await client.get(url, headers=headers, timeout=15)
+                response.raise_for_status()
+                
+                soup = BeautifulSoup(response.content, 'html.parser')
+                
+                # Remove script and style elements
+                for script in soup(["script", "style"]):
+                    script.decompose()
+                
+                # Get text content
+                text = soup.get_text()
+                
+                # Clean up text
+                lines = (line.strip() for line in text.splitlines())
+                chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+                text = ' '.join(chunk for chunk in chunks if chunk)
+                
+                # Limit text length
+                if len(text) > 5000:
+                    text = text[:5000] + "...\n[Content truncated]"
+                
+                return f"Content from {url}:\n\n{text}"
+                
+        except Exception as e:
+            return f"Failed to browse {url}: {str(e)}"
 
     @retry(
         stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)
@@ -494,6 +832,13 @@ Additionally, if after some searching you find out that you need more informatio
                 "task_id": task_id,
                 "status": "unknown",
                 "message": "Task status tracking not available for open-deep-research provider"
+            }
+        elif self.config.provider in {"anthropic"}:
+            # For Anthropic, we don't have persistent task tracking
+            return {
+                "task_id": task_id,
+                "status": "unknown",
+                "message": "Task status tracking not available for anthropic provider"
             }
         else:
             return {"task_id": task_id, "status": "error", "error": f"Provider {self.config.provider} not supported"}

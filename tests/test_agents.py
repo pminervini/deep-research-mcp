@@ -18,6 +18,7 @@ from deep_research_mcp.config import ResearchConfig
     [
         ("openai", "gpt-5-mini"),
         ("open-deep-research", "openai/qwen/qwen3-coder-30b"),
+        ("anthropic", "claude-3-5-sonnet-20241022"),
     ],
 )
 async def test_mcp_server_with_providers(provider, model):
@@ -35,6 +36,8 @@ async def test_mcp_server_with_providers(provider, model):
         assert cfg.provider == provider
         if provider == "openai":
             assert cfg.model == "gpt-5-mini"
+        elif provider == "anthropic":
+            assert cfg.model == "claude-3-5-sonnet-20241022"
         else:
             assert cfg.model == model
 

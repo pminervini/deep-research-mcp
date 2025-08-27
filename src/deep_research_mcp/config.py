@@ -76,13 +76,22 @@ class ResearchConfig:
         elif provider in {"openai"}:
             # For OpenAI, model is the Deep Research model
             default_model = "gpt-5-mini"
+        elif provider in {"anthropic"}:
+            # For Anthropic, model is the Claude model to use
+            default_model = "claude-3-5-sonnet-20241022"
+            default_base_url = "https://api.anthropic.com"
         else:
             raise ConfigurationError(f"Provider '{provider}' is not supported")
         
         research_model = os.environ.get("RESEARCH_MODEL", default_model)
 
-        api_key = os.environ.get("OPENAI_API_KEY")
-        base_url = os.environ.get("OPENAI_BASE_URL", default_base_url)
+        # Get API key based on provider
+        if provider in {"anthropic"}:
+            api_key = os.environ.get("ANTHROPIC_API_KEY")
+        else:
+            api_key = os.environ.get("OPENAI_API_KEY")
+        
+        base_url = os.environ.get("RESEARCH_BASE_URL", default_base_url)
 
         return cls(
             api_key=api_key,
@@ -109,6 +118,9 @@ class ResearchConfig:
         if self.provider in {"openai"}:
             if self.api_key and not self.api_key.startswith("sk-"):
                 raise ConfigurationError("Invalid API key format")
+        elif self.provider in {"anthropic"}:
+            if self.api_key and not self.api_key.startswith("sk-ant-"):
+                raise ConfigurationError("Invalid Anthropic API key format")
 
         if self.timeout <= 0:
             raise ConfigurationError("Timeout must be positive")

@@ -236,3 +236,86 @@ def test_instruction_builder_model_defaults():
 
     assert config.instruction_builder_model == "gpt-5-mini"
     assert config.validate() is True
+
+
+def test_anthropic_provider_config():
+    """Test config creation for Anthropic provider"""
+    api_key = "sk-ant-test-key-12345"
+    config = ResearchConfig(
+        provider="anthropic",
+        api_key=api_key,
+        model="claude-3-5-sonnet-20241022",
+        base_url="https://api.anthropic.com",
+        timeout=1800
+    )
+
+    assert config.provider == "anthropic"
+    assert config.api_key == api_key
+    assert config.model == "claude-3-5-sonnet-20241022"
+    assert config.base_url == "https://api.anthropic.com"
+    assert config.validate() is True
+
+
+def test_anthropic_from_env():
+    """Test loading Anthropic config from environment variables"""
+    old_provider = os.environ.get("PROVIDER")
+    old_api_key = os.environ.get("ANTHROPIC_API_KEY")
+    old_model = os.environ.get("RESEARCH_MODEL")
+    old_base_url = os.environ.get("RESEARCH_BASE_URL")
+
+    os.environ["PROVIDER"] = "anthropic"
+    os.environ["ANTHROPIC_API_KEY"] = "sk-ant-env-key-12345"
+    os.environ["RESEARCH_MODEL"] = "claude-3-5-sonnet-20241022"
+    os.environ["RESEARCH_BASE_URL"] = "https://api.anthropic.com"
+
+    try:
+        config = ResearchConfig.from_env()
+        assert config.provider == "anthropic"
+        assert config.api_key == "sk-ant-env-key-12345"
+        assert config.model == "claude-3-5-sonnet-20241022"
+        assert config.base_url == "https://api.anthropic.com"
+        assert config.validate() is True
+    finally:
+        # Restore old environment variables
+        if old_provider:
+            os.environ["PROVIDER"] = old_provider
+        elif "PROVIDER" in os.environ:
+            del os.environ["PROVIDER"]
+
+        if old_api_key:
+            os.environ["ANTHROPIC_API_KEY"] = old_api_key
+        elif "ANTHROPIC_API_KEY" in os.environ:
+            del os.environ["ANTHROPIC_API_KEY"]
+
+        if old_model:
+            os.environ["RESEARCH_MODEL"] = old_model
+        elif "RESEARCH_MODEL" in os.environ:
+            del os.environ["RESEARCH_MODEL"]
+
+        if old_base_url:
+            os.environ["RESEARCH_BASE_URL"] = old_base_url
+        elif "RESEARCH_BASE_URL" in os.environ:
+            del os.environ["RESEARCH_BASE_URL"]
+
+
+def test_anthropic_api_key_validation():
+    """Test Anthropic API key validation"""
+    from deep_research_mcp.errors import ConfigurationError
+    
+    # Valid Anthropic API key should pass
+    config = ResearchConfig(
+        provider="anthropic",
+        api_key="sk-ant-valid-key-12345",
+        model="claude-3-5-sonnet-20241022"
+    )
+    assert config.validate() is True
+
+    # Invalid Anthropic API key should raise error
+    config_invalid = ResearchConfig(
+        provider="anthropic",
+        api_key="sk-invalid-key-format",  # Should start with sk-ant-
+        model="claude-3-5-sonnet-20241022"
+    )
+    
+    with pytest.raises(ConfigurationError, match="Invalid Anthropic API key format"):
+        config_invalid.validate()

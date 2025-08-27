@@ -61,13 +61,16 @@ The server exposes three main tools:
 
 ## Research Provider Options
 
-This MCP server supports two research providers:
+This MCP server supports three research providers:
 
 ### 1. OpenAI (Default)
 Uses OpenAI's Responses API with built-in web search and code interpreter tools.
 
 ### 2. Open Deep Research  
 Uses the open-source alternative with smolagents framework, providing customizable search tools and local model support.
+
+### 3. Anthropic
+Uses Anthropic's Claude models with function calling for web search and content analysis.
 
 Choose your provider in the configuration file with the `provider` key in `[research]`, or set env `PROVIDER`.
 
@@ -154,3 +157,30 @@ pip install -r requirements.txt
 ```
 
 The ODR-specific dependencies are included via the `open-deep-research` extra in `requirements.txt` and will be installed automatically.
+
+#### Anthropic Configuration
+
+```toml
+[research]
+provider = "anthropic"
+model = "claude-3-5-sonnet-20241022"     # Pick an Anthropic Claude model
+api_key = "sk-ant-your-api-key-here"     # Or set env ANTHROPIC_API_KEY
+base_url = "https://api.anthropic.com"   # Anthropic API endpoint
+timeout = 1800
+
+[clarification]
+enable_clarification = true
+triage_model = "gpt-5-mini"
+clarifier_model = "gpt-5-mini"
+instruction_builder_model = "gpt-5-mini"
+clarification_api_key = ""               # Optional, overrides api_key
+clarification_base_url = ""              # Optional, overrides base_url
+```
+
+#### Installation for Anthropic
+
+If using the Anthropic provider, install the required dependencies:
+
+```bash
+pip install anthropic beautifulsoup4
+```
