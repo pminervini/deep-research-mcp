@@ -39,12 +39,31 @@ mypy src/deep_research_mcp/
 ```
 
 ### Running the MCP Server
+
+The server supports both stdio (default) and HTTP transports:
+
+#### Stdio Transport (Default)
 ```bash
-# Start the MCP server directly
+# Start the MCP server with stdio transport (default)
 python src/deep_research_mcp/mcp_server.py
+
+# Or explicitly specify stdio transport
+python src/deep_research_mcp/mcp_server.py --transport stdio
 
 # Or use the installed console script
 deep-research-mcp
+```
+
+#### HTTP Transport
+```bash
+# Start the MCP server with HTTP transport on default port 8080
+python src/deep_research_mcp/mcp_server.py --transport http
+
+# Specify custom host and port
+python src/deep_research_mcp/mcp_server.py --transport http --host 0.0.0.0 --port 3000
+
+# For development with custom settings
+python src/deep_research_mcp/mcp_server.py --transport http --host localhost --port 8080
 ```
 
 ## MCP Integration for Claude Code

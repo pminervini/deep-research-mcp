@@ -176,11 +176,69 @@ asyncio.run(main())
 
 ### As an MCP Server
 
+The server supports both stdio (default) and HTTP transports:
+
+#### Stdio Transport (Default)
 ```bash
-# Start the MCP server
+# Start the MCP server with stdio transport (default)
 python src/deep_research_mcp/mcp_server.py
 
-# The server will now be available to Claude Code
+# Or explicitly specify stdio transport  
+python src/deep_research_mcp/mcp_server.py --transport stdio
+```
+
+#### HTTP Transport
+```bash
+# Start the MCP server with HTTP transport on default port 8080
+python src/deep_research_mcp/mcp_server.py --transport http
+
+# Specify custom host and port for remote access
+python src/deep_research_mcp/mcp_server.py --transport http --host 0.0.0.0 --port 3000
+
+# For development with custom settings
+python src/deep_research_mcp/mcp_server.py --transport http --host localhost --port 8080
+```
+
+### HTTP Transport Use Cases
+
+HTTP transport enables several advanced deployment scenarios:
+
+- **Remote deployment**: Deploy on cloud servers and access from multiple clients
+- **Load balancing**: Use HTTP load balancers for high availability
+- **Network isolation**: Deploy in DMZ or private networks with HTTP routing
+- **Containerization**: Deploy in Docker/Kubernetes with standard HTTP service patterns
+- **Development teams**: Share a single research server instance across team members
+
+### Docker Deployment Example
+
+Create a `Dockerfile` for HTTP deployment:
+
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY src/ ./src/
+
+EXPOSE 8080
+
+CMD ["python", "src/deep_research_mcp/mcp_server.py", "--transport", "http", "--host", "0.0.0.0", "--port", "8080"]
+```
+
+Build and run:
+
+```bash
+# Build the image
+docker build -t deep-research-mcp .
+
+# Run with environment variables
+docker run -p 8080:8080 -e OPENAI_API_KEY=your-key-here deep-research-mcp
+
+# Or run with config file mounted
+docker run -p 8080:8080 -v ~/.deep_research:/root/.deep_research deep-research-mcp
 ```
 
 ### Example Queries
