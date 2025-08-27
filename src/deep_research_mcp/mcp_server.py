@@ -24,6 +24,7 @@ Based on the deep research patterns from:
 https://cookbook.openai.com/examples/deep_research_api/introduction_to_deep_research_api_agents
 """
 
+import argparse
 import logging
 from typing import Annotated, Optional
 from fastmcp import FastMCP
@@ -349,7 +350,28 @@ research_with_context = _research_with_context_impl
 
 def main():
     """Main entry point for MCP server"""
-    logger.info("Starting Deep Research MCP server...")
+    parser = argparse.ArgumentParser(description="Deep Research MCP Server")
+    parser.add_argument(
+        "--transport",
+        choices=["stdio", "http"],
+        default="stdio",
+        help="Transport type for MCP server (default: stdio)"
+    )
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind for HTTP transport (default: 127.0.0.1)"
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8080,
+        help="Port to bind for HTTP transport (default: 8080)"
+    )
+    
+    args = parser.parse_args()
+    
+    logger.info(f"Starting Deep Research MCP server with {args.transport} transport...")
 
     # Validate configuration on startup
     try:
@@ -363,8 +385,13 @@ def main():
         )
         return
 
-    # Run the MCP server
-    mcp.run()
+    # Run the MCP server with selected transport
+    if args.transport == "http":
+        logger.info(f"Starting HTTP server on {args.host}:{args.port}")
+        mcp.run(transport="http", host=args.host, port=args.port)
+    else:
+        logger.info("Starting stdio server")
+        mcp.run()
 
 
 if __name__ == "__main__":
