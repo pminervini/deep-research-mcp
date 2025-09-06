@@ -32,7 +32,7 @@ max_retries = 3
 
 # Largely based on https://cookbook.openai.com/examples/deep_research_api/introduction_to_deep_research_api_agents
 [clarification]                                       # Optional query clarification component
-enable_clarification = false
+enable = true
 triage_model = "gpt-5-mini"
 clarifier_model = "gpt-5-mini"
 instruction_builder_model = "gpt-5-mini"
