@@ -36,8 +36,8 @@ enable_clarification = false
 triage_model = "gpt-5-mini"
 clarifier_model = "gpt-5-mini"
 instruction_builder_model = "gpt-5-mini"
-clarification_api_key = "sk-your-api-key"             # Optional, overrides api_key
-clarification_base_url = "https://api.openai.com/v1"  # Optional, overrides base_url
+api_key = "sk-your-api-key"             # Optional, overrides api_key
+base_url = "https://api.openai.com/v1"  # Optional, overrides base_url
 
 [logging]
 level = "INFO"

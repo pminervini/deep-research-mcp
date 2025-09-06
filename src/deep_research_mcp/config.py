@@ -71,8 +71,34 @@ class ResearchConfig:
     def from_env(cls) -> "ResearchConfig":
         """Create configuration from environment variables"""
         logger.info("Creating configuration from environment variables")
-        provider = os.environ.get("PROVIDER", cls.provider)
-        
+        provider = os.environ.get("RESEARCH_PROVIDER", cls.provider)
+
+        # Helpers for resolving environment variables with backward-compatible aliases
+        def get_env_first(*keys: str, default: Optional[str] = None) -> Optional[str]:
+            for key in keys:
+                val = os.environ.get(key)
+                if val is not None:
+                    return val
+            return default
+
+        def get_bool_env(*keys: str, default: bool = False) -> bool:
+            truthy = {"true", "1", "yes", "y", "on"}
+            falsy = {"false", "0", "no", "n", "off"}
+            for key in keys:
+                val = os.environ.get(key)
+                if val is not None:
+                    v = val.strip().lower()
+                    if v in truthy:
+                        return True
+                    if v in falsy:
+                        return False
+            return default
+
+        # Print all environment variables for debugging
+        logger.debug("All environment variables:")
+        for key, value in sorted(os.environ.items()):
+            logger.debug(f"  {key}={value}")
+
         # Set different defaults based on provider
         default_model = default_base_url = None
         if provider in {"open-deep-research"}:
@@ -81,40 +107,52 @@ class ResearchConfig:
             default_base_url = "http://localhost:1234/v1"
         elif provider in {"openai"}:
             # For OpenAI, model is the Deep Research model
-            default_model = "gpt-5-mini"
+            default_model = "o4-mini-deep-research-2025-06-26"
             default_base_url = "https://api.openai.com/v1"
         else:
             raise ConfigurationError(f"Provider '{provider}' is not supported")
         
         research_model = os.environ.get("RESEARCH_MODEL", default_model)
 
-
-        api_key = os.environ.get("OPENAI_API_KEY")
-        base_url = os.environ.get("OPENAI_BASE_URL", default_base_url)
-
-        if api_key is None:
-             api_key = os.environ.get("API_KEY")
-
-        if base_url is None:
-            base_url = os.environ.get("BASE_URL")
+        api_key = get_env_first("RESEARCH_API_KEY", "OPENAI_API_KEY")
+        base_url = get_env_first("RESEARCH_BASE_URL", "OPENAI_BASE_URL", default=default_base_url)
 
         return cls(
             api_key=api_key,
             base_url=base_url,
-            provider=os.environ.get("PROVIDER", cls.provider),
+            provider=os.environ.get("RESEARCH_PROVIDER", cls.provider),
             model=research_model,
             timeout=float(os.environ.get("RESEARCH_TIMEOUT", cls.timeout)),
-            poll_interval=float(os.environ.get("POLL_INTERVAL", cls.poll_interval)),
-            max_retries=int(os.environ.get("MAX_RETRIES", cls.max_retries)),
-            log_level=os.environ.get("LOG_LEVEL", cls.log_level),
-            enable_clarification=os.environ.get("ENABLE_CLARIFICATION", "false").lower()
-            in ("true", "1", "yes"),
-            triage_model=os.environ.get("TRIAGE_MODEL", cls.triage_model),
-            clarifier_model=os.environ.get("CLARIFIER_MODEL", cls.clarifier_model),
-            clarification_base_url=os.environ.get("CLARIFICATION_BASE_URL"),
-            clarification_api_key=os.environ.get("CLARIFICATION_API_KEY"),
-            instruction_builder_model=os.environ.get(
-                "INSTRUCTION_BUILDER_MODEL", cls.instruction_builder_model
+            poll_interval=float(os.environ.get("RESEARCH_POLL_INTERVAL", cls.poll_interval)),
+            max_retries=int(os.environ.get("RESEARCH_MAX_RETRIES", cls.max_retries)),
+            log_level=os.environ.get("LOGGING_LEVEL", cls.log_level),
+            enable_clarification=get_bool_env(
+                # Preferred env var (used in README examples)
+                "ENABLE_CLARIFICATION",
+                # Existing env var created by TOML flattener for [clarification].enable_clarification
+                "CLARIFICATION_ENABLE_CLARIFICATION",
+                default=False,
+            ),
+            triage_model=os.environ.get("CLARIFICATION_TRIAGE_MODEL", cls.triage_model),
+            clarifier_model=os.environ.get("CLARIFICATION_CLARIFIER_MODEL", cls.clarifier_model),
+            instruction_builder_model=get_env_first(
+                # Preferred when set under [clarification] in TOML
+                "CLARIFICATION_INSTRUCTION_BUILDER_MODEL",
+                # Backward-compatible top-level env var
+                "INSTRUCTION_BUILDER_MODEL",
+                default=cls.instruction_builder_model,
+            ),
+            clarification_base_url=get_env_first(
+                # Standard from [clarification].base_url
+                "CLARIFICATION_BASE_URL",
+                # Also accept [clarification].clarification_base_url (would flatten twice)
+                "CLARIFICATION_CLARIFICATION_BASE_URL",
+            ),
+            clarification_api_key=get_env_first(
+                # Standard from [clarification].api_key
+                "CLARIFICATION_API_KEY",
+                # Also accept [clarification].clarification_api_key (would flatten twice)
+                "CLARIFICATION_CLARIFICATION_API_KEY",
             ),
         )
 
