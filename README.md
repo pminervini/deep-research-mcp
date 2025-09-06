@@ -84,6 +84,11 @@ claude mcp add deep-research python /path/to/deep-research-mcp/src/deep_research
 
 Replace `/path/to/deep-research-mcp/` with the actual path to your cloned repository.
 
+HTTP transport: If your client supports MCP-over-HTTP, you can run this
+server in HTTP streaming mode (see "As an MCP Server" below) and configure the
+client to connect to `http://127.0.0.1:8080/`. Refer to your client's
+documentation for how to add an HTTP MCP server.
+
 2. **Use in Claude Code**:
    - The research tools will appear in Claude Code's tool palette
    - Simply ask Claude to "research [your topic]" and it will use the Deep Research agent
@@ -103,6 +108,10 @@ env = { "OPENAI_API_KEY" = "$OPENAI_API_KEY" }
 ```
 
 Replace `/path/to/deep-research-mcp/` with the actual path to your cloned repository.
+
+Some environments also support MCP-over-HTTP. If available, run the server in
+HTTP mode and configure the client with the base URL (for example,
+`http://127.0.0.1:8080/`). Consult the specific client's docs for setup steps.
 
 2. **Use in OpenAI Codex**:
    - The research tools will be available automatically when you start Codex
@@ -140,8 +149,11 @@ Replace `/path/to/deep-research-mcp/` with the actual path to your cloned reposi
 2. **Use in Gemini CLI**:
    - Start Gemini CLI with `gemini`
    - The research tools will be available automatically
-   - Ask Gemini to "research [your topic]" and it will use the Deep Research MCP server
-   - Use `/mcp` command to view server status and available tools
+- Ask Gemini to "research [your topic]" and it will use the Deep Research MCP server
+- Use `/mcp` command to view server status and available tools
+
+HTTP transport: If your Gemini environment supports MCP-over-HTTP, you may run
+the server with `--transport http` and configure Gemini with the server URL.
 
 ## Usage
 
@@ -176,12 +188,21 @@ asyncio.run(main())
 
 ### As an MCP Server
 
+Two transports are supported: stdio (default) and HTTP streaming.
+
 ```bash
-# Start the MCP server
+# 1) stdio (default) — for editors/CLIs that spawn a local process
 python src/deep_research_mcp/mcp_server.py
 
-# The server will now be available to Claude Code
+# 2) HTTP streaming — start a local HTTP MCP server
+python src/deep_research_mcp/mcp_server.py --transport http --host 127.0.0.1 --port 8080
 ```
+
+Notes:
+- HTTP mode uses streaming responses provided by FastMCP. The tools in this
+  server return their full results when a research task completes; streaming is
+  still beneficial for compatible clients and for future incremental outputs.
+- To use HTTP mode, point your MCP-over-HTTP client at the host/port you chose.
 
 ### Example Queries
 

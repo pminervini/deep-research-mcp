@@ -110,12 +110,12 @@ The project is composed of four main layers:
 
 ### `src/deep_research_mcp/mcp_server.py`
 
--   **Purpose**: Implements the MCP (Model-Client Protocol) server using the `fastmcp` library. This file exposes the research functionality as tools that can be called by clients like Claude Code.
+-   **Purpose**: Implements the MCP (Model-Client Protocol) server using the `fastmcp` library. Supports both stdio and HTTP (streaming) transports. Exposes the research functionality as tools that can be called by clients like Claude Code or any MCP‑compatible client.
 -   **Key Functionality**:
     -   `@mcp.tool() deep_research()`: The main tool that performs research. It initializes the `DeepResearchAgent`, calls its `research()` method, and formats the output for the client. Now supports clarification via the `request_clarification` parameter.
     -   `@mcp.tool() research_with_context()`: A new tool that performs research using enriched queries from clarification sessions. Takes a session ID and answers to clarifying questions.
     -   `@mcp.tool() research_status()`: A tool to check the status of a research task.
-    -   `main()`: The entry point for running the MCP server. It loads the configuration and starts the server.
+    -   `main()`: The entry point for running the MCP server. It loads the configuration and starts the server. Transport is selectable via `--transport {stdio,http}` with `--host`/`--port` for HTTP.
 
 ### `src/deep_research_mcp/config.py`
 

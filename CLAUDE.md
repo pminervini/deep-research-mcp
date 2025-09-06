@@ -1,4 +1,4 @@
-# CLAUDE.md
+# Claude Code Guide
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -40,10 +40,13 @@ mypy src/deep_research_mcp/
 
 ### Running the MCP Server
 ```bash
-# Start the MCP server directly
+# Start the MCP server (stdio)
 python src/deep_research_mcp/mcp_server.py
 
-# Or use the installed console script
+# Start the MCP server (HTTP streaming)
+python src/deep_research_mcp/mcp_server.py --transport http --host 127.0.0.1 --port 8080
+
+# Or use the installed console script (stdio)
 deep-research-mcp
 ```
 
@@ -53,6 +56,10 @@ To add this MCP server to Claude Code:
 ```bash
 claude mcp add deep-research python /path/to/deep-research-mcp/src/deep_research_mcp/mcp_server.py
 ```
+
+Alternatively, for environments that support MCP-over-HTTP, run the server in
+HTTP mode and configure the client with the server URL (for example,
+`http://127.0.0.1:8080/`).
 
 The server exposes three main tools:
 - `deep_research()` - Perform autonomous research with web search and analysis (supports clarification)

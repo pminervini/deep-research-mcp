@@ -4,21 +4,38 @@
 """
 MCP Server for Deep Research Agent
 
-This module provides an MCP (Model Context Protocol) server interface for the Deep Research Agent.
-It exposes research capabilities through standardized MCP tools that can be used by AI assistants
-and other MCP-compatible clients.
+This module provides an MCP (Model Context Protocol) server interface for the
+Deep Research Agent. It exposes research capabilities through standardized MCP
+tools that can be used by AI assistants and other MCP‑compatible clients.
+
+Transports:
+- stdio (default) — for editors/CLIs that spawn a local process
+- http (streaming) — runs a local HTTP server with streaming responses so
+  MCP‑over‑HTTP clients can connect over the network
 
 Features:
 - Deep research with multiple backend providers (OpenAI Responses API, Open Deep Research)
 - Clarification workflows to improve research quality
-- Task status monitoring for long-running research
+- Task status monitoring for long‑running research
 - Configurable research parameters and system instructions
 - Support for data analysis and visualization capabilities
 
-The server exposes the following tools:
+Exposed tools:
 - deep_research: Main research tool with optional clarification
 - research_with_context: Research using clarification answers
-- check_research_status: Monitor task progress
+- research_status: Monitor task progress
+
+Quick start:
+    # stdio (default)
+    python src/deep_research_mcp/mcp_server.py
+
+    # HTTP streaming (bind to 127.0.0.1:8080)
+    python src/deep_research_mcp/mcp_server.py --transport http --host 127.0.0.1 --port 8080
+
+Note: In HTTP mode, responses are streamed by the underlying FastMCP HTTP
+server. The tools in this module currently return their full results when a
+research task completes; clients that support streaming will still benefit from
+the HTTP transport and any incremental events emitted by the server.
 
 Based on the deep research patterns from:
 https://cookbook.openai.com/examples/deep_research_api/introduction_to_deep_research_api_agents
@@ -37,7 +54,7 @@ from deep_research_mcp.errors import ResearchError
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize MCP server
+# Initialize MCP server (works with both stdio and HTTP transports)
 mcp = FastMCP("deep-research")
 
 # Global agent instance
@@ -349,7 +366,11 @@ research_with_context = _research_with_context_impl
 
 
 def main():
-    """Main entry point for MCP server"""
+    """Main entry point for MCP server.
+
+    Use ``--transport`` to select between stdio and HTTP streaming modes.
+    In HTTP mode you can customize ``--host`` and ``--port``.
+    """
     parser = argparse.ArgumentParser(description="Deep Research MCP Server")
     parser.add_argument(
         "--transport",
@@ -387,7 +408,7 @@ def main():
 
     # Run the MCP server with selected transport
     if args.transport in {"http"}:
-        logger.info(f"Starting HTTP server on {args.host}:{args.port}")
+        logger.info(f"Starting HTTP (streaming) server on {args.host}:{args.port}")
         mcp.run(transport="http", host=args.host, port=args.port)
     elif args.transport in {"stdio"}:
         logger.info("Starting stdio server")
