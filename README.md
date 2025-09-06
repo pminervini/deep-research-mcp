@@ -56,6 +56,19 @@ poll_interval = 30
 max_retries = 3
 ```
 
+Perplexity (via [Sonar Deep Research](https://docs.perplexity.ai/getting-started/models/models/sonar-deep-research) and Perplexity's [OpenAI-compatible endpoint](https://docs.perplexity.ai/guides/chat-completions-guide)) provider example:
+
+```toml
+[research]
+provider = "openai"
+model = "sonar-deep-research"               # Perplexity's Sonar Deep Research
+api_key = "ppl-..."                         # Defaults to OPENAI_API_KEY
+base_url = "https://api.perplexity.ai"      # Perplexity's OpenAI-compatible endpoint
+timeout = 1800
+poll_interval = 30
+max_retries = 3
+```
+
 Open Deep Research provider example:
 
 ```toml
