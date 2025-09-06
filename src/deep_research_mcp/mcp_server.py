@@ -386,12 +386,14 @@ def main():
         return
 
     # Run the MCP server with selected transport
-    if args.transport == "http":
+    if args.transport in {"http"}:
         logger.info(f"Starting HTTP server on {args.host}:{args.port}")
         mcp.run(transport="http", host=args.host, port=args.port)
-    else:
+    elif args.transport in {"stdio"}:
         logger.info("Starting stdio server")
         mcp.run()
+    else:
+        raise ValueError(f"Invalid transport: {args.transport}")
 
 
 if __name__ == "__main__":
