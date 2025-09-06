@@ -13,9 +13,14 @@ from deep_research_mcp.errors import ConfigurationError
 
 import toml
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def load_config_file():
     """Load configuration from ~/.deep_research TOML file"""
+    logger.info("Loading configuration from ~/.deep_research file")
     config_file = Path.home() / ".deep_research"
     if config_file.exists():
         with open(config_file, "r") as f:
@@ -65,6 +70,7 @@ class ResearchConfig:
     @classmethod
     def from_env(cls) -> "ResearchConfig":
         """Create configuration from environment variables"""
+        logger.info("Creating configuration from environment variables")
         provider = os.environ.get("PROVIDER", cls.provider)
         
         # Set different defaults based on provider
@@ -76,13 +82,21 @@ class ResearchConfig:
         elif provider in {"openai"}:
             # For OpenAI, model is the Deep Research model
             default_model = "gpt-5-mini"
+            default_base_url = "https://api.openai.com/v1"
         else:
             raise ConfigurationError(f"Provider '{provider}' is not supported")
         
         research_model = os.environ.get("RESEARCH_MODEL", default_model)
 
+
         api_key = os.environ.get("OPENAI_API_KEY")
         base_url = os.environ.get("OPENAI_BASE_URL", default_base_url)
+
+        if api_key is None:
+             api_key = os.environ.get("API_KEY")
+
+        if base_url is None:
+            base_url = os.environ.get("BASE_URL")
 
         return cls(
             api_key=api_key,
