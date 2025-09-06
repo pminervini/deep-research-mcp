@@ -130,7 +130,7 @@ class ResearchConfig:
                 # Preferred env var (used in README examples)
                 "ENABLE_CLARIFICATION",
                 # Existing env var created by TOML flattener for [clarification].enable_clarification
-                "CLARIFICATION_ENABLE_CLARIFICATION",
+                "CLARIFICATION_ENABLE",
                 default=False,
             ),
             triage_model=os.environ.get("CLARIFICATION_TRIAGE_MODEL", cls.triage_model),
