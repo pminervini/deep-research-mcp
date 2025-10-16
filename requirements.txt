@@ -1,7 +1,7 @@
 # Core dependencies
 openai>=1.88
 openai-agents>=0.0.19
-fastmcp>=0.1.0
+mcp[cli]>=1.17.0
 httpx>=0.25.0
 pydantic>=2.0.0
 pydantic-settings>=2.0.0
@@ -38,4 +38,3 @@ mkdocs-material>=9.2.0
 
 # Open Deep Research
 open-deep-research @ git+https://github.com/pminervini/open-deep-research.git
-
