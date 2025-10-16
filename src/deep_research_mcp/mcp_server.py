@@ -42,9 +42,13 @@ https://cookbook.openai.com/examples/deep_research_api/introduction_to_deep_rese
 """
 
 import argparse
+import asyncio
 import logging
+from contextlib import suppress
 from typing import Annotated, Optional
+
 from fastmcp import FastMCP
+from fastmcp.server.context import Context
 
 from deep_research_mcp.agent import DeepResearchAgent
 from deep_research_mcp.config import ResearchConfig
@@ -59,6 +63,36 @@ mcp = FastMCP("deep-research", request_timeout=60 * 60 * 6)
 
 # Global agent instance
 research_agent: Optional[DeepResearchAgent] = None
+
+
+async def _progress_heartbeat(ctx: Context, label: str, interval_seconds: int = 60) -> None:
+    """Send periodic heartbeat updates to keep long jobs alive."""
+    minutes = 1
+    while True:
+        await asyncio.sleep(interval_seconds)
+        try:
+            await ctx.report_progress(
+                progress=minutes,
+                message=f"{label} ({minutes} minute{'s' if minutes != 1 else ''})",
+            )
+        except Exception:
+            logger.debug("Progress heartbeat failed", exc_info=True)
+            return
+        minutes += 1
+
+
+async def _safe_report_progress(
+    ctx: Context,
+    *,
+    progress: float,
+    total: Optional[float] = None,
+    message: Optional[str] = None,
+) -> None:
+    """Best-effort progress reporting helper."""
+    try:
+        await ctx.report_progress(progress=progress, total=total, message=message)
+    except Exception:
+        logger.debug("Failed to report progress", exc_info=True)
 
 
 # Define the actual async functions that will be wrapped by FastMCP
@@ -79,6 +113,7 @@ async def _deep_research_impl(
         bool,
         "When True, analyze the query and return clarifying questions instead of starting research. Use this to improve research quality for ambiguous queries.",
     ] = False,
+    ctx: Optional[Context] = None,
 ) -> str:
     """
     Performs autonomous deep research using OpenAI's Deep Research API with web search and analysis capabilities.
@@ -160,13 +195,54 @@ You can proceed with the research using the same query."""
         """
         )
 
-        result = await research_agent.research(
-            query=query,
-            system_prompt=system_prompt,
-            include_code_interpreter=include_analysis,
-        )
+        heartbeat_task: Optional[asyncio.Task] = None
+
+        if ctx:
+            await _safe_report_progress(
+                ctx, progress=0, message="Research started...", total=None
+            )
+            heartbeat_task = asyncio.create_task(
+                _progress_heartbeat(ctx, "Research in progress")
+            )
+
+        try:
+            result = await research_agent.research(
+                query=query,
+                system_prompt=system_prompt,
+                include_code_interpreter=include_analysis,
+            )
+        except ResearchError:
+            if ctx:
+                await _safe_report_progress(
+                    ctx,
+                    progress=1,
+                    total=1,
+                    message="Research ended with provider error",
+                )
+            raise
+        except Exception:
+            if ctx:
+                await _safe_report_progress(
+                    ctx,
+                    progress=1,
+                    total=1,
+                    message="Research ended unexpectedly",
+                )
+            raise
+        finally:
+            if heartbeat_task:
+                heartbeat_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await heartbeat_task
 
         if result["status"] == "completed":
+            if ctx:
+                await _safe_report_progress(
+                    ctx,
+                    progress=1,
+                    total=1,
+                    message="Research completed successfully",
+                )
             formatted_result = f"""# Research Report: {query}
 
 {result['final_report']}
@@ -186,7 +262,15 @@ You can proceed with the research using the same query."""
 
             return formatted_result
         else:
-            return f"Research failed: {result.get('message', 'Unknown error')}"
+            failure_message = result.get("message", "Unknown error")
+            if ctx:
+                await _safe_report_progress(
+                    ctx,
+                    progress=1,
+                    total=1,
+                    message=f"Research failed: {failure_message}",
+                )
+            return f"Research failed: {failure_message}"
 
     except ResearchError as e:
         logger.error(f"Research error: {e}")
@@ -255,6 +339,7 @@ async def _research_with_context_impl(
         bool,
         "Enable code execution for data analysis, calculations, and visualizations. Useful for: statistical analysis, creating charts/graphs, processing datasets. Set to False for text-only research.",
     ] = True,
+    ctx: Optional[Context] = None,
 ) -> str:
     """
     Perform research using an enriched query based on clarification answers.
@@ -310,14 +395,58 @@ async def _research_with_context_impl(
         """
         )
 
-        # Perform research with enriched query
-        result = await research_agent.research(
-            query=enriched_query,
-            system_prompt=system_prompt,
-            include_code_interpreter=include_analysis,
-        )
+        heartbeat_task: Optional[asyncio.Task] = None
+
+        if ctx:
+            await _safe_report_progress(
+                ctx,
+                progress=0,
+                total=None,
+                message="Research with context started...",
+            )
+            heartbeat_task = asyncio.create_task(
+                _progress_heartbeat(ctx, "Research with context in progress")
+            )
+
+        try:
+            # Perform research with enriched query
+            result = await research_agent.research(
+                query=enriched_query,
+                system_prompt=system_prompt,
+                include_code_interpreter=include_analysis,
+            )
+        except ResearchError:
+            if ctx:
+                await _safe_report_progress(
+                    ctx,
+                    progress=1,
+                    total=1,
+                    message="Contextual research ended with provider error",
+                )
+            raise
+        except Exception:
+            if ctx:
+                await _safe_report_progress(
+                    ctx,
+                    progress=1,
+                    total=1,
+                    message="Contextual research ended unexpectedly",
+                )
+            raise
+        finally:
+            if heartbeat_task:
+                heartbeat_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await heartbeat_task
 
         if result["status"] == "completed":
+            if ctx:
+                await _safe_report_progress(
+                    ctx,
+                    progress=1,
+                    total=1,
+                    message="Contextual research completed successfully",
+                )
             # Format for Claude Code consumption
             formatted_result = f"""# Enhanced Research Report
 
@@ -347,6 +476,14 @@ async def _research_with_context_impl(
 
             return formatted_result
         else:
+            failure_message = result.get("message", "Unknown error")
+            if ctx:
+                await _safe_report_progress(
+                    ctx,
+                    progress=1,
+                    total=1,
+                    message=f"Contextual research failed: {failure_message}",
+                )
             return f"Research failed: {result.get('message', 'Unknown error')}"
 
     except Exception as e:
