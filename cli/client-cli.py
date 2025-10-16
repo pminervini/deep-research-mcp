@@ -59,20 +59,12 @@ Notes:
     - The default FastMCP Streamable HTTP path is "/mcp".
 """
 
-from __future__ import annotations
-
 import argparse
 import asyncio
 from typing import Any, List, Optional
 
 from fastmcp import Client as MCPClient
 import mcp.types as types
-
-
-async def _logging_callback(params: types.LoggingMessageNotificationParams) -> None:
-    level = params.level.value if hasattr(params.level, "value") else str(params.level)
-    msg = params.message
-    print(f"[server-log][{level}] {msg}")
 
 
 async def _progress_callback(progress: float, total: float | None, message: str | None) -> None:
@@ -134,7 +126,7 @@ async def cmd_research(
         }
 
         print("Calling tool: deep_research ...")
-        result = await client.call_tool_mcp("_deep_research_impl", args, progress_handler=_progress_callback)
+        result = await client.call_tool_mcp("deep_research", args, progress_handler=_progress_callback)
         if result.isError:
             print("Tool error:")
             print(_render_call_tool_result(result))
@@ -150,7 +142,7 @@ async def cmd_status(url: str, task_id: str) -> int:
         print("Connected.")
 
         print("Calling tool: research_status ...")
-        result = await client.call_tool_mcp("_research_status_impl", {"task_id": task_id}, progress_handler=_progress_callback)
+        result = await client.call_tool_mcp("research_status", {"task_id": task_id}, progress_handler=_progress_callback)
         if result.isError:
             print("Tool error:")
             print(_render_call_tool_result(result))
@@ -172,7 +164,7 @@ async def cmd_research_with_context(
 
         print("Calling tool: research_with_context ...")
         result = await client.call_tool_mcp(
-            "_research_with_context_impl",
+            "research_with_context",
             {
                 "session_id": session_id,
                 "answers": answers,

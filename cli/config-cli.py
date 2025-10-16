@@ -16,8 +16,6 @@ Usage:
   python cli/config-cli.py --show-secrets  # Print full secrets
 """
 
-from __future__ import annotations
-
 import argparse
 import json
 import sys
@@ -93,4 +91,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
