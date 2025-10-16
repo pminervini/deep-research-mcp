@@ -54,8 +54,8 @@ from deep_research_mcp.errors import ResearchError
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize MCP server (works with both stdio and HTTP transports)
-mcp = FastMCP("deep-research")
+# Initialize MCP server (works with both stdio and HTTP transports) -- request timeout of 6 hours
+mcp = FastMCP("deep-research", request_timeout=60 * 60 * 6)
 
 # Global agent instance
 research_agent: Optional[DeepResearchAgent] = None
