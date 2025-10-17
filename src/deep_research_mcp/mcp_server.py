@@ -49,6 +49,7 @@ from typing import Annotated, Optional
 
 from mcp.server.fastmcp import Context, FastMCP
 
+from deep_research_mcp import __version__
 from deep_research_mcp.agent import DeepResearchAgent
 from deep_research_mcp.config import ResearchConfig
 from deep_research_mcp.errors import ResearchError
@@ -57,11 +58,23 @@ from deep_research_mcp.errors import ResearchError
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Request timeout of 6 hours
-mcp = FastMCP("deep-research", request_timeout=60 * 60 * 6)
-
 # Global agent instance
 research_agent: Optional[DeepResearchAgent] = None
+
+# Initialize FastMCP server at module level with metadata
+mcp = FastMCP(
+    name=f"deep-research (v{__version__})",
+    instructions=(
+        "Deep Research MCP Server - Autonomous research agent with web search, "
+        "data analysis, and citation capabilities. Supports OpenAI Responses API "
+        "and Open Deep Research providers. Use deep_research for comprehensive "
+        "research queries, research_with_context for clarification-enhanced research, "
+        "and research_status to monitor long-running tasks."
+    ),
+    website_url="https://github.com/pminervini/deep-research-mcp",
+    debug=False,
+    log_level="INFO"
+)
 
 
 async def _progress_heartbeat(ctx: Context, label: str, interval_seconds: int = 60) -> None:
@@ -95,6 +108,7 @@ async def _safe_report_progress(
 
 
 # Define the actual async functions that will be wrapped by FastMCP
+@mcp.tool()
 async def deep_research(
     query: Annotated[
         str,
@@ -279,6 +293,7 @@ You can proceed with the research using the same query."""
         return f"Unexpected error: {str(e)}"
 
 
+@mcp.tool()
 async def research_status(
     task_id: Annotated[
         str,
@@ -321,6 +336,7 @@ async def research_status(
         return f"Error checking status: {str(e)}"
 
 
+@mcp.tool()
 async def research_with_context(
     session_id: Annotated[
         str,
@@ -490,12 +506,6 @@ async def research_with_context(
         return f"Error performing enhanced research: {str(e)}"
 
 
-# Register the functions with FastMCP
-deep_research_tool = mcp.tool()(deep_research)
-research_status_tool = mcp.tool()(research_status)
-research_with_context_tool = mcp.tool()(research_with_context)
-
-
 def main():
     """Main entry point for MCP server.
 
@@ -520,9 +530,9 @@ def main():
         default=8080,
         help="Port to bind for HTTP transport (default: 8080)"
     )
-    
+
     args = parser.parse_args()
-    
+
     logger.info(f"Starting Deep Research MCP server with {args.transport} transport...")
 
     # Validate configuration on startup
@@ -537,10 +547,14 @@ def main():
         )
         return
 
+    # Update host and port settings for HTTP transport
+    mcp.settings.host = args.host
+    mcp.settings.port = args.port
+
     # Run the MCP server with selected transport
     if args.transport in {"http"}:
         logger.info(f"Starting HTTP (streaming) server on {args.host}:{args.port}")
-        mcp.run(transport="http", host=args.host, port=args.port)
+        mcp.run(transport="streamable-http")
     elif args.transport in {"stdio"}:
         logger.info("Starting stdio server")
         mcp.run()
