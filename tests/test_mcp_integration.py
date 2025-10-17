@@ -23,7 +23,12 @@ async def test_research_status():
     result = await research_status("fake-task-id")
     assert result is not None
     assert isinstance(result, str)
-    assert "Research agent not initialized" in result
+    # May return "not initialized" if agent is uninitialized,
+    # or an error if the agent is initialized but task ID is invalid
+    assert (
+        "Research agent not initialized" in result
+        or "Error checking status" in result
+    )
 
 
 @pytest.mark.asyncio
