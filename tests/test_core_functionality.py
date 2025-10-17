@@ -79,11 +79,7 @@ async def test_research_dry_run(test_agent):
 
     # We'll attempt to start research but expect it to fail at the API call stage
     # This tests that all the setup and parameter handling works correctly
-    result = await test_agent.research(
-        query="Test research query for validation",
-        system_prompt="This is a test system prompt",
-        include_code_interpreter=False,
-    )
+    result = await test_agent.research(query="Test research query for validation", system_prompt="This is a test system prompt", include_code_interpreter=False)
 
     # Check the result format
     assert isinstance(result, dict)
