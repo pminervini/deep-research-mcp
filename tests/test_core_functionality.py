@@ -74,14 +74,18 @@ async def test_agent_status_check(test_agent):
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
+@pytest.mark.api
+@pytest.mark.integration
 async def test_research_dry_run(test_agent):
-    """Test research initialization (without actual API call)"""
+    """Test full research flow (REAL API CALL - takes 2-5 minutes and costs money)"""
     # Skip if no API key
     if not os.getenv("OPENAI_API_KEY"):
         pytest.skip("OPENAI_API_KEY not set - skipping real API tests")
 
-    # We'll attempt to start research but expect it to fail at the API call stage
-    # This tests that all the setup and parameter handling works correctly
+    # WARNING: This makes a REAL OpenAI Deep Research API call
+    # It will take several minutes and costs real money
+    # This is an integration test, not a unit test
     result = await test_agent.research(query="Test research query for validation", system_prompt="This is a test system prompt", include_code_interpreter=False)
 
     # Check the result format

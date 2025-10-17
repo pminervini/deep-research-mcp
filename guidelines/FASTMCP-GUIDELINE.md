@@ -1,3 +1,27 @@
+# FastMCP Usage Guideline (Legacy)
+
+> **Important:** Deep Research MCP now targets the official `mcp` Python SDK. Use `guidelines/MCP-PYTHON-GUIDELINE.md` for the maintained walkthrough. The table below lists the modern CLI equivalents; the original FastMCP 2.x reference is preserved in a collapsible section for historical context.
+
+## MCP CLI Quick Reference
+
+| Task | Command |
+| ---- | ------- |
+| Run server (stdio) | `mcp run server.py` |
+| Run server with Inspector UI | `mcp dev server.py` |
+| Install into Claude Desktop | `mcp install server.py --name "Deep Research"` |
+| Show CLI version | `mcp version` |
+
+Install the CLI in a fresh environment with:
+
+```bash
+uv pip install "mcp[cli]"
+```
+
+Additional usage patterns, client samples, and SDK APIs are documented in `guidelines/MCP-PYTHON-GUIDELINE.md`.
+
+<details>
+<summary>Legacy FastMCP 2.x Guide (archived)</summary>
+
 # FastMCP Usage Guideline
 
 > An in-depth field guide to building, running, and consuming FastMCP 2.x servers. It targets both human developers and autonomous coding agents that need deterministic patterns, strong typing, and clear integration touchpoints.
@@ -823,3 +847,4 @@ Best practices:
 
 Keep this guideline close while building or automating against FastMCP servers. It mirrors the repository’s code and documentation structure and should help both humans and agents onboard quickly.
 
+</details>

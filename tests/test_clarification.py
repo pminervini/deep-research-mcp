@@ -115,6 +115,7 @@ def test_triage_agent_error_handling(config):
     """Test TriageAgent handles errors gracefully"""
     # Test with invalid API key to trigger error
     original_key = os.environ.get("OPENAI_API_KEY")
+    original_research_key = os.environ.get("RESEARCH_API_KEY")
     try:
         os.environ["RESEARCH_API_KEY"] = "invalid-key"
         # Create a new config with the invalid API key
@@ -134,11 +135,16 @@ def test_triage_agent_error_handling(config):
         )
 
     finally:
-        # Restore original key
+        # Restore original keys
         if original_key:
             os.environ["OPENAI_API_KEY"] = original_key
         elif "OPENAI_API_KEY" in os.environ:
             del os.environ["OPENAI_API_KEY"]
+
+        if original_research_key:
+            os.environ["RESEARCH_API_KEY"] = original_research_key
+        elif "RESEARCH_API_KEY" in os.environ:
+            del os.environ["RESEARCH_API_KEY"]
 
 
 def test_clarifier_agent(config):
