@@ -28,6 +28,10 @@ logger = logging.getLogger(__name__)
     ],
 )
 async def test_mcp_server_with_providers(provider, model):
+    await run_provider_check(provider, model)
+
+
+async def run_provider_check(provider, model):
     logger.info(f"=== Starting test for provider={provider}, model={model} ===")
 
     # Prepare environment for this run
@@ -100,3 +104,29 @@ async def test_mcp_server_with_providers(provider, model):
         else:
             os.environ["ENABLE_CLARIFICATION"] = old_enable_clar
         logger.info(f"=== Finished test for provider={provider} ===")
+
+
+def main() -> None:
+    import argparse
+    import asyncio
+
+    parser = argparse.ArgumentParser(
+        description="Run the deep research provider integration check without pytest."
+    )
+    parser.add_argument(
+        "--provider",
+        default="openai",
+        help="Research provider to validate (default: openai).",
+    )
+    parser.add_argument(
+        "--model",
+        default="gpt-5-mini",
+        help="Model identifier to use for the provider (default: gpt-5-mini).",
+    )
+
+    args = parser.parse_args()
+    asyncio.run(run_provider_check(args.provider, args.model))
+
+
+if __name__ == "__main__":
+    main()
