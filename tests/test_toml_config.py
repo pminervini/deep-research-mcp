@@ -28,8 +28,8 @@ def test_config_with_environment_variables():
     env_vars = [
         "RESEARCH_MODEL",
         "ENABLE_CLARIFICATION",
-        "TRIAGE_MODEL",
-        "CLARIFIER_MODEL",
+        "CLARIFICATION_TRIAGE_MODEL",
+        "CLARIFICATION_CLARIFIER_MODEL",
         "CLARIFICATION_INSTRUCTION_BUILDER_MODEL",
     ]
     original_values = {}
@@ -42,8 +42,8 @@ def test_config_with_environment_variables():
         # Set test environment variables
         os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
         os.environ["ENABLE_CLARIFICATION"] = "true"
-        os.environ["TRIAGE_MODEL"] = "gpt-5-mini"
-        os.environ["CLARIFIER_MODEL"] = "gpt-5-mini"
+        os.environ["CLARIFICATION_TRIAGE_MODEL"] = "gpt-5-mini"
+        os.environ["CLARIFICATION_CLARIFIER_MODEL"] = "gpt-5-mini"
         os.environ["CLARIFICATION_INSTRUCTION_BUILDER_MODEL"] = "gpt-4o-mini"
 
         # Test config creation
