@@ -76,10 +76,10 @@ def test_config_with_custom_endpoint():
 def test_from_env_with_base_url():
     """Test loading base_url from environment variables"""
     old_model = os.environ.get("RESEARCH_MODEL")
-    old_base_url = os.environ.get("OPENAI_BASE_URL")
+    old_base_url = os.environ.get("RESEARCH_BASE_URL")
 
     os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
-    os.environ["OPENAI_BASE_URL"] = "https://api.custom-provider.com/v1"
+    os.environ["RESEARCH_BASE_URL"] = "https://api.custom-provider.com/v1"
 
     try:
         config = ResearchConfig.from_env()
@@ -92,10 +92,10 @@ def test_from_env_with_base_url():
             del os.environ["RESEARCH_MODEL"]
 
         if old_base_url:
-            os.environ["OPENAI_BASE_URL"] = old_base_url
+            os.environ["RESEARCH_BASE_URL"] = old_base_url
         else:
-            if "OPENAI_BASE_URL" in os.environ:
-                del os.environ["OPENAI_BASE_URL"]
+            if "RESEARCH_BASE_URL" in os.environ:
+                del os.environ["RESEARCH_BASE_URL"]
 
 
 def test_config_with_clarification_base_url():
@@ -204,10 +204,10 @@ def test_config_with_instruction_builder_model():
 def test_from_env_with_instruction_builder_model():
     """Test loading instruction_builder_model from environment variables"""
     old_model = os.environ.get("RESEARCH_MODEL")
-    old_instruction_builder_model = os.environ.get("INSTRUCTION_BUILDER_MODEL")
+    old_instruction_builder_model = os.environ.get("CLARIFICATION_INSTRUCTION_BUILDER_MODEL")
 
     os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
-    os.environ["INSTRUCTION_BUILDER_MODEL"] = "gpt-4o-mini"
+    os.environ["CLARIFICATION_INSTRUCTION_BUILDER_MODEL"] = "gpt-4o-mini"
 
     try:
         config = ResearchConfig.from_env()
@@ -220,10 +220,10 @@ def test_from_env_with_instruction_builder_model():
             del os.environ["RESEARCH_MODEL"]
 
         if old_instruction_builder_model:
-            os.environ["INSTRUCTION_BUILDER_MODEL"] = old_instruction_builder_model
+            os.environ["CLARIFICATION_INSTRUCTION_BUILDER_MODEL"] = old_instruction_builder_model
         else:
-            if "INSTRUCTION_BUILDER_MODEL" in os.environ:
-                del os.environ["INSTRUCTION_BUILDER_MODEL"]
+            if "CLARIFICATION_INSTRUCTION_BUILDER_MODEL" in os.environ:
+                del os.environ["CLARIFICATION_INSTRUCTION_BUILDER_MODEL"]
 
 
 def test_instruction_builder_model_defaults():
