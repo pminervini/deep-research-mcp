@@ -9,12 +9,7 @@ import pytest
 import os
 
 from deep_research_mcp.config import ResearchConfig
-from deep_research_mcp.clarification import (
-    TriageAgent,
-    ClarifierAgent,
-    ClarificationManager,
-    ClarificationSession,
-)
+from deep_research_mcp.clarification import TriageAgent, ClarifierAgent, ClarificationManager, ClarificationSession
 
 
 @pytest.fixture
@@ -120,8 +115,9 @@ def test_triage_agent_error_handling(config):
     """Test TriageAgent handles errors gracefully"""
     # Test with invalid API key to trigger error
     original_key = os.environ.get("OPENAI_API_KEY")
+    original_research_key = os.environ.get("RESEARCH_API_KEY")
     try:
-        os.environ["OPENAI_API_KEY"] = "invalid-key"
+        os.environ["RESEARCH_API_KEY"] = "invalid-key"
         # Create a new config with the invalid API key
         error_config = ResearchConfig.from_env()
         agent = TriageAgent(error_config)
@@ -129,19 +125,26 @@ def test_triage_agent_error_handling(config):
 
         # Should handle error gracefully
         assert isinstance(result, dict)
+
         assert result["needs_clarification"] == False
         # Should contain some error indication in reasoning
+
         assert (
             "error" in result["reasoning"].lower()
             or "could not parse" in result["reasoning"].lower()
         )
 
     finally:
-        # Restore original key
+        # Restore original keys
         if original_key:
             os.environ["OPENAI_API_KEY"] = original_key
         elif "OPENAI_API_KEY" in os.environ:
             del os.environ["OPENAI_API_KEY"]
+
+        if original_research_key:
+            os.environ["RESEARCH_API_KEY"] = original_research_key
+        elif "RESEARCH_API_KEY" in os.environ:
+            del os.environ["RESEARCH_API_KEY"]
 
 
 def test_clarifier_agent(config):
