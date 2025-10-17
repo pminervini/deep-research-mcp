@@ -5,11 +5,14 @@ Test script to verify the core deep research functionality.
 This tests the underlying components that the MCP server uses.
 """
 
-import pytest
 import os
 
-from deep_research_mcp.config import ResearchConfig
+import pytest
+
+import deep_research_mcp.mcp_server as mcp_server
+
 from deep_research_mcp.agent import DeepResearchAgent
+from deep_research_mcp.config import ResearchConfig
 
 
 @pytest.fixture
@@ -102,8 +105,6 @@ def test_clarification_methods(test_agent):
 def test_mcp_server_imports():
     """Test that MCP server can import all required components"""
     try:
-        import deep_research_mcp.mcp_server as mcp_server
-
         # Test that the module imports successfully
         assert hasattr(mcp_server, "deep_research")
         assert hasattr(mcp_server, "research_with_context")
