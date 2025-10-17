@@ -117,10 +117,17 @@ Add the MCP server configuration to your `~/.codex/config.toml` file:
 [mcp_servers.deep-research]
 command = "python"
 args = ["/path/to/deep-research-mcp/src/deep_research_mcp/mcp_server.py"]
-env = { "OPENAI_API_KEY" = "$OPENAI_API_KEY" }
+startup_timeout_ms = 30000  # 30 seconds for server startup
+request_timeout_ms = 7200000  # 2 hours for long-running research tasks
 ```
 
 Replace `/path/to/deep-research-mcp/` with the actual path to your cloned repository.
+
+**Important timeout configuration:**
+- `startup_timeout_ms`: Time allowed for the MCP server to start (default: 30000ms / 30 seconds)
+- `request_timeout_ms`: Maximum time for research queries to complete (recommended: 7200000ms / 2 hours for comprehensive research)
+
+Without proper timeout configuration, long-running research queries may fail with "request timed out" errors.
 
 Some environments also support MCP-over-HTTP. If available, run the server in
 HTTP mode and configure the client with the base URL (for example,
