@@ -9,6 +9,7 @@ a full Claude Code MCP integration.
 import pytest
 
 # Import the underlying functions directly
+from deep_research_mcp import __version__
 from deep_research_mcp.mcp_server import (
     deep_research,
     research_status,
@@ -23,7 +24,12 @@ async def test_research_status():
     result = await research_status("fake-task-id")
     assert result is not None
     assert isinstance(result, str)
-    assert "Research agent not initialized" in result
+    # May return "not initialized" if agent is uninitialized,
+    # or an error if the agent is initialized but task ID is invalid
+    assert (
+        "Research agent not initialized" in result
+        or "Error checking status" in result
+    )
 
 
 @pytest.mark.asyncio
@@ -66,7 +72,7 @@ def test_mcp_server_structure():
     """Test that MCP server structure is correct"""
     # Check that the MCP instance exists
     assert mcp is not None
-    assert mcp.name == "deep-research"
+    assert mcp.name == f"deep-research (v{__version__})"
 
     # Check that the exported functions are callable
     assert callable(deep_research)

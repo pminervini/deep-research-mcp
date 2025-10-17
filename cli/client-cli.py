@@ -61,10 +61,20 @@ Notes:
 
 import argparse
 import asyncio
-from typing import Any, List, Optional
+from contextlib import asynccontextmanager
+from typing import Any, AsyncIterator, List, Optional
 
-from fastmcp import Client as MCPClient
-import mcp.types as types
+from mcp import ClientSession, types
+from mcp.client.streamable_http import streamablehttp_client
+
+
+@asynccontextmanager
+async def _connect(url: str) -> AsyncIterator[ClientSession]:
+    """Connect to an MCP server over Streamable HTTP, following the SDK docs."""
+    async with streamablehttp_client(url) as (read_stream, write_stream, _):
+        async with ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
+            yield session
 
 
 async def _progress_callback(progress: float, total: float | None, message: str | None) -> None:
@@ -95,16 +105,17 @@ def _render_call_tool_result(result: types.CallToolResult) -> str:
 
 
 async def cmd_list_tools(url: str) -> int:
-    async with MCPClient(url) as client:
-        tools = await client.list_tools()
-        if not tools:
+    async with _connect(url) as session:
+        print("Connected.")
+        tools = await session.list_tools()
+        if not tools.tools:
             print("No tools available.")
             return 0
 
         print("Available tools:")
-        for t in tools:
-            desc = (t.description or "").strip().splitlines()[0] if t.description else ""
-            print(f"- {t.name}: {desc}")
+        for tool in tools.tools:
+            desc = (tool.description or "").strip().splitlines()[0] if tool.description else ""
+            print(f"- {tool.name}: {desc}")
         return 0
 
 
@@ -115,7 +126,7 @@ async def cmd_research(
     include_analysis: bool,
     request_clarification: bool,
 ) -> int:
-    async with MCPClient(url) as client:
+    async with _connect(url) as session:
         print("Connected.")
 
         args = {
@@ -126,7 +137,7 @@ async def cmd_research(
         }
 
         print("Calling tool: deep_research ...")
-        result = await client.call_tool_mcp("deep_research", args, progress_handler=_progress_callback)
+        result = await session.call_tool("deep_research", args, progress_callback=_progress_callback)
         if result.isError:
             print("Tool error:")
             print(_render_call_tool_result(result))
@@ -138,11 +149,15 @@ async def cmd_research(
 
 
 async def cmd_status(url: str, task_id: str) -> int:
-    async with MCPClient(url) as client:
+    async with _connect(url) as session:
         print("Connected.")
 
         print("Calling tool: research_status ...")
-        result = await client.call_tool_mcp("research_status", {"task_id": task_id}, progress_handler=_progress_callback)
+        result = await session.call_tool(
+            "research_status",
+            {"task_id": task_id},
+            progress_callback=_progress_callback,
+        )
         if result.isError:
             print("Tool error:")
             print(_render_call_tool_result(result))
@@ -159,11 +174,11 @@ async def cmd_research_with_context(
     system_instructions: str,
     include_analysis: bool,
 ) -> int:
-    async with MCPClient(url) as client:
+    async with _connect(url) as session:
         print("Connected.")
 
         print("Calling tool: research_with_context ...")
-        result = await client.call_tool_mcp(
+        result = await session.call_tool(
             "research_with_context",
             {
                 "session_id": session_id,
@@ -171,7 +186,7 @@ async def cmd_research_with_context(
                 "system_instructions": system_instructions,
                 "include_analysis": include_analysis,
             },
-            progress_handler=_progress_callback,
+            progress_callback=_progress_callback,
         )
         if result.isError:
             print("Tool error:")

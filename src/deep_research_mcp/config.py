@@ -33,7 +33,10 @@ def load_config_file():
                 if isinstance(value, dict):
                     set_env_vars(value, f"{prefix}{key}_")
                 else:
-                    os.environ[env_key] = str(value)
+                    if env_key in os.environ:
+                        logger.warning(f"Environment variable {env_key} already exists, skipping")
+                    else:
+                        os.environ[env_key] = str(value)
 
         set_env_vars(config)
 
