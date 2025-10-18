@@ -10,6 +10,14 @@ A Python-based agent that integrates research providers with Claude Code through
   - Open Deep Research dependencies (installed via `requirements.txt`)
 - Claude Code, or any other assistant supporting MCP integration
 
+### Optional: Document Conversion
+
+For document conversion support, run [unoserver](https://github.com/unoconv/unoserver-docker) in the background:
+
+```bash
+docker run -d -p 2003:2003 ghcr.io/unoconv/unoserver-docker
+```
+
 ## Configuration
 
 ### Configuration File
