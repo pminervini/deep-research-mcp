@@ -102,6 +102,15 @@ server in HTTP streaming mode (see "As an MCP Server" below) and configure the
 client to connect to `http://127.0.0.1:8080/`. Refer to your client's
 documentation for how to add an HTTP MCP server.
 
+For multi-hour research, raise Claude Code's tool timeout before launching the CLI and rely on incremental status polls:
+
+```bash
+export MCP_TOOL_TIMEOUT=14400000  # 4 hours
+claude --mcp-config ./.mcp.json
+```
+
+Kick off work with `deep_research` or `research_with_context`, note the returned job ID, and call `research_status` to stream progress without letting any single tool call stagnate.
+
 2. **Use in Claude Code**:
    - The research tools will appear in Claude Code's tool palette
    - Simply ask Claude to "research [your topic]" and it will use the Deep Research agent
@@ -119,6 +128,8 @@ command = "python"
 args = ["/path/to/deep-research-mcp/src/deep_research_mcp/mcp_server.py"]
 startup_timeout_ms = 30000  # 30 seconds for server startup
 request_timeout_ms = 7200000  # 2 hours for long-running research tasks
+# Alternatively, set tool_timeout_sec when using newer Codex clients
+# tool_timeout_sec = 14400.0     # 4 hours for deep research runs
 ```
 
 Replace `/path/to/deep-research-mcp/` with the actual path to your cloned repository.
@@ -126,6 +137,8 @@ Replace `/path/to/deep-research-mcp/` with the actual path to your cloned reposi
 **Important timeout configuration:**
 - `startup_timeout_ms`: Time allowed for the MCP server to start (default: 30000ms / 30 seconds)
 - `request_timeout_ms`: Maximum time for research queries to complete (recommended: 7200000ms / 2 hours for comprehensive research)
+- `tool_timeout_sec`: Preferred for newer Codex clients; set this to a large value (e.g., `14400.0` for 4 hours) when you expect long-running research.
+- Kick off research once to capture the job ID, then poll `research_status` so each tool call remains short and avoids hitting client timeouts.
 
 Without proper timeout configuration, long-running research queries may fail with "request timed out" errors.
 
