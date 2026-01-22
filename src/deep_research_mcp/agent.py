@@ -442,15 +442,58 @@ Additionally, if after some searching you find out that you need more informatio
         citations = []
         if final_output.content and final_output.content[0].annotations:
             for i, annotation in enumerate(final_output.content[0].annotations):
-                citations.append(
-                    {
-                        "index": i + 1,
-                        "title": annotation.title,
-                        "url": annotation.url,
-                        "start_char": annotation.start_index,
-                        "end_char": annotation.end_index,
-                    }
-                )
+                # Handle different annotation types using the type discriminator
+                if annotation.type == "url_citation":
+                    # Web search citation - has all fields we need
+                    citations.append(
+                        {
+                            "index": i + 1,
+                            "title": annotation.title,
+                            "url": annotation.url,
+                            "start_char": annotation.start_index,
+                            "end_char": annotation.end_index,
+                        }
+                    )
+                elif annotation.type == "file_citation":
+                    # File citation - use filename as title, create file:// URL
+                    citations.append(
+                        {
+                            "index": i + 1,
+                            "title": f"File: {annotation.filename}",
+                            "url": f"file://{annotation.file_id}/{annotation.filename}",
+                            "start_char": annotation.index,
+                            "end_char": annotation.index,
+                        }
+                    )
+                elif annotation.type == "container_file_citation":
+                    # Container file citation - use filename as title
+                    citations.append(
+                        {
+                            "index": i + 1,
+                            "title": f"Container File: {annotation.filename}",
+                            "url": f"container://{annotation.container_id}/{annotation.file_id}/{annotation.filename}",
+                            "start_char": annotation.start_index,
+                            "end_char": annotation.end_index,
+                        }
+                    )
+                elif annotation.type == "file_path":
+                    # File path citation - minimal info
+                    citations.append(
+                        {
+                            "index": i + 1,
+                            "title": f"File Path: {annotation.file_id}",
+                            "url": f"file://{annotation.file_id}",
+                            "start_char": annotation.index,
+                            "end_char": annotation.index,
+                        }
+                    )
+                else:
+                    # Unknown annotation type - log and skip
+                    self.logger.warning(
+                        f"Unknown annotation type '{annotation.type}' "
+                        f"at index {i}, skipping"
+                    )
+                    continue
 
         # Extract intermediate steps for debugging
         reasoning_steps = [
