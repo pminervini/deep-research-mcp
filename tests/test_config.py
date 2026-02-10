@@ -236,3 +236,88 @@ def test_instruction_builder_model_defaults():
 
     assert config.instruction_builder_model == "gpt-5-mini"
     assert config.validate() is True
+
+
+# --- api_style tests ---
+
+
+def test_api_style_defaults_to_responses():
+    """Test that api_style defaults to 'responses'"""
+    config = ResearchConfig(api_key="sk-test", model="gpt-5-mini")
+    assert config.api_style == "responses"
+
+
+def test_api_style_from_env():
+    """Test loading api_style from RESEARCH_API_STYLE env var"""
+    old_api_style = os.environ.get("RESEARCH_API_STYLE")
+    old_model = os.environ.get("RESEARCH_MODEL")
+
+    os.environ["RESEARCH_API_STYLE"] = "chat_completions"
+    os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
+
+    try:
+        config = ResearchConfig.from_env()
+        assert config.api_style == "chat_completions"
+    finally:
+        if old_api_style:
+            os.environ["RESEARCH_API_STYLE"] = old_api_style
+        else:
+            os.environ.pop("RESEARCH_API_STYLE", None)
+
+        if old_model:
+            os.environ["RESEARCH_MODEL"] = old_model
+        else:
+            os.environ.pop("RESEARCH_MODEL", None)
+
+
+def test_api_style_invalid_value_rejected():
+    """Test that invalid api_style values are rejected"""
+    old_api_style = os.environ.get("RESEARCH_API_STYLE")
+
+    os.environ["RESEARCH_API_STYLE"] = "invalid_value"
+
+    try:
+        from deep_research_mcp.errors import ConfigurationError
+
+        with pytest.raises(ConfigurationError, match="Invalid api_style"):
+            ResearchConfig.from_env()
+    finally:
+        if old_api_style:
+            os.environ["RESEARCH_API_STYLE"] = old_api_style
+        else:
+            os.environ.pop("RESEARCH_API_STYLE", None)
+
+
+def test_api_style_chat_completions_skips_api_key_validation():
+    """Test that API key validation is skipped for chat_completions mode"""
+    config = ResearchConfig(
+        api_key="ppl-perplexity-key",
+        model="sonar-deep-research",
+        api_style="chat_completions",
+    )
+    # Should not raise despite non-sk- prefix
+    assert config.validate() is True
+
+
+def test_api_style_chat_completions_default_model():
+    """Test that chat_completions mode defaults to gpt-5-mini for openai provider"""
+    old_api_style = os.environ.get("RESEARCH_API_STYLE")
+    old_model = os.environ.get("RESEARCH_MODEL")
+
+    os.environ["RESEARCH_API_STYLE"] = "chat_completions"
+    os.environ.pop("RESEARCH_MODEL", None)
+
+    try:
+        config = ResearchConfig.from_env()
+        assert config.api_style == "chat_completions"
+        assert config.model == "gpt-5-mini"
+    finally:
+        if old_api_style:
+            os.environ["RESEARCH_API_STYLE"] = old_api_style
+        else:
+            os.environ.pop("RESEARCH_API_STYLE", None)
+
+        if old_model:
+            os.environ["RESEARCH_MODEL"] = old_model
+        else:
+            os.environ.pop("RESEARCH_MODEL", None)

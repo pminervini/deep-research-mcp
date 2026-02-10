@@ -201,6 +201,13 @@ Additionally, if after some searching you find out that you need more informatio
             enhanced_query = query
 
         if self.config.provider in {"openai"}:
+            # Route based on api_style
+            if self.config.api_style == "chat_completions":
+                return await self._run_chat_completions_research(
+                    enhanced_query, system_prompt, include_code_interpreter
+                )
+
+            # Responses API path (default)
             # Prepare input messages for OpenAI
             input_messages = []
             if system_prompt:
@@ -217,7 +224,7 @@ Additionally, if after some searching you find out that you need more informatio
                     "content": [{"type": "input_text", "text": enhanced_query}],
                 }
             )
-        
+
             # Configure tools
             tools = [{"type": "web_search_preview"}]
             if include_code_interpreter:
@@ -323,6 +330,137 @@ Additionally, if after some searching you find out that you need more informatio
                 "task_id": task_id,
                 "execution_time": time.time() - start_time
             }
+
+    async def _run_chat_completions_research(
+        self,
+        query: str,
+        system_prompt: Optional[str] = None,
+        include_code_interpreter: bool = True,
+    ) -> Dict[str, Any]:
+        """Run research using the Chat Completions API (synchronous call, no polling)."""
+        import re
+        import uuid
+
+        if include_code_interpreter:
+            self.logger.debug(
+                "code_interpreter is not available with Chat Completions API; ignoring"
+            )
+
+        # Build messages in Chat Completions format
+        messages: List[Dict[str, str]] = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": query})
+
+        start_time = time.time()
+
+        try:
+            # Create a client with an appropriate timeout for long-running requests
+            client = OpenAI(
+                api_key=self.client.api_key,
+                base_url=str(self.client.base_url),
+                timeout=httpx.Timeout(self.config.timeout, connect=10.0),
+            )
+
+            # Run the synchronous API call in an executor to avoid blocking
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: self._create_chat_completions_request(client, messages),
+            )
+
+            elapsed = time.time() - start_time
+            return self._extract_chat_completions_results(response, elapsed)
+
+        except Exception as e:
+            self.logger.error(f"Chat Completions research error: {e}")
+            return {
+                "status": "failed",
+                "message": str(e),
+                "task_id": str(uuid.uuid4()),
+                "execution_time": time.time() - start_time,
+            }
+
+    @retry(
+        stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
+    def _create_chat_completions_request(self, client: OpenAI, messages: List[Dict[str, str]]):
+        """Retry-wrapped Chat Completions API call."""
+        return client.chat.completions.create(
+            model=self.config.model,
+            messages=messages,
+        )
+
+    def _extract_chat_completions_results(self, response, elapsed_time: float) -> Dict[str, Any]:
+        """Parse Chat Completions response into the standard output dict."""
+        content = response.choices[0].message.content if response.choices else ""
+        citations = self._extract_chat_completions_citations(response, content)
+
+        return {
+            "status": "completed",
+            "final_report": content,
+            "citations": citations,
+            "reasoning_steps": 0,
+            "search_queries": [],
+            "total_steps": 1,
+            "task_id": response.id,
+            "execution_time": elapsed_time,
+        }
+
+    def _extract_chat_completions_citations(self, response, text: str) -> List[Dict[str, Any]]:
+        """Multi-layer citation extraction for Chat Completions responses."""
+        import re
+
+        citations: List[Dict[str, Any]] = []
+        seen_urls: set = set()
+
+        # 1. Perplexity-style: response.citations (list of URLs)
+        provider_citations = getattr(response, "citations", None)
+        if provider_citations and isinstance(provider_citations, list):
+            for i, url in enumerate(provider_citations):
+                if isinstance(url, str) and url not in seen_urls:
+                    seen_urls.add(url)
+                    citations.append({
+                        "index": len(citations) + 1,
+                        "title": f"Source {len(citations) + 1}",
+                        "url": url,
+                        "start_char": 0,
+                        "end_char": 0,
+                    })
+
+        # 2. Annotation-based: message.annotations
+        message = response.choices[0].message if response.choices else None
+        if message:
+            annotations = getattr(message, "annotations", None)
+            if annotations:
+                for annotation in annotations:
+                    url = getattr(annotation, "url", None)
+                    if url and url not in seen_urls:
+                        seen_urls.add(url)
+                        citations.append({
+                            "index": len(citations) + 1,
+                            "title": getattr(annotation, "title", f"Source {len(citations) + 1}"),
+                            "url": url,
+                            "start_char": getattr(annotation, "start_index", 0),
+                            "end_char": getattr(annotation, "end_index", 0),
+                        })
+
+        # 3. Regex fallback: extract URLs from response text
+        if not citations and text:
+            urls = re.findall(r"https?://[^\s\)\]\}>\"']+", text)
+            for url in urls:
+                url = url.rstrip(".,;:")
+                if url not in seen_urls:
+                    seen_urls.add(url)
+                    citations.append({
+                        "index": len(citations) + 1,
+                        "title": f"Source {len(citations) + 1}",
+                        "url": url,
+                        "start_char": 0,
+                        "end_char": 0,
+                    })
+
+        return citations
 
     @retry(
         stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)
@@ -519,6 +657,12 @@ Additionally, if after some searching you find out that you need more informatio
 
     async def get_task_status(self, task_id: str) -> Dict[str, Any]:
         """Check the status of a research task"""
+        if self.config.provider in {"openai"} and self.config.api_style == "chat_completions":
+            return {
+                "task_id": task_id,
+                "status": "unknown",
+                "message": "Task status tracking not available with Chat Completions API",
+            }
         if self.config.provider in {"openai"}:
             try:
                 response = self.client.responses.retrieve(task_id)

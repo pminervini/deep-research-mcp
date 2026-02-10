@@ -1,6 +1,6 @@
 # Deep Research MCP
 
-A Python-based agent that integrates research providers with Claude Code through the Model Context Protocol (MCP). It supports both OpenAI (Responses API with web search and code interpreter) and the open-source Open Deep Research stack (based on smolagents).
+A Python-based agent that integrates research providers with Claude Code through the Model Context Protocol (MCP). It supports OpenAI (Responses API with web search and code interpreter, or Chat Completions API for broad provider compatibility) and the open-source Open Deep Research stack (based on smolagents).
 
 ## Prerequisites
 
@@ -21,6 +21,7 @@ Common settings:
 ```toml
 [research]                                  # Core Deep Research functionality
 provider = "openai"                         # Available options: "openai", "open-deep-research" -- defaults to "openai"
+api_style = "responses"                     # "responses" (default) or "chat_completions" -- use "chat_completions" for Perplexity, Groq, Ollama, etc.
 model = "o4-mini-deep-research-2025-06-26"  # OpenAI: model identifier; ODR: LiteLLM model identifier, e.g., openai/qwen/qwen3-coder-30b
 api_key = "sk-your-api-key"                 # API key, optional
 base_url = "https://api.openai.com/v1"      # OpenAI: OpenAI-compatible endpoint; ODR: LiteLLM-compatible endpoint, e.g., http://localhost:1234/v1
@@ -61,11 +62,11 @@ Perplexity (via [Sonar Deep Research](https://docs.perplexity.ai/getting-started
 ```toml
 [research]
 provider = "openai"
+api_style = "chat_completions"              # Required for Perplexity (no Responses API)
 model = "sonar-deep-research"               # Perplexity's Sonar Deep Research
 api_key = "ppl-..."                         # Defaults to OPENAI_API_KEY
 base_url = "https://api.perplexity.ai"      # Perplexity's OpenAI-compatible endpoint
 timeout = 1800
-poll_interval = 30
 max_retries = 3
 ```
 
@@ -78,6 +79,32 @@ model = "openai/qwen/qwen3-coder-30b"  # LiteLLM-compatible model id
 base_url = "http://localhost:1234/v1"  # LiteLLM-compatible endpoint (local or remote)
 api_key = ""                           # Optional if endpoint requires it
 timeout = 1800
+```
+
+Ollama (local) provider example:
+
+```toml
+[research]
+provider = "openai"
+api_style = "chat_completions"
+model = "llama3.1"                     # Any model available in your Ollama instance
+base_url = "http://localhost:11434/v1" # Ollama's OpenAI-compatible endpoint
+api_key = ""                           # Not required for local Ollama
+timeout = 600
+max_retries = 3
+```
+
+Generic OpenAI-compatible Chat Completions provider (Groq, Together AI, vLLM, etc.):
+
+```toml
+[research]
+provider = "openai"
+api_style = "chat_completions"
+model = "your-model-name"
+api_key = "your-api-key"
+base_url = "https://api.your-provider.com/v1"
+timeout = 600
+max_retries = 3
 ```
 
 Optional env variables for Open Deep Research tools:
@@ -358,6 +385,7 @@ Configuration class for the research agent.
 #### Parameters
 
 - `provider`: Research provider (`openai` or `open-deep-research`; default: `openai`)
+- `api_style`: API style for the `openai` provider (`responses` or `chat_completions`; default: `responses`). Use `chat_completions` for Perplexity, Groq, Ollama, and other OpenAI-compatible providers.
 - `model`: Model identifier
   - OpenAI: Responses model (e.g., `gpt-5-mini`)
   - Open Deep Research: LiteLLM model id (e.g., `openai/qwen/qwen3-coder-30b`)
