@@ -55,6 +55,7 @@ class ResearchConfig:
     base_url: Optional[str] = None
     provider: str = "openai"
     model: str = "o4-mini-deep-research-2025-06-26"
+    api_style: str = "responses"  # "responses" | "chat_completions"
     timeout: float = 1800.0  # 30 minutes
     poll_interval: float = 30.0
     max_retries: int = 3
@@ -102,6 +103,13 @@ class ResearchConfig:
         for key, value in sorted(os.environ.items()):
             logger.debug(f"  {key}={value}")
 
+        # Load api_style
+        api_style = os.environ.get("RESEARCH_API_STYLE", cls.api_style)
+        if api_style not in ("responses", "chat_completions"):
+            raise ConfigurationError(
+                f"Invalid api_style '{api_style}'. Must be 'responses' or 'chat_completions'"
+            )
+
         # Set different defaults based on provider
         default_model = default_base_url = None
         if provider in {"open-deep-research"}:
@@ -109,12 +117,16 @@ class ResearchConfig:
             default_model = "openai/qwen/qwen3-coder-30b"
             default_base_url = "http://localhost:1234/v1"
         elif provider in {"openai"}:
-            # For OpenAI, model is the Deep Research model
-            default_model = "o4-mini-deep-research-2025-06-26"
+            if api_style == "chat_completions":
+                # Chat Completions mode: deep-research model only works with Responses API
+                default_model = "gpt-5-mini"
+            else:
+                # Responses API: use the Deep Research model
+                default_model = "o4-mini-deep-research-2025-06-26"
             default_base_url = "https://api.openai.com/v1"
         else:
             raise ConfigurationError(f"Provider '{provider}' is not supported")
-        
+
         research_model = os.environ.get("RESEARCH_MODEL", default_model)
 
         api_key = get_env_first("RESEARCH_API_KEY", "OPENAI_API_KEY")
@@ -124,6 +136,7 @@ class ResearchConfig:
             api_key=api_key,
             base_url=base_url,
             provider=os.environ.get("RESEARCH_PROVIDER", cls.provider),
+            api_style=api_style,
             model=research_model,
             timeout=float(os.environ.get("RESEARCH_TIMEOUT", cls.timeout)),
             poll_interval=float(os.environ.get("RESEARCH_POLL_INTERVAL", cls.poll_interval)),
@@ -161,7 +174,7 @@ class ResearchConfig:
 
     def validate(self) -> bool:
         """Validate configuration settings"""
-        if self.provider in {"openai"}:
+        if self.provider in {"openai"} and self.api_style == "responses":
             if self.api_key and not self.api_key.startswith("sk-"):
                 raise ConfigurationError("Invalid API key format")
 

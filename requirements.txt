@@ -37,4 +37,4 @@ mkdocs>=1.5.0
 mkdocs-material>=9.2.0
 
 # Open Deep Research
-open-deep-research @ git+https://github.com/pminervini/open-deep-research.git
+# open-deep-research @ git+https://github.com/pminervini/open-deep-research.git

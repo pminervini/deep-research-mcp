@@ -66,10 +66,12 @@ mcp = FastMCP(
     name=f"deep-research (v{__version__})",
     instructions=(
         "Deep Research MCP Server - Autonomous research agent with web search, "
-        "data analysis, and citation capabilities. Supports OpenAI Responses API "
-        "and Open Deep Research providers. Use deep_research for comprehensive "
-        "research queries, research_with_context for clarification-enhanced research, "
-        "and research_status to monitor long-running tasks."
+        "data analysis, and citation capabilities. Supports OpenAI Responses API, "
+        "OpenAI Chat Completions API (compatible with Perplexity, Groq, Ollama, "
+        "and other providers), and Open Deep Research. Use deep_research for "
+        "comprehensive research queries, research_with_context for "
+        "clarification-enhanced research, and research_status to monitor "
+        "long-running tasks."
     ),
     website_url="https://github.com/pminervini/deep-research-mcp",
     debug=False,

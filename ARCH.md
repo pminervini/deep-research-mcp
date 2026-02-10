@@ -36,6 +36,7 @@ graph TD
 
     subgraph External Services
         H[OpenAI Responses API web+code tools]
+        H2[OpenAI Chat Completions API]
         I[OpenAI Chat API for Clarification]
         L[OpenAI Chat API for Instruction Builder]
         M[Open Deep Research smolagents + text browser]
@@ -49,6 +50,7 @@ graph TD
     D -- "Uses clarification from" --> G
     D -- "Uses instruction builder from" --> J
     D -- "Makes API calls to" --> H
+    D -- "Makes API calls to" --> H2
     D -- "Orchestrates agents via" --> M
     
     G --> G1
@@ -70,7 +72,7 @@ The project is composed of four main layers:
 1.  **MCP Server (`mcp_server.py`)**: This is the entry point for external clients like Claude Code. It uses the `mcp.server.fastmcp` module from the official MCP Python SDK to expose the core research functionality as tools. It handles incoming requests, initializes the `DeepResearchAgent`, and formats the results for the client. Now includes three tools: `deep_research()`, `research_with_context()`, and `research_status()`.
 
 2.  **Core Logic (`agent.py`, `config.py`, `errors.py`)**: This layer contains the main business logic of the application.
-    *   `agent.py` is the heart of the project, managing provider-based research interactions and coordinating clarification workflows. Supports OpenAI (Responses API) when provider is `"openai"` and Open Deep Research (smolagents) when provider is `"open-deep-research"`.
+    *   `agent.py` is the heart of the project, managing provider-based research interactions and coordinating clarification workflows. Supports OpenAI (Responses API or Chat Completions API, controlled by `api_style`) when provider is `"openai"` and Open Deep Research (smolagents) when provider is `"open-deep-research"`. Chat Completions mode enables compatibility with any OpenAI-compatible provider (Perplexity, Groq, Ollama, vLLM, etc.).
     *   `config.py` handles loading and validating configuration from environment variables, including provider selection and clarification settings.
     *   `errors.py` defines custom exception classes for better error handling.
 
@@ -85,7 +87,8 @@ The project is composed of four main layers:
     *   `PromptManager` manages loading and formatting of YAML-based prompt templates, including the instruction builder prompt.
 
 5.  **External Services**: This layer represents the external systems used:
-    * Provider `openai`: OpenAI Responses API (web search + code interpreter tools), OpenAI Chat API for clarification agents and instruction builder.
+    * Provider `openai` with `api_style = "responses"` (default): OpenAI Responses API (web search + code interpreter tools), OpenAI Chat API for clarification agents and instruction builder.
+    * Provider `openai` with `api_style = "chat_completions"`: OpenAI Chat Completions API -- works with any OpenAI-compatible provider (Perplexity, Groq, Ollama, vLLM, etc.). No built-in tools (web_search_preview, code_interpreter); no background mode or polling.
     * Provider `open-deep-research`: smolagents stack with a text browser and search tools; optional OpenAI-compatible LLM endpoint via LiteLLM.
 
 ## File-by-File Breakdown
@@ -94,9 +97,13 @@ The project is composed of four main layers:
 
 -   **Purpose**: Contains the `DeepResearchAgent` class, which is the core component responsible for interacting with research providers based on configuration.
 -   **Key Functionality**:
-    -   `research()`: Orchestrates the research process. Builds enhanced instructions (if clarification enabled), then routes to OpenAI or Open Deep Research based on `config.provider`.
+    -   `research()`: Orchestrates the research process. Builds enhanced instructions (if clarification enabled), then routes to OpenAI (Responses API or Chat Completions API based on `api_style`) or Open Deep Research based on `config.provider`.
     -   `build_research_instruction()`: Converts basic queries into detailed research briefs using the instruction builder model (only when clarification is enabled).
     -   `_create_instruction_client()`: Creates OpenAI client for instruction builder using clarification settings or default config.
+    -   `_run_chat_completions_research()`: Runs research via the Chat Completions API (synchronous call in executor, no polling).
+    -   `_create_chat_completions_request()`: Retry-wrapped Chat Completions API call.
+    -   `_extract_chat_completions_results()`: Parses Chat Completions response into the standard output dict.
+    -   `_extract_chat_completions_citations()`: Multi-layer citation extraction (Perplexity-style, annotation-based, regex fallback).
     -   `_create_openai_research_task()`: Starts an OpenAI background research task (Responses API) with retry logic.
     -   `_init_open_deep_research()`: Initializes smolagents model, browser, and tools for Open Deep Research.
     -   `_run_open_deep_research()`: Executes the ODR manager/search agents and extracts a structured result.
@@ -121,7 +128,7 @@ The project is composed of four main layers:
 
 -   **Purpose**: Manages the application's configuration.
 -   **Key Functionality**:
-    -   `ResearchConfig` (dataclass): Defines the configuration parameters for the agent, such as API key, model name, base URL, timeout, poll interval, clarification settings, and instruction builder model.
+    -   `ResearchConfig` (dataclass): Defines the configuration parameters for the agent, such as API key, model name, base URL, `api_style` (`"responses"` or `"chat_completions"`), timeout, poll interval, clarification settings, and instruction builder model.
     -   `from_env()`: A class method to load configuration from environment variables. Configuration is loaded from a `~/.deep_research` TOML file that sets environment variables. This allows for easy configuration without hardcoding values. Now includes clarification and instruction builder settings.
     -   `validate()`: A method to validate the configuration to ensure that the provided values are valid.
 

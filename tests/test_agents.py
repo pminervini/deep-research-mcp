@@ -21,36 +21,40 @@ logger = logging.getLogger(__name__)
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "provider,model",
+    "provider,model,api_style",
     [
-        ("openai", "gpt-5-mini"),
-        # ("open-deep-research", "openai/qwen/qwen3-coder-30b"),
+        ("openai", "gpt-5-mini", "responses"),
+        ("openai", "gpt-5-mini", "chat_completions"),
+        # ("open-deep-research", "openai/qwen/qwen3-coder-30b", "responses"),
     ],
 )
-async def test_mcp_server_with_providers(provider, model):
-    await run_provider_check(provider, model)
+async def test_mcp_server_with_providers(provider, model, api_style):
+    await run_provider_check(provider, model, api_style=api_style)
 
 
-async def run_provider_check(provider, model):
-    logger.info(f"=== Starting test for provider={provider}, model={model} ===")
+async def run_provider_check(provider, model, api_style="responses"):
+    logger.info(f"=== Starting test for provider={provider}, model={model}, api_style={api_style} ===")
 
     # Prepare environment for this run
     old_provider = os.environ.get("PROVIDER")
     old_model = os.environ.get("RESEARCH_MODEL")
     old_enable_clar = os.environ.get("ENABLE_CLARIFICATION")
+    old_api_style = os.environ.get("RESEARCH_API_STYLE")
 
-    logger.info(f"Setting environment: PROVIDER={provider}, RESEARCH_MODEL={model}")
+    logger.info(f"Setting environment: PROVIDER={provider}, RESEARCH_MODEL={model}, RESEARCH_API_STYLE={api_style}")
     os.environ["PROVIDER"] = provider
     os.environ["RESEARCH_MODEL"] = model
     os.environ["ENABLE_CLARIFICATION"] = "false"
+    os.environ["RESEARCH_API_STYLE"] = api_style
 
     try:
         # Confirm config resolve reflects our desired provider/model
         logger.info("Loading ResearchConfig from environment...")
         cfg = ResearchConfig.from_env()
-        logger.info(f"Config loaded: provider={cfg.provider}, model={cfg.model}")
+        logger.info(f"Config loaded: provider={cfg.provider}, model={cfg.model}, api_style={cfg.api_style}")
 
         assert cfg.provider == provider
+        assert cfg.api_style == api_style
         if provider == "openai":
             assert cfg.model == "gpt-5-mini"
         else:
@@ -62,7 +66,7 @@ async def run_provider_check(provider, model):
         mcp_server.research_agent = None
 
         # Run deep research for real (no mocks/mocks)
-        logger.info(f"Starting deep_research call for provider: {provider}")
+        logger.info(f"Starting deep_research call for provider: {provider} (api_style={api_style})")
         logger.info("This may take several minutes...")
         result = await mcp_server.deep_research(
             query="Sanity check query for provider: " + provider,
@@ -84,7 +88,7 @@ async def run_provider_check(provider, model):
         )
         logger.info("Checking for acceptable result indicators...")
         assert any(ind in result for ind in acceptable_indicators)
-        logger.info(f"Test PASSED for provider={provider}")
+        logger.info(f"Test PASSED for provider={provider} (api_style={api_style})")
 
     finally:
         # Restore environment
@@ -103,7 +107,12 @@ async def run_provider_check(provider, model):
             os.environ.pop("ENABLE_CLARIFICATION", None)
         else:
             os.environ["ENABLE_CLARIFICATION"] = old_enable_clar
-        logger.info(f"=== Finished test for provider={provider} ===")
+
+        if old_api_style is None:
+            os.environ.pop("RESEARCH_API_STYLE", None)
+        else:
+            os.environ["RESEARCH_API_STYLE"] = old_api_style
+        logger.info(f"=== Finished test for provider={provider} (api_style={api_style}) ===")
 
 
 def main() -> None:
@@ -123,9 +132,15 @@ def main() -> None:
         default="gpt-5-mini",
         help="Model identifier to use for the provider (default: gpt-5-mini).",
     )
+    parser.add_argument(
+        "--api-style",
+        default="responses",
+        choices=["responses", "chat_completions"],
+        help="API style to use (default: responses).",
+    )
 
     args = parser.parse_args()
-    asyncio.run(run_provider_check(args.provider, args.model))
+    asyncio.run(run_provider_check(args.provider, args.model, api_style=args.api_style))
 
 
 if __name__ == "__main__":
