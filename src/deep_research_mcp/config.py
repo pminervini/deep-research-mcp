@@ -174,10 +174,6 @@ class ResearchConfig:
 
     def validate(self) -> bool:
         """Validate configuration settings"""
-        if self.provider in {"openai"} and self.api_style == "responses":
-            if self.api_key and not self.api_key.startswith("sk-"):
-                raise ConfigurationError("Invalid API key format")
-
         if self.timeout <= 0:
             raise ConfigurationError("Timeout must be positive")
 

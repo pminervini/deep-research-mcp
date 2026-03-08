@@ -19,6 +19,7 @@
 ## Coding Style & Naming Conventions
 - Python 3.9+, 4-space indentation, use type hints in new/changed code.
 - Format with `black` defaults; keep imports and docstrings idiomatic.
+- Keep every import, method/function call, and `assert` statement on a single line.
 - Naming: snake_case for modules/functions, PascalCase for classes, UPPER_CASE for constants.
 - Keep public tool signatures stable; document changes in `README.md`/`ARCH.md`.
 
