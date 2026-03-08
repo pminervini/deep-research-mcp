@@ -6,10 +6,13 @@ This script tests the deep research MCP server tools without requiring
 a full Claude Code MCP integration.
 """
 
+import os
+
 import pytest
 
 # Import the underlying functions directly
 from deep_research_mcp import __version__
+import deep_research_mcp.mcp_server as mcp_server
 from deep_research_mcp.mcp_server import (
     deep_research,
     research_status,
@@ -21,6 +24,7 @@ from deep_research_mcp.mcp_server import (
 @pytest.mark.asyncio
 async def test_research_status():
     """Test the research_status tool with a fake task ID"""
+    mcp_server.research_agent = None
     result = await research_status("fake-task-id")
     assert result is not None
     assert isinstance(result, str)
@@ -47,6 +51,38 @@ async def test_deep_research_without_api():
     assert (
         "Research Report:" in result or "Failed to initialize research agent" in result
     )
+
+
+@pytest.mark.asyncio
+async def test_deep_research_invalid_api_key_graceful_error():
+    """Test deep_research handles invalid API keys gracefully."""
+    old_research_api_key = os.environ.get("RESEARCH_API_KEY")
+    old_openai_api_key = os.environ.get("OPENAI_API_KEY")
+
+    os.environ["RESEARCH_API_KEY"] = "invalid-api-key"
+    os.environ.pop("OPENAI_API_KEY", None)
+    mcp_server.research_agent = None
+
+    try:
+        result = await deep_research(
+            query="Test query with invalid key",
+            system_instructions="This is just a test",
+            include_analysis=False,
+        )
+        assert isinstance(result, str)
+        assert "Failed to initialize research agent: Invalid API key format" in result
+    finally:
+        if old_research_api_key is None:
+            os.environ.pop("RESEARCH_API_KEY", None)
+        else:
+            os.environ["RESEARCH_API_KEY"] = old_research_api_key
+
+        if old_openai_api_key is None:
+            os.environ.pop("OPENAI_API_KEY", None)
+        else:
+            os.environ["OPENAI_API_KEY"] = old_openai_api_key
+
+        mcp_server.research_agent = None
 
 
 @pytest.mark.asyncio
