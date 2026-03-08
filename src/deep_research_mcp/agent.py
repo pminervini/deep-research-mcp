@@ -13,9 +13,9 @@ import asyncio
 import time
 from typing import Dict, Any, Optional, List
 import logging
-from openai import OpenAI
+from openai import AuthenticationError, OpenAI
 import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wait_exponential
 
 from deep_research_mcp.config import ResearchConfig
 from deep_research_mcp.errors import ResearchError, TaskTimeoutError, ConfigurationError
@@ -381,15 +381,10 @@ Additionally, if after some searching you find out that you need more informatio
                 "execution_time": time.time() - start_time,
             }
 
-    @retry(
-        stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)
-    )
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10), retry=retry_if_not_exception_type(AuthenticationError), reraise=True)
     def _create_chat_completions_request(self, client: OpenAI, messages: List[Dict[str, str]]):
         """Retry-wrapped Chat Completions API call."""
-        return client.chat.completions.create(
-            model=self.config.model,
-            messages=messages,
-        )
+        return client.chat.completions.create(model=self.config.model, messages=messages)
 
     def _extract_chat_completions_results(self, response, elapsed_time: float) -> Dict[str, Any]:
         """Parse Chat Completions response into the standard output dict."""
@@ -462,27 +457,15 @@ Additionally, if after some searching you find out that you need more informatio
 
         return citations
 
-    @retry(
-        stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)
-    )
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10), retry=retry_if_not_exception_type(AuthenticationError), reraise=True)
     async def _create_openai_research_task(
         self, input_messages: List[Dict], tools: List[Dict]
     ) -> Dict[str, Any]:
         """Create research task with retry logic (OpenAI)"""
-        try:
-            response: Dict[str, Any] = self.client.responses.create(
-                model=self.config.model,
-                input=input_messages,
-                tools=tools,
-                reasoning={"summary": "auto"},
-                background=True,
-            )  # Essential for long-running tasks
+        response: Dict[str, Any] = self.client.responses.create(model=self.config.model, input=input_messages, tools=tools, reasoning={"summary": "auto"}, background=True)  # Essential for long-running tasks
 
-            self.logger.info(f"Research task started: {response.id}")
-            return response
-        except Exception as e:
-            self.logger.error(f"Failed to create research task: {e}")
-            raise
+        self.logger.info(f"Research task started: {response.id}")
+        return response
 
     async def _wait_for_completion(self, task_id: str) -> Dict[str, Any]:
         """Poll for task completion with timeout"""

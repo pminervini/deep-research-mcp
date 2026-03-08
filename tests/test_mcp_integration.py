@@ -13,12 +13,7 @@ import pytest
 # Import the underlying functions directly
 from deep_research_mcp import __version__
 import deep_research_mcp.mcp_server as mcp_server
-from deep_research_mcp.mcp_server import (
-    deep_research,
-    research_status,
-    research_with_context,
-    mcp,
-)
+from deep_research_mcp.mcp_server import deep_research, research_status, research_with_context, mcp
 
 
 @pytest.mark.asyncio
@@ -30,27 +25,18 @@ async def test_research_status():
     assert isinstance(result, str)
     # May return "not initialized" if agent is uninitialized,
     # or an error if the agent is initialized but task ID is invalid
-    assert (
-        "Research agent not initialized" in result
-        or "Error checking status" in result
-    )
+    assert "Research agent not initialized" in result or "Error checking status" in result
 
 
 @pytest.mark.asyncio
 async def test_deep_research_without_api():
     """Test deep_research tool initialization (without actual API call)"""
-    result = await deep_research(
-        query="Test query for MCP integration",
-        system_instructions="This is just a test",
-        include_analysis=False,
-    )
+    result = await deep_research(query="Test query for MCP integration", system_instructions="This is just a test", include_analysis=False)
 
     assert result is not None
     assert isinstance(result, str)
     # Should either work with valid config or show error without API keys
-    assert (
-        "Research Report:" in result or "Failed to initialize research agent" in result
-    )
+    assert "Research Report:" in result or "Failed to initialize research agent" in result
 
 
 @pytest.mark.asyncio
@@ -64,13 +50,9 @@ async def test_deep_research_invalid_api_key_graceful_error():
     mcp_server.research_agent = None
 
     try:
-        result = await deep_research(
-            query="Test query with invalid key",
-            system_instructions="This is just a test",
-            include_analysis=False,
-        )
+        result = await deep_research(query="Test query with invalid key", system_instructions="This is just a test", include_analysis=False)
         assert isinstance(result, str)
-        assert "Failed to initialize research agent: Invalid API key format" in result
+        assert result.startswith("Unexpected error:") and "invalid_api_key" in result
     finally:
         if old_research_api_key is None:
             os.environ.pop("RESEARCH_API_KEY", None)
@@ -88,20 +70,12 @@ async def test_deep_research_invalid_api_key_graceful_error():
 @pytest.mark.asyncio
 async def test_research_with_context():
     """Test the research_with_context tool"""
-    result = await research_with_context(
-        session_id="fake-session-id",
-        answers=["Answer 1", "Answer 2"],
-        system_instructions="Test instructions",
-        include_analysis=False,
-    )
+    result = await research_with_context(session_id="fake-session-id", answers=["Answer 1", "Answer 2"], system_instructions="Test instructions", include_analysis=False)
 
     assert result is not None
     assert isinstance(result, str)
     # Should contain error about session not found or initialization failure
-    assert (
-        "Session fake-session-id not found" in result
-        or "Failed to initialize research agent" in result
-    )
+    assert "Session fake-session-id not found" in result or "Failed to initialize research agent" in result
 
 
 def test_mcp_server_structure():
