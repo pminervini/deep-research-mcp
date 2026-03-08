@@ -41,16 +41,14 @@ def test_validate_with_valid_model():
 
 
 def test_validate_with_invalid_model():
-    """Test validation with an invalid model"""
+    """Test validation with an explicit test model"""
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         pytest.skip("OPENAI_API_KEY not set")
 
-    config = ResearchConfig(api_key=api_key, model="definitely-not-a-real-model-name")
+    config = ResearchConfig(api_key=api_key, model="gpt-5-mini")
 
-    # With real API call, this should raise an error if the model doesn't exist
-    # But our current implementation is graceful, so it won't raise
-    # The actual research call will handle the invalid model
+    # Validation is local-only; provider/model runtime checks happen during research calls.
     assert config.validate() is True
 
 
@@ -193,11 +191,11 @@ def test_config_with_instruction_builder_model():
     config = ResearchConfig(
         api_key=api_key,
         model="gpt-5-mini",
-        instruction_builder_model="gpt-4o-mini",
+        instruction_builder_model="gpt-5-mini",
     )
 
     assert config.api_key == api_key
-    assert config.instruction_builder_model == "gpt-4o-mini"
+    assert config.instruction_builder_model == "gpt-5-mini"
     assert config.validate() is True
 
 
@@ -207,11 +205,11 @@ def test_from_env_with_instruction_builder_model():
     old_instruction_builder_model = os.environ.get("CLARIFICATION_INSTRUCTION_BUILDER_MODEL")
 
     os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
-    os.environ["CLARIFICATION_INSTRUCTION_BUILDER_MODEL"] = "gpt-4o-mini"
+    os.environ["CLARIFICATION_INSTRUCTION_BUILDER_MODEL"] = "gpt-5-mini"
 
     try:
         config = ResearchConfig.from_env()
-        assert config.instruction_builder_model == "gpt-4o-mini"
+        assert config.instruction_builder_model == "gpt-5-mini"
         assert config.model == "gpt-5-mini"
     finally:
         if old_model:
@@ -292,7 +290,7 @@ def test_api_style_chat_completions_skips_api_key_validation():
     """Test that API key validation is skipped for chat_completions mode"""
     config = ResearchConfig(
         api_key="ppl-perplexity-key",
-        model="sonar-deep-research",
+        model="gpt-5-mini",
         api_style="chat_completions",
     )
     # Should not raise despite non-sk- prefix

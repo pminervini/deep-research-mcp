@@ -236,11 +236,11 @@ def test_config_instruction_builder_env_override():
     old_instruction_model = os.environ.get("INSTRUCTION_BUILDER_MODEL")
 
     os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
-    os.environ["CLARIFICATION_INSTRUCTION_BUILDER_MODEL"] = "gpt-4o-mini"
+    os.environ["CLARIFICATION_INSTRUCTION_BUILDER_MODEL"] = "gpt-5-mini"
 
     try:
         config = ResearchConfig.from_env()
-        assert config.instruction_builder_model == "gpt-4o-mini"
+        assert config.instruction_builder_model == "gpt-5-mini"
         assert config.model == "gpt-5-mini"
     finally:
         if old_model:

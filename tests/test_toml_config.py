@@ -44,7 +44,7 @@ def test_config_with_environment_variables():
         os.environ["ENABLE_CLARIFICATION"] = "true"
         os.environ["CLARIFICATION_TRIAGE_MODEL"] = "gpt-5-mini"
         os.environ["CLARIFICATION_CLARIFIER_MODEL"] = "gpt-5-mini"
-        os.environ["CLARIFICATION_INSTRUCTION_BUILDER_MODEL"] = "gpt-4o-mini"
+        os.environ["CLARIFICATION_INSTRUCTION_BUILDER_MODEL"] = "gpt-5-mini"
 
         # Test config creation
         config = ResearchConfig.from_env()
@@ -53,7 +53,7 @@ def test_config_with_environment_variables():
         assert config.enable_clarification == True
         assert config.triage_model == "gpt-5-mini"
         assert config.clarifier_model == "gpt-5-mini"
-        assert config.instruction_builder_model == "gpt-4o-mini"
+        assert config.instruction_builder_model == "gpt-5-mini"
 
     finally:
         # Restore original environment
