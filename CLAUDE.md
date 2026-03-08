@@ -22,3 +22,4 @@ Exposed Tools
 
 Development
 - Testing, linting, formatting, and type-checking commands are documented in README.md. Use those as the single source of truth.
+- ABSOLUTELY DO NOT use monkey patching or mock classes in `tests/`.
