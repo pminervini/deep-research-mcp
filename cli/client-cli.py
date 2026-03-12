@@ -6,14 +6,14 @@ Simple HTTP-streaming MCP client for the Deep Research MCP server.
 
 How to start the server (HTTP streaming mode):
     # Bind on 127.0.0.1:8080 and expose Streamable HTTP endpoint at /mcp
-    python src/deep_research_mcp/mcp_server.py --transport http --host 127.0.0.1 --port 8080
+    uv run deep-research-mcp --transport http --host 127.0.0.1 --port 8080
 
 How to connect this client to the server:
     # List available tools
-    python cli/client-cli.py --url http://127.0.0.1:8080/mcp list-tools
+    uv run python cli/client-cli.py --url http://127.0.0.1:8080/mcp list-tools
 
     # Run a simple research query (streams over HTTP)
-    python cli/client-cli.py --url http://127.0.0.1:8080/mcp research "What’s new in quantum computing?"
+    uv run python cli/client-cli.py --url http://127.0.0.1:8080/mcp research "What’s new in quantum computing?"
 
 Pure curl usage (HTTP streaming):
     # 1) Initialize a session and capture the mcp-session-id response header

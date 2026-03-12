@@ -80,7 +80,7 @@ class PromptManager:
         Load prompt from package resources as fallback.
         """
         try:
-            # Python 3.9+ approach
+            # Modern importlib.resources API
             if hasattr(resources, "files"):
                 files = resources.files("deep_research_mcp.prompts")
                 prompt_file = files / category / f"{name}.yaml"

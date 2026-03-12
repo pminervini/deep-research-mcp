@@ -7,19 +7,19 @@ Simple CLI tool to use the Deep Research MCP server functionality.
 USAGE EXAMPLES:
 
   # Basic research query
-  python cli/agent-cli.py research "What are the latest treatments for diabetes?"
+  uv run python cli/agent-cli.py research "What are the latest treatments for diabetes?"
 
   # Research with specific model (recommended)
-  python cli/agent-cli.py research "Healthcare costs in the US" --model gpt-5-mini
+  uv run python cli/agent-cli.py research "Healthcare costs in the US" --model gpt-5-mini
 
   # Research with clarification (interactive)
-  python cli/agent-cli.py research "Quantum computing" --clarify
+  uv run python cli/agent-cli.py research "Quantum computing" --clarify
 
   # Check configuration
-  python cli/agent-cli.py config
+  uv run python cli/agent-cli.py config
 
   # List available models
-  python cli/agent-cli.py models
+  uv run python cli/agent-cli.py models
 
 EXAMPLE QUERIES:
   - "What are the current market trends for AI in healthcare?"

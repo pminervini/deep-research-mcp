@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=69.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deep-research-mcp"
+version = "0.1.0"
+description = "MCP server and agent for autonomous deep research workflows"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Deep Research MCP Contributors" }]
+dependencies = [
+    "aiofiles>=23.2.1",
+    "asyncio-throttle>=1.0.2",
+    "colorama>=0.4.6",
+    "httpx>=0.25.0",
+    "instructor>=1.10.0",
+    "mcp[cli]>=1.17.0",
+    "openai>=1.88",
+    "openai-agents>=0.0.19",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "python-json-logger>=2.0.7",
+    "pyyaml>=6.0",
+    "structlog>=23.1.0",
+    "tenacity>=8.2.0",
+    "toml>=0.10",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=23.7.0",
+    "mypy>=1.5.0",
+    "pre-commit>=3.3.0",
+    "pylint>=2.17.0",
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.11.0",
+]
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.2.0",
+]
+open-deep-research = [
+    "open-deep-research @ git+https://github.com/pminervini/open-deep-research.git",
+]
+
+[project.scripts]
+deep-research-mcp = "deep_research_mcp.mcp_server:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+deep_research_mcp = ["prompts/**/*.yaml"]
