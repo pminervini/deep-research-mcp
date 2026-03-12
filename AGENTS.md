@@ -7,17 +7,17 @@
   - `config.py`, `errors.py`, `clarification.py`, `prompts/` (YAML prompt templates).
 - `cli/`: runnable examples and utilities (e.g., `agent-cli.py`).
 - `tests/`: `pytest` suite (`test_*.py`) with markers configured in `pytest.ini`.
-- `requirements.txt`, `README.md`, `ARCH.md`, `LICENSE`.
+- `pyproject.toml`, `requirements.txt` (unpinned compatibility install), `README.md`, `ARCH.md`, `LICENSE`.
 
 ## Build, Test, and Development Commands
-- Setup env: `python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt`.
-- Run MCP server: `python src/deep_research_mcp/mcp_server.py`.
-- Try CLI: `python cli/agent-cli.py research "What’s new in quantum computing?" --model gpt-5-mini`.
-- Tests: `pytest -v` or `pytest --cov=deep_research_mcp tests/`.
-- Lint/format/type-check: `black .`, `pylint src/deep_research_mcp tests`, `mypy src/deep_research_mcp`.
+- Setup env: `uv sync --upgrade --extra dev` (or compatibility: `python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && pip install -e .`).
+- Run MCP server: `uv run deep-research-mcp`.
+- Try CLI: `uv run python cli/agent-cli.py research "What’s new in quantum computing?" --model gpt-5-mini`.
+- Tests: `uv run pytest -v` or `uv run pytest --cov=deep_research_mcp tests/`.
+- Lint/format/type-check: `uv run black .`, `uv run pylint src/deep_research_mcp tests`, `uv run mypy src/deep_research_mcp`.
 
 ## Coding Style & Naming Conventions
-- Python 3.9+, 4-space indentation, use type hints in new/changed code.
+- Python 3.10+, 4-space indentation, use type hints in new/changed code.
 - Format with `black` defaults; keep imports and docstrings idiomatic.
 - Keep every import, method/function call, and `assert` statement on a single line.
 - Naming: snake_case for modules/functions, PascalCase for classes, UPPER_CASE for constants.

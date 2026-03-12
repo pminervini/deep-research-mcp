@@ -4,11 +4,42 @@ A Python-based agent that integrates research providers with Claude Code through
 
 ## Prerequisites
 
-- Python 3.9+
+- Python 3.10+
+- [uv](https://docs.astral.sh/uv/) installed
 - One of:
   - OpenAI API access (Responses API models, e.g., `o4-mini-deep-research-2025-06-26`)
-  - Open Deep Research dependencies (installed via `requirements.txt`)
+  - Open Deep Research dependencies (installed via `uv sync --extra open-deep-research`)
 - Claude Code, or any other assistant supporting MCP integration
+
+## Installation
+
+Recommended setup (resolves the latest compatible versions):
+
+```bash
+# Install runtime dependencies + project in editable mode
+uv sync --upgrade
+
+# Development tooling (pytest, black, pylint, mypy, pre-commit)
+uv sync --upgrade --extra dev
+
+# Optional docs tooling
+uv sync --upgrade --extra docs
+
+# Optional Open Deep Research provider dependencies
+uv sync --upgrade --extra open-deep-research
+```
+
+Compatibility setup (pip-based):
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install -e .
+```
+
+`requirements.txt` is intentionally unpinned (uses `>=`) and can be edited directly.
+`uv.lock` is not tracked in this repository.
 
 ## Configuration
 
@@ -119,7 +150,7 @@ Optional env variables for Open Deep Research tools:
 Add the MCP server using Claude Code's command line:
 
 ```bash
-claude mcp add deep-research python /path/to/deep-research-mcp/src/deep_research_mcp/mcp_server.py
+claude mcp add deep-research -- uv run --directory /path/to/deep-research-mcp deep-research-mcp
 ```
 
 Replace `/path/to/deep-research-mcp/` with the actual path to your cloned repository.
@@ -151,8 +182,8 @@ Add the MCP server configuration to your `~/.codex/config.toml` file:
 
 ```toml
 [mcp_servers.deep-research]
-command = "python"
-args = ["/path/to/deep-research-mcp/src/deep_research_mcp/mcp_server.py"]
+command = "uv"
+args = ["run", "--directory", "/path/to/deep-research-mcp", "deep-research-mcp"]
 startup_timeout_ms = 30000  # 30 seconds for server startup
 request_timeout_ms = 7200000  # 2 hours for long-running research tasks
 # Alternatively, set tool_timeout_sec when using newer Codex clients
@@ -185,7 +216,7 @@ HTTP mode and configure the client with the base URL (for example,
 Add the MCP server using Gemini CLI's built-in command:
 
 ```bash
-gemini mcp add deep-research python /path/to/deep-research-mcp/src/deep_research_mcp/mcp_server.py
+gemini mcp add deep-research -- uv run --directory /path/to/deep-research-mcp deep-research-mcp
 ```
 
 Or manually add to your `~/.gemini/settings.json` file:
@@ -194,8 +225,8 @@ Or manually add to your `~/.gemini/settings.json` file:
 {
   "mcpServers": {
     "deep-research": {
-      "command": "python",
-      "args": ["/path/to/deep-research-mcp/src/deep_research_mcp/mcp_server.py"],
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/deep-research-mcp", "deep-research-mcp"],
       "env": {
         "OPENAI_API_KEY": "$OPENAI_API_KEY"
       }
@@ -209,8 +240,8 @@ Replace `/path/to/deep-research-mcp/` with the actual path to your cloned reposi
 2. **Use in Gemini CLI**:
    - Start Gemini CLI with `gemini`
    - The research tools will be available automatically
-- Ask Gemini to "research [your topic]" and it will use the Deep Research MCP server
-- Use `/mcp` command to view server status and available tools
+   - Ask Gemini to "research [your topic]" and it will use the Deep Research MCP server
+   - Use `/mcp` command to view server status and available tools
 
 HTTP transport: If your Gemini environment supports MCP-over-HTTP, you may run
 the server with `--transport http` and configure Gemini with the server URL.
@@ -252,10 +283,10 @@ Two transports are supported: stdio (default) and HTTP streaming.
 
 ```bash
 # 1) stdio (default) — for editors/CLIs that spawn a local process
-python src/deep_research_mcp/mcp_server.py
+uv run deep-research-mcp
 
 # 2) HTTP streaming — start a local HTTP MCP server
-python src/deep_research_mcp/mcp_server.py --transport http --host 127.0.0.1 --port 8080
+uv run deep-research-mcp --transport http --host 127.0.0.1 --port 8080
 ```
 
 Notes:
@@ -405,12 +436,23 @@ Configuration class for the research agent.
 ### Running Tests
 
 ```bash
+# Install dev dependencies
+uv sync --extra dev
+
 # Run all tests
-pytest
+uv run pytest -v
 
 # Run with coverage
-pytest --cov=deep-research-mcp tests/
+uv run pytest --cov=deep_research_mcp tests/
 
 # Run specific test file
-pytest tests/test_agent.py
+uv run pytest tests/test_agents.py
+```
+
+### Lint, Format, Type Check
+
+```bash
+uv run black .
+uv run pylint src/deep_research_mcp tests
+uv run mypy src/deep_research_mcp
 ```

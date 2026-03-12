@@ -27,10 +27,10 @@ Exposed tools:
 
 Quick start:
     # stdio (default)
-    python src/deep_research_mcp/mcp_server.py
+    uv run deep-research-mcp
 
     # HTTP streaming (bind to 127.0.0.1:8080)
-    python src/deep_research_mcp/mcp_server.py --transport http --host 127.0.0.1 --port 8080
+    uv run deep-research-mcp --transport http --host 127.0.0.1 --port 8080
 
 Note: In HTTP mode, responses are streamed by the underlying FastMCP HTTP
 server. The tools in this module currently return their full results when a

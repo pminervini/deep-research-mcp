@@ -1,3 +1,6 @@
+# Unpinned compatibility requirements for pip-based installs.
+# This project intentionally tracks minimum versions (>=), not exact pins.
+
 # Core dependencies
 openai>=1.88
 openai-agents>=0.0.19
@@ -16,13 +19,13 @@ tenacity>=8.2.0
 
 # Logging and monitoring
 structlog>=23.1.0
-colorama>=0.4.6  # For colored logs on Windows
+colorama>=0.4.6
 
-# Optional: For enhanced functionality
-aiofiles>=23.2.1  # For async file operations
-python-json-logger>=2.0.7  # For JSON logging
+# Optional runtime enhancements
+aiofiles>=23.2.1
+python-json-logger>=2.0.7
 
-# Development dependencies (optional, can be in requirements-dev.txt)
+# Development dependencies
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
 pytest-cov>=4.1.0
@@ -32,9 +35,9 @@ pylint>=2.17.0
 mypy>=1.5.0
 pre-commit>=3.3.0
 
-# Documentation (optional)
+# Documentation dependencies
 mkdocs>=1.5.0
 mkdocs-material>=9.2.0
 
-# Open Deep Research
+# Optional Open Deep Research dependency
 # open-deep-research @ git+https://github.com/pminervini/open-deep-research.git

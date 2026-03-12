@@ -2,6 +2,14 @@
 
 This document provides a detailed overview of the `deep-research-mcp` project architecture, including component interactions and file-by-file descriptions.
 
+## Build and Dependency Management
+
+- Packaging metadata is defined in `pyproject.toml` (PEP 621) using `setuptools` with a `src/` layout.
+- Dependency constraints are minimum-version (`>=`) specifications in `pyproject.toml`.
+- `requirements.txt` is a compatibility install file that also uses unpinned `>=` constraints.
+- `uv.lock` is not tracked, so CI/dev environments resolve the latest compatible versions.
+- The MCP server entrypoint is exposed as the console script `deep-research-mcp` (`deep_research_mcp.mcp_server:main`).
+
 ## Architectural Diagram
 
 ```mermaid
