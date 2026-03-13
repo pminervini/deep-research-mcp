@@ -27,7 +27,7 @@ def test_research_result_completed_contract():
     assert result.is_completed == True
     assert result.status == "completed"
     assert result.task_id == "task-123"
-    assert result["final_report"] == "Structured report"
+    assert result.final_report == "Structured report"
     assert result.to_dict()["citations"][0]["url"] == "https://example.com"
 
 
@@ -40,6 +40,6 @@ def test_research_task_status_helpers():
 
     assert unknown_status.status == "unknown"
     assert unknown_status.message == "Polling not supported"
-    assert unknown_status["task_id"] == "task-123"
+    assert unknown_status.task_id == "task-123"
     assert error_status.status == "error"
     assert error_status.error == "Boom"

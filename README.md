@@ -297,10 +297,10 @@ async def main():
     )
     
     # Print results
-    print(f"Report: {result['final_report']}")
-    print(f"Citations: {result['citations']}")
-    print(f"Research steps: {result['reasoning_steps']}")
-    print(f"Execution time: {result['execution_time']:.2f}s")
+    print(f"Report: {result.final_report}")
+    print(f"Citations: {result.citations}")
+    print(f"Research steps: {result.reasoning_steps}")
+    print(f"Execution time: {result.execution_time:.2f}s")
 
 # Run the research
 asyncio.run(main())

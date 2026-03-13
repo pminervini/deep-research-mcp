@@ -4,7 +4,6 @@
 Structured result models for research and task status operations.
 """
 
-from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -20,7 +19,7 @@ class ResearchCitation:
     end_char: int = 0
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialize the citation into the legacy dictionary shape."""
+        """Serialize the citation into a dictionary."""
         return {
             "index": self.index,
             "title": self.title,
@@ -31,7 +30,7 @@ class ResearchCitation:
 
 
 @dataclass(slots=True)
-class ResearchResult(Mapping[str, Any]):
+class ResearchResult:
     """Normalized result for every research execution path."""
 
     status: str
@@ -109,7 +108,7 @@ class ResearchResult(Mapping[str, Any]):
         return self.status == "completed"
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialize the result into the legacy dictionary shape."""
+        """Serialize the result into a dictionary."""
         return {
             "status": self.status,
             "task_id": self.task_id,
@@ -123,22 +122,9 @@ class ResearchResult(Mapping[str, Any]):
             "execution_time": self.execution_time,
         }
 
-    def __getitem__(self, key: str) -> Any:
-        return self.to_dict()[key]
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(self.to_dict())
-
-    def __len__(self) -> int:
-        return len(self.to_dict())
-
-    def get(self, key: str, default: Any = None) -> Any:
-        """Provide dict-style access during the transition to attribute access."""
-        return self.to_dict().get(key, default)
-
 
 @dataclass(slots=True)
-class ResearchTaskStatus(Mapping[str, Any]):
+class ResearchTaskStatus:
     """Normalized task status response across providers."""
 
     task_id: str
@@ -159,7 +145,7 @@ class ResearchTaskStatus(Mapping[str, Any]):
         return cls(task_id=task_id, status="error", error=error)
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialize the task status into the legacy dictionary shape."""
+        """Serialize the task status into a dictionary."""
         return {
             "task_id": self.task_id,
             "status": self.status,
@@ -168,16 +154,3 @@ class ResearchTaskStatus(Mapping[str, Any]):
             "message": self.message,
             "error": self.error,
         }
-
-    def __getitem__(self, key: str) -> Any:
-        return self.to_dict()[key]
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(self.to_dict())
-
-    def __len__(self) -> int:
-        return len(self.to_dict())
-
-    def get(self, key: str, default: Any = None) -> Any:
-        """Provide dict-style access during the transition to attribute access."""
-        return self.to_dict().get(key, default)
