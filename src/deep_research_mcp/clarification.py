@@ -212,29 +212,23 @@ class ClarificationManager:
         self.clarifier_agent = ClarifierAgent(config, self.prompt_manager)
         self._sessions: dict[str, ClarificationSession] = {}
 
-    def start_clarification(self, user_query: str) -> dict[str, Any]:
-        """
-        Start clarification process for a query
+    @staticmethod
+    def _clarification_disabled_result() -> dict[str, Any]:
+        """Return the standard response when clarification is disabled."""
+        return {
+            "needs_clarification": False,
+            "reasoning": "Clarification is disabled in configuration",
+        }
 
-        Returns:
-            Dictionary with clarification status and questions
-        """
-        if not self.config.enable_clarification:
-            return {
-                "needs_clarification": False,
-                "reasoning": "Clarification is disabled in configuration",
-            }
-
-        # Analyze query with triage agent
-        triage_result = self.triage_agent.analyze_query(user_query)
-
+    def _build_clarification_result(
+        self, user_query: str, triage_result: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Create a clarification session and extend the triage result."""
         if not triage_result.get("needs_clarification", False):
             return triage_result
 
-        # Create clarification session
-        session_id = str(uuid.uuid4())
         questions = triage_result.get("potential_clarifications", [])
-
+        session_id = str(uuid.uuid4())
         session = ClarificationSession(session_id, user_query, questions)
         self._sessions[session_id] = session
 
@@ -243,8 +237,31 @@ class ClarificationManager:
         result["questions"] = questions
         result["created_at"] = session.created_at
         result["total_questions"] = len(questions)
-
         return result
+
+    @staticmethod
+    def _build_qa_pairs(session: ClarificationSession) -> list[dict[str, str]]:
+        """Convert a clarification session into question/answer pairs."""
+        return [
+            {
+                "question": question,
+                "answer": session.answers[index] if index < len(session.answers) else "",
+            }
+            for index, question in enumerate(session.questions)
+        ]
+
+    def start_clarification(self, user_query: str) -> dict[str, Any]:
+        """
+        Start clarification process for a query
+
+        Returns:
+            Dictionary with clarification status and questions
+        """
+        if not self.config.enable_clarification:
+            return self._clarification_disabled_result()
+
+        triage_result = self.triage_agent.analyze_query(user_query)
+        return self._build_clarification_result(user_query, triage_result)
 
     async def start_clarification_async(self, user_query: str) -> dict[str, Any]:
         """
@@ -254,29 +271,10 @@ class ClarificationManager:
             Dictionary with clarification status and questions
         """
         if not self.config.enable_clarification:
-            return {
-                "needs_clarification": False,
-                "reasoning": "Clarification is disabled in configuration",
-            }
+            return self._clarification_disabled_result()
 
         triage_result = await self.triage_agent.analyze_query_async(user_query)
-
-        if not triage_result.get("needs_clarification", False):
-            return triage_result
-
-        session_id = str(uuid.uuid4())
-        questions = triage_result.get("potential_clarifications", [])
-
-        session = ClarificationSession(session_id, user_query, questions)
-        self._sessions[session_id] = session
-
-        result = triage_result.copy()
-        result["session_id"] = session_id
-        result["questions"] = questions
-        result["created_at"] = session.created_at
-        result["total_questions"] = len(questions)
-
-        return result
+        return self._build_clarification_result(user_query, triage_result)
 
     def add_answers(self, session_id: str, answers: list[str]) -> dict[str, Any]:
         """
@@ -317,22 +315,9 @@ class ClarificationManager:
             return None
 
         session = self._sessions[session_id]
-
-        # Create Q&A pairs for enrichment
-        qa_pairs = []
-        for i, question in enumerate(session.questions):
-            answer = session.answers[i] if i < len(session.answers) else ""
-            qa_pairs.append({"question": question, "answer": answer})
-
-        # Generate enriched query
-        enriched_query = self.clarifier_agent.enrich_query(
-            session.original_query, qa_pairs
+        return self.clarifier_agent.enrich_query(
+            session.original_query, self._build_qa_pairs(session)
         )
-
-        # Clean up session (optional - could keep for debugging)
-        # del self._sessions[session_id]
-
-        return enriched_query
 
     async def get_enriched_query_async(self, session_id: str) -> str | None:
         """
@@ -348,12 +333,6 @@ class ClarificationManager:
             return None
 
         session = self._sessions[session_id]
-
-        qa_pairs = []
-        for i, question in enumerate(session.questions):
-            answer = session.answers[i] if i < len(session.answers) else ""
-            qa_pairs.append({"question": question, "answer": answer})
-
         return await self.clarifier_agent.enrich_query_async(
-            session.original_query, qa_pairs
+            session.original_query, self._build_qa_pairs(session)
         )
