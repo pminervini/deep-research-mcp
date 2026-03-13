@@ -153,7 +153,7 @@ class ClarifierAgent:
             )
 
             enriched_query = response.choices[0].message.content.strip()
-            logger.info(f"Query enriched successfully")
+            logger.info("Query enriched successfully")
             return enriched_query
 
         except Exception as e:
