@@ -9,9 +9,10 @@ import logging
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional
-from openai import OpenAI
+from typing import Any
+
 import instructor
+from openai import OpenAI
 from pydantic import BaseModel
 
 
@@ -21,9 +22,9 @@ from deep_research_mcp.prompts import PromptManager
 logger = logging.getLogger(__name__)
 
 
-def build_clarification_client_kwargs(config: ResearchConfig) -> Dict[str, str]:
+def build_clarification_client_kwargs(config: ResearchConfig) -> dict[str, str]:
     """Build OpenAI client kwargs for clarification and instruction-building flows."""
-    kwargs: Dict[str, str] = {}
+    kwargs: dict[str, str] = {}
 
     api_key = config.clarification_api_key
     if not api_key:
@@ -52,7 +53,7 @@ class TriageResponse(BaseModel):
 
     needs_clarification: bool
     reasoning: str
-    potential_clarifications: List[str]
+    potential_clarifications: list[str]
     query_assessment: str
 
 
@@ -60,7 +61,7 @@ class TriageAgent:
     """Analyzes queries to determine if clarification is needed"""
 
     def __init__(
-        self, config: ResearchConfig, prompt_manager: Optional[PromptManager] = None
+        self, config: ResearchConfig, prompt_manager: PromptManager | None = None
     ):
         self.config = config
         self.prompt_manager = prompt_manager or PromptManager()
@@ -68,7 +69,7 @@ class TriageAgent:
         openai_client = OpenAI(**build_clarification_client_kwargs(config))
         self.client = instructor.from_openai(openai_client)
 
-    def analyze_query(self, user_query: str) -> Dict[str, Any]:
+    def analyze_query(self, user_query: str) -> dict[str, Any]:
         """
         Analyze query and decide if clarification is needed
 
@@ -106,7 +107,7 @@ class ClarifierAgent:
     """Enriches queries based on user responses to clarifying questions"""
 
     def __init__(
-        self, config: ResearchConfig, prompt_manager: Optional[PromptManager] = None
+        self, config: ResearchConfig, prompt_manager: PromptManager | None = None
     ):
         self.config = config
         self.prompt_manager = prompt_manager or PromptManager()
@@ -114,7 +115,7 @@ class ClarifierAgent:
         openai_client = OpenAI(**build_clarification_client_kwargs(config))
         self.client = instructor.from_openai(openai_client)
 
-    def enrich_query(self, user_query: str, qa_pairs: List[Dict[str, str]]) -> str:
+    def enrich_query(self, user_query: str, qa_pairs: list[dict[str, str]]) -> str:
         """
         Create enriched query based on original query and Q&A pairs
 
@@ -160,14 +161,14 @@ class ClarifierAgent:
 class ClarificationSession:
     """Manages a clarification session with unique ID and state"""
 
-    def __init__(self, session_id: str, original_query: str, questions: List[str]):
+    def __init__(self, session_id: str, original_query: str, questions: list[str]):
         self.session_id = session_id
         self.original_query = original_query
         self.questions = questions
-        self.answers: List[str] = []
+        self.answers: list[str] = []
         self.created_at = datetime.now(timezone.utc).isoformat()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert session to dictionary for serialization"""
         return {
             "session_id": self.session_id,
@@ -185,15 +186,15 @@ class ClarificationManager:
     """Manages the complete clarification pipeline"""
 
     def __init__(
-        self, config: ResearchConfig, prompt_manager: Optional[PromptManager] = None
+        self, config: ResearchConfig, prompt_manager: PromptManager | None = None
     ):
         self.config = config
         self.prompt_manager = prompt_manager or PromptManager()
         self.triage_agent = TriageAgent(config, self.prompt_manager)
         self.clarifier_agent = ClarifierAgent(config, self.prompt_manager)
-        self._sessions: Dict[str, ClarificationSession] = {}
+        self._sessions: dict[str, ClarificationSession] = {}
 
-    def start_clarification(self, user_query: str) -> Dict[str, Any]:
+    def start_clarification(self, user_query: str) -> dict[str, Any]:
         """
         Start clarification process for a query
 
@@ -227,7 +228,7 @@ class ClarificationManager:
 
         return result
 
-    def add_answers(self, session_id: str, answers: List[str]) -> Dict[str, Any]:
+    def add_answers(self, session_id: str, answers: list[str]) -> dict[str, Any]:
         """
         Add answers to a clarification session
 
@@ -252,7 +253,7 @@ class ClarificationManager:
             "is_complete": len(session.answers) >= len(session.questions),
         }
 
-    def get_enriched_query(self, session_id: str) -> Optional[str]:
+    def get_enriched_query(self, session_id: str) -> str | None:
         """
         Get enriched query for a completed clarification session
 
@@ -283,6 +284,6 @@ class ClarificationManager:
 
         return enriched_query
 
-    def get_session(self, session_id: str) -> Optional[ClarificationSession]:
+    def get_session(self, session_id: str) -> ClarificationSession | None:
         """Get session by ID"""
         return self._sessions.get(session_id)

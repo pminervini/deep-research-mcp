@@ -20,7 +20,7 @@ import argparse
 import json
 import sys
 from dataclasses import asdict
-from typing import Any, Dict
+from typing import Any
 
 from deep_research_mcp.config import ResearchConfig
 
@@ -31,6 +31,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 logger = logging.getLogger(__name__)
 
+
 def _mask_secret(value: str | None, keep: int = 4) -> str:
     if not value:
         return ""
@@ -39,7 +40,7 @@ def _mask_secret(value: str | None, keep: int = 4) -> str:
     return ("*" * (len(value) - keep)) + value[-keep:]
 
 
-def _masked_config_dict(cfg: ResearchConfig, show_secrets: bool) -> Dict[str, Any]:
+def _masked_config_dict(cfg: ResearchConfig, show_secrets: bool) -> dict[str, Any]:
     data = asdict(cfg)
     if not show_secrets:
         # Mask sensitive fields

@@ -9,7 +9,7 @@ import logging
 import os
 from importlib import resources
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import yaml
 
@@ -24,7 +24,7 @@ class PromptManager:
     of prompt files, falling back to package resources when needed.
     """
 
-    def __init__(self, custom_prompts_dir: Optional[str] = None):
+    def __init__(self, custom_prompts_dir: str | None = None):
         """
         Initialize the PromptManager with auto-discovery.
 
@@ -35,9 +35,7 @@ class PromptManager:
         self.prompts_cache: dict[str, dict[str, Any]] = {}
         self.prompts_dir = self._discover_prompts_directory(custom_prompts_dir)
 
-    def _discover_prompts_directory(
-        self, custom_dir: Optional[str] = None
-    ) -> Optional[Path]:
+    def _discover_prompts_directory(self, custom_dir: str | None = None) -> Path | None:
         """
         Discover the prompts directory using multiple strategies.
 
