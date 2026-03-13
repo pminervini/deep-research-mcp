@@ -13,6 +13,7 @@ from typing import Any
 
 import httpx
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessageParam
 
 from deep_research_mcp.async_utils import run_blocking
 from deep_research_mcp.backends import ResearchBackend, build_research_backend
@@ -179,11 +180,16 @@ class DeepResearchAgent:
             instruction_prompt = self.prompt_manager.get_instruction_builder_prompt(
                 query
             )
+            messages: list[ChatCompletionMessageParam] = [
+                {"role": "user", "content": instruction_prompt}
+            ]
             response = self.instruction_client.chat.completions.create(
                 model=self.config.instruction_builder_model,
-                messages=[{"role": "user", "content": instruction_prompt}],
+                messages=messages,
             )
-            enhanced_instruction = response.choices[0].message.content.strip()
+            enhanced_instruction = (response.choices[0].message.content or "").strip()
+            if not enhanced_instruction:
+                return query
             self.logger.info(
                 f"Enhanced research instruction created for query: {query[:50]}..."
             )

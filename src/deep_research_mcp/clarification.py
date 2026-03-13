@@ -9,10 +9,11 @@ import logging
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, TypedDict
 
 import instructor
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessageParam
 from pydantic import BaseModel
 
 from deep_research_mcp.async_utils import run_blocking
@@ -22,9 +23,16 @@ from deep_research_mcp.prompts import PromptManager
 logger = logging.getLogger(__name__)
 
 
-def build_clarification_client_kwargs(config: ResearchConfig) -> dict[str, str]:
+class OpenAIClientKwargs(TypedDict, total=False):
+    """Subset of OpenAI client kwargs used by this project."""
+
+    api_key: str
+    base_url: str
+
+
+def build_clarification_client_kwargs(config: ResearchConfig) -> OpenAIClientKwargs:
     """Build OpenAI client kwargs for clarification and instruction-building flows."""
-    kwargs: dict[str, str] = {}
+    kwargs: OpenAIClientKwargs = {}
 
     api_key = config.clarification_api_key
     if not api_key:
@@ -81,9 +89,12 @@ class TriageAgent:
         triage_prompt = self.prompt_manager.get_triage_prompt(user_query=user_query)
 
         try:
+            messages: list[ChatCompletionMessageParam] = [
+                {"role": "user", "content": triage_prompt}
+            ]
             response = self.client.chat.completions.create(
                 model=self.config.triage_model,
-                messages=[{"role": "user", "content": triage_prompt}],
+                messages=messages,
                 response_model=TriageResponse,
             )
 
@@ -147,12 +158,18 @@ class ClarifierAgent:
         )
 
         try:
+            messages: list[ChatCompletionMessageParam] = [
+                {"role": "user", "content": enrichment_prompt}
+            ]
             response = self.client.chat.completions.create(
+                response_model=None,
                 model=self.config.clarifier_model,
-                messages=[{"role": "user", "content": enrichment_prompt}],
+                messages=messages,
             )
 
-            enriched_query = response.choices[0].message.content.strip()
+            enriched_query = (response.choices[0].message.content or "").strip()
+            if not enriched_query:
+                return user_query
             logger.info("Query enriched successfully")
             return enriched_query
 

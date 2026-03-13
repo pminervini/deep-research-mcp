@@ -38,14 +38,12 @@ class GeminiResearchBackend(ResearchBackend):
         from google.genai import types
 
         client_kwargs: dict[str, Any] = {}
-        http_options_kwargs = {"apiVersion": GEMINI_API_VERSION}
-
         if self.config.api_key:
             client_kwargs["api_key"] = self.config.api_key
-        if self.config.base_url:
-            http_options_kwargs["baseUrl"] = self.config.base_url
-
-        client_kwargs["http_options"] = types.HttpOptions(**http_options_kwargs)
+        client_kwargs["http_options"] = types.HttpOptions(
+            api_version=GEMINI_API_VERSION,
+            base_url=self.config.base_url,
+        )
         self.client = genai.Client(**client_kwargs)
 
         with warnings.catch_warnings():
