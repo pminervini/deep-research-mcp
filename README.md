@@ -7,7 +7,6 @@
 [![Claude Code](https://img.shields.io/badge/Claude_Code-ready-cc785c)](https://github.com/pminervini/deep-research-mcp#claude-code-integration)
 [![OpenAI](https://img.shields.io/badge/OpenAI-compatible-10a37f)](https://platform.openai.com/)
 [![Gemini](https://img.shields.io/badge/Gemini-supported-4285F4)](https://ai.google.dev/)
-[![Open Deep Research](https://img.shields.io/badge/Open_Deep_Research-supported-6b7280)](https://github.com/pminervini/open-deep-research)
 
 A Python-based agent that integrates research providers with Claude Code through the Model Context Protocol (MCP). It supports OpenAI (Responses API with web search and code interpreter, or Chat Completions API for broad provider compatibility), Gemini Deep Research via the Interactions API, and the open-source Open Deep Research stack (based on smolagents).
 
