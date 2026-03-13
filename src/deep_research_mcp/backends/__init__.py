@@ -4,8 +4,6 @@
 Provider-specific research backend package.
 """
 
-from __future__ import annotations
-
 import logging
 
 from deep_research_mcp.config import ResearchConfig

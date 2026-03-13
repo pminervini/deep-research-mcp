@@ -4,8 +4,6 @@
 Open Deep Research provider backend.
 """
 
-from __future__ import annotations
-
 import re
 import time
 import uuid
