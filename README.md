@@ -80,7 +80,6 @@ base_url = "https://api.openai.com/v1"      # OpenAI: OpenAI-compatible endpoint
 # Task behavior
 timeout = 1800
 poll_interval = 30
-max_retries = 3
 
 # Largely based on https://cookbook.openai.com/examples/deep_research_api/introduction_to_deep_research_api_agents
 [clarification]                                       # Optional query clarification component
@@ -105,7 +104,6 @@ api_key = "sk-..."                          # Defaults to OPENAI_API_KEY
 base_url = "https://api.openai.com/v1"      # OpenAI-compatible endpoint
 timeout = 1800
 poll_interval = 30
-max_retries = 3
 ```
 
 Gemini Deep Research provider example:
@@ -118,7 +116,6 @@ api_key = "AIza..."                             # Defaults to GEMINI_API_KEY or 
 base_url = "https://generativelanguage.googleapis.com"
 timeout = 1800
 poll_interval = 30
-max_retries = 3
 ```
 
 Perplexity (via [Sonar Deep Research](https://docs.perplexity.ai/getting-started/models/models/sonar-deep-research) and Perplexity's [OpenAI-compatible endpoint](https://docs.perplexity.ai/guides/chat-completions-guide)) provider example:
@@ -131,7 +128,6 @@ model = "sonar-deep-research"               # Perplexity's Sonar Deep Research
 api_key = "ppl-..."                         # Defaults to OPENAI_API_KEY
 base_url = "https://api.perplexity.ai"      # Perplexity's OpenAI-compatible endpoint
 timeout = 1800
-max_retries = 3
 ```
 
 Open Deep Research provider example:
@@ -155,7 +151,6 @@ model = "llama3.1"                     # Any model available in your Ollama inst
 base_url = "http://localhost:11434/v1" # Ollama's OpenAI-compatible endpoint
 api_key = ""                           # Not required for local Ollama
 timeout = 600
-max_retries = 3
 ```
 
 Generic OpenAI-compatible Chat Completions provider (Groq, Together AI, vLLM, etc.):
@@ -168,7 +163,6 @@ model = "your-model-name"
 api_key = "your-api-key"
 base_url = "https://api.your-provider.com/v1"
 timeout = 600
-max_retries = 3
 ```
 
 Optional env variables for Open Deep Research tools:
@@ -463,7 +457,6 @@ Configuration class for the research agent.
 - `base_url`: Provider API base URL (optional). Defaults to `https://api.openai.com/v1` for `openai`, `https://generativelanguage.googleapis.com` for `gemini`, and `http://localhost:1234/v1` for `open-deep-research`.
 - `timeout`: Maximum time for research in seconds (default: 1800)
 - `poll_interval`: Polling interval in seconds (default: 30)
-- `max_retries`: Maximum retry attempts (default: 3)
 - `enable_clarification`: Enable clarifying questions (default: False)
 - `triage_model`: Model for query analysis (default: `gpt-5-mini`)
 - `clarifier_model`: Model for query enrichment (default: `gpt-5-mini`)

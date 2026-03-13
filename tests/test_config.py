@@ -19,7 +19,6 @@ def test_config_creation_with_overrides():
         model="gpt-5-mini",
         timeout=120.0,
         poll_interval=5.0,
-        max_retries=7,
         log_level="DEBUG",
     )
 
@@ -27,7 +26,6 @@ def test_config_creation_with_overrides():
     assert config.model == "gpt-5-mini"
     assert config.timeout == 120.0
     assert config.poll_interval == 5.0
-    assert config.max_retries == 7
     assert config.log_level == "DEBUG"
 
 
@@ -42,7 +40,6 @@ def test_validate_with_valid_model():
     [
         ("timeout", 0.0, "Timeout must be positive"),
         ("poll_interval", 0.0, "Poll interval must be positive"),
-        ("max_retries", -1, "Max retries must be non-negative"),
     ],
 )
 def test_validate_rejects_invalid_runtime_limits(

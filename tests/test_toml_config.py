@@ -181,7 +181,6 @@ def test_config_defaults():
         assert config.instruction_builder_model == "gpt-5-mini"  # Default
         assert config.timeout == 1800.0  # Default
         assert config.poll_interval == 30.0  # Default
-        assert config.max_retries == 3  # Default
         assert config.log_level == "INFO"
 
     finally:
