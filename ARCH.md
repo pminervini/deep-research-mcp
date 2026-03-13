@@ -126,7 +126,6 @@ The project is composed of five main layers:
 -   **Purpose**: Contains the `DeepResearchAgent` class, which orchestrates research execution, clarification, instruction building, and callbacks.
 -   **Key Functionality**:
     -   `research()`: Orchestrates the research process. Builds enhanced instructions (if clarification enabled), delegates research execution to the configured backend, and optionally triggers completion callbacks.
-    -   `__getattr__()`: Proxies backend attributes for compatibility so existing callers can still access provider-specific clients and handles where needed.
     -   `build_research_instruction()`: Converts basic queries into detailed research briefs using the instruction builder model (only when clarification is enabled).
     -   `build_research_instruction_async()`: Runs instruction building off the event loop in a worker thread.
     -   `_create_instruction_client()`: Creates OpenAI client for instruction builder using clarification settings or default config.

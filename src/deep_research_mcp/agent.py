@@ -41,15 +41,6 @@ class DeepResearchAgent:
             self._create_instruction_client() if config.enable_clarification else None
         )
 
-    def __getattr__(self, name: str) -> Any:
-        """Expose backend attributes for compatibility with existing callers/tests."""
-        backend = self.__dict__.get("backend")
-        if backend is not None and hasattr(backend, name):
-            return getattr(backend, name)
-        raise AttributeError(
-            f"{self.__class__.__name__!s} object has no attribute {name!r}"
-        )
-
     async def research(
         self,
         query: str,
