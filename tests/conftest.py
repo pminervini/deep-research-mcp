@@ -6,7 +6,6 @@ import os
 
 import pytest
 
-
 MODEL_ENV_VARS = (
     "RESEARCH_MODEL",
     "TRIAGE_MODEL",
