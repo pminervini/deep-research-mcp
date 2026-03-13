@@ -42,6 +42,15 @@ pip install -e .
 `requirements.txt` is intentionally unpinned (uses `>=`) and can be edited directly.
 `uv.lock` is not tracked in this repository.
 
+## Code Layout
+
+- `src/deep_research_mcp/agent.py`: orchestration layer; owns clarification, instruction building, callbacks, and delegates provider work to backends
+- `src/deep_research_mcp/backends/`: provider-specific implementations for OpenAI, Gemini, and Open Deep Research
+- `src/deep_research_mcp/mcp_server.py`: FastMCP server and tool entrypoints
+- `src/deep_research_mcp/clarification.py`: clarification agents, sessions, and enrichment flow
+- `src/deep_research_mcp/prompts/`: YAML prompt templates used by clarification and instruction building
+- `tests/`: `pytest` suite covering configuration, MCP integration, prompts, results, and clarification flows
+
 ## Configuration
 
 ### Configuration File
