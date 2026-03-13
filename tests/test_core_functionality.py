@@ -136,6 +136,15 @@ def test_start_clarification_returns_disabled_when_feature_off(test_agent):
     assert result["needs_clarification"] == False
 
 
+@pytest.mark.asyncio
+async def test_start_clarification_async_returns_disabled_when_feature_off(test_agent):
+    """Async clarification should return a disabled response when the feature is off."""
+    test_agent.config.enable_clarification = False
+    result = await test_agent.start_clarification_async("test query")
+    assert isinstance(result, dict)
+    assert result["needs_clarification"] == False
+
+
 def test_config_clarification_enabled():
     """Test clarification configuration when enabled"""
     os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
@@ -218,6 +227,20 @@ async def test_instruction_builder_fallback(test_agent):
     assert enhanced_query is not None
     assert isinstance(enhanced_query, str)
     assert len(enhanced_query) > 0
+
+
+@pytest.mark.asyncio
+async def test_instruction_builder_async_returns_original_query_when_disabled(
+    test_agent,
+):
+    """Async instruction building should short-circuit when disabled."""
+    original_query = "test query for async fallback"
+    test_agent.config.enable_clarification = False
+    test_agent.instruction_client = None
+
+    enhanced_query = await test_agent.build_research_instruction_async(original_query)
+
+    assert enhanced_query == original_query
 
 
 def test_config_instruction_builder_env_override():

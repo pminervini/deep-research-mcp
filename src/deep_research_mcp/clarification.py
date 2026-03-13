@@ -15,7 +15,7 @@ import instructor
 from openai import OpenAI
 from pydantic import BaseModel
 
-
+from deep_research_mcp.async_utils import run_blocking
 from deep_research_mcp.config import ResearchConfig
 from deep_research_mcp.prompts import PromptManager
 
@@ -102,6 +102,10 @@ class TriageAgent:
                 "query_assessment": "Error during assessment",
             }
 
+    async def analyze_query_async(self, user_query: str) -> dict[str, Any]:
+        """Run the blocking triage API call in a worker thread."""
+        return await run_blocking(self.analyze_query, user_query)
+
 
 class ClarifierAgent:
     """Enriches queries based on user responses to clarifying questions"""
@@ -156,6 +160,12 @@ class ClarifierAgent:
             logger.error(f"ClarifierAgent error: {e}")
             # Fallback to original query if enrichment fails
             return user_query
+
+    async def enrich_query_async(
+        self, user_query: str, qa_pairs: list[dict[str, str]]
+    ) -> str:
+        """Run the blocking clarification API call in a worker thread."""
+        return await run_blocking(self.enrich_query, user_query, qa_pairs)
 
 
 class ClarificationSession:
@@ -228,6 +238,38 @@ class ClarificationManager:
 
         return result
 
+    async def start_clarification_async(self, user_query: str) -> dict[str, Any]:
+        """
+        Start clarification without blocking the event loop on network calls.
+
+        Returns:
+            Dictionary with clarification status and questions
+        """
+        if not self.config.enable_clarification:
+            return {
+                "needs_clarification": False,
+                "reasoning": "Clarification is disabled in configuration",
+            }
+
+        triage_result = await self.triage_agent.analyze_query_async(user_query)
+
+        if not triage_result.get("needs_clarification", False):
+            return triage_result
+
+        session_id = str(uuid.uuid4())
+        questions = triage_result.get("potential_clarifications", [])
+
+        session = ClarificationSession(session_id, user_query, questions)
+        self._sessions[session_id] = session
+
+        result = triage_result.copy()
+        result["session_id"] = session_id
+        result["questions"] = questions
+        result["created_at"] = session.created_at
+        result["total_questions"] = len(questions)
+
+        return result
+
     def add_answers(self, session_id: str, answers: list[str]) -> dict[str, Any]:
         """
         Add answers to a clarification session
@@ -283,6 +325,30 @@ class ClarificationManager:
         # del self._sessions[session_id]
 
         return enriched_query
+
+    async def get_enriched_query_async(self, session_id: str) -> str | None:
+        """
+        Get an enriched query without blocking the event loop on network calls.
+
+        Args:
+            session_id: Session identifier
+
+        Returns:
+            Enriched query string or None if session not found/incomplete
+        """
+        if session_id not in self._sessions:
+            return None
+
+        session = self._sessions[session_id]
+
+        qa_pairs = []
+        for i, question in enumerate(session.questions):
+            answer = session.answers[i] if i < len(session.answers) else ""
+            qa_pairs.append({"question": question, "answer": answer})
+
+        return await self.clarifier_agent.enrich_query_async(
+            session.original_query, qa_pairs
+        )
 
     def get_session(self, session_id: str) -> ClarificationSession | None:
         """Get session by ID"""
