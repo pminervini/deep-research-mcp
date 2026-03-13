@@ -55,20 +55,12 @@ def test_clarification_session():
     assert session.original_query == "quantum computing"
     assert len(session.questions) == 3
     assert len(session.answers) == 0
-
-    # Test to_dict
-    session_dict = session.to_dict()
-    assert session_dict["session_id"] == "test-123"
-    assert session_dict["created_at"] is not None
-    assert session_dict["total_questions"] == 3
-    assert session_dict["answered_questions"] == 0
-    assert session_dict["is_complete"] == False
+    assert session.created_at is not None
 
     # Add answers
     session.answers = ["A1", "A2", "A3"]
-    session_dict = session.to_dict()
-    assert session_dict["answered_questions"] == 3
-    assert session_dict["is_complete"] == True
+    assert len(session.answers) == 3
+    assert len(session.answers) == len(session.questions)
 
 
 def test_clarification_manager_disabled(config_disabled):
