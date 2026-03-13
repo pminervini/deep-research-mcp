@@ -54,7 +54,7 @@ jobs:
         run: uv sync --upgrade --extra dev
 
       - name: Check formatting
-        run: uv run black --check .
+        run: uv run black --fast --check .
 
       - name: Run pylint
         run: uv run pylint src/deep_research_mcp tests

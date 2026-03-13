@@ -53,6 +53,7 @@ Do:
 Be analytical, avoid generalities, and ensure that each section supports data-backed reasoning that could inform healthcare policy or financial modeling.
 """
 
+
 async def research(
     query: str, model: str = "gpt-5-mini", clarify: bool = False, callback_url: str = ""
 ) -> None:
