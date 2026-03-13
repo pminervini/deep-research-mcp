@@ -45,7 +45,7 @@ import argparse
 import asyncio
 import logging
 from contextlib import suppress
-from typing import Annotated, Any
+from typing import Annotated
 
 from mcp.server.fastmcp import Context, FastMCP
 
@@ -53,6 +53,7 @@ from deep_research_mcp import __version__
 from deep_research_mcp.agent import DeepResearchAgent
 from deep_research_mcp.config import ResearchConfig
 from deep_research_mcp.errors import ResearchError
+from deep_research_mcp.results import ResearchResult
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -96,9 +97,9 @@ def _build_research_agent() -> DeepResearchAgent:
     return DeepResearchAgent(config)
 
 
-def _format_execution_time_line(result: dict[str, Any]) -> str:
+def _format_execution_time_line(result: ResearchResult) -> str:
     """Format execution time for markdown output when available."""
-    execution_time = result.get("execution_time")
+    execution_time = result.execution_time
     if isinstance(execution_time, (int, float)):
         return f"- **Execution time**: {execution_time:.2f} seconds\n"
     return ""
@@ -277,32 +278,32 @@ You can proceed with the research using the same query."""
                 with suppress(asyncio.CancelledError):
                     await heartbeat_task
 
-        if result["status"] == "completed":
+        if result.is_completed:
             if ctx:
                 await _safe_report_progress(
                     ctx, progress=1, total=1, message="Research completed successfully"
                 )
             formatted_result = f"""# Research Report: {query}
 
-{result['final_report']}
+{result.final_report}
 
 ## Research Metadata
-- **Total research steps**: {result['total_steps']}
-- **Search queries executed**: {len(result['search_queries'])}
-- **Citations found**: {len(result['citations'])}
-- **Task ID**: {result['task_id']}
+- **Total research steps**: {result.total_steps}
+- **Search queries executed**: {len(result.search_queries)}
+- **Citations found**: {len(result.citations)}
+- **Task ID**: {result.task_id}
 {_format_execution_time_line(result)}
 
 ## Citations
 """
-            for citation in result["citations"]:
+            for citation in result.citations:
                 formatted_result += (
-                    f"{citation['index']}. [{citation['title']}]({citation['url']})\n"
+                    f"{citation.index}. [{citation.title}]({citation.url})\n"
                 )
 
             return formatted_result
         else:
-            failure_message = result.get("message", "Unknown error")
+            failure_message = result.message or "Unknown error"
             if ctx:
                 await _safe_report_progress(
                     ctx,
@@ -345,16 +346,19 @@ async def research_status(
     try:
         status = await research_agent.get_task_status(task_id)
 
-        if status["status"] == "error":
-            return f"Error checking status: {status.get('error', 'Unknown error')}"
+        if status.status == "error":
+            return f"Error checking status: {status.error or 'Unknown error'}"
 
-        result = f"Task {task_id} status: {status['status']}"
+        result = f"Task {task_id} status: {status.status}"
 
-        if status.get("created_at"):
-            result += f"\nCreated at: {status['created_at']}"
+        if status.created_at:
+            result += f"\nCreated at: {status.created_at}"
 
-        if status.get("completed_at"):
-            result += f"\nCompleted at: {status['completed_at']}"
+        if status.completed_at:
+            result += f"\nCompleted at: {status.completed_at}"
+
+        if status.message:
+            result += f"\nMessage: {status.message}"
 
         return result
 
@@ -478,7 +482,7 @@ async def research_with_context(
                 with suppress(asyncio.CancelledError):
                     await heartbeat_task
 
-        if result["status"] == "completed":
+        if result.is_completed:
             if ctx:
                 await _safe_report_progress(
                     ctx,
@@ -497,26 +501,26 @@ async def research_with_context(
 
 ---
 
-{result['final_report']}
+{result.final_report}
 
 ## Research Metadata
-- **Total research steps**: {result['total_steps']}
-- **Search queries executed**: {len(result['search_queries'])}
-- **Citations found**: {len(result['citations'])}
-- **Task ID**: {result['task_id']}
+- **Total research steps**: {result.total_steps}
+- **Search queries executed**: {len(result.search_queries)}
+- **Citations found**: {len(result.citations)}
+- **Task ID**: {result.task_id}
 - **Clarification Session**: {session_id}
 {_format_execution_time_line(result)}
 
 ## Citations
 """
-            for citation in result["citations"]:
+            for citation in result.citations:
                 formatted_result += (
-                    f"{citation['index']}. [{citation['title']}]({citation['url']})\n"
+                    f"{citation.index}. [{citation.title}]({citation.url})\n"
                 )
 
             return formatted_result
         else:
-            failure_message = result.get("message", "Unknown error")
+            failure_message = result.message or "Unknown error"
             if ctx:
                 await _safe_report_progress(
                     ctx,
@@ -524,7 +528,7 @@ async def research_with_context(
                     total=1,
                     message=f"Contextual research failed: {failure_message}",
                 )
-            return f"Research failed: {result.get('message', 'Unknown error')}"
+            return f"Research failed: {failure_message}"
 
     except Exception as e:
         logger.error(f"Error in research_with_context: {e}")
