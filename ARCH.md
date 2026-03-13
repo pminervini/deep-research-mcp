@@ -45,6 +45,7 @@ graph TD
     subgraph External Services
         H[OpenAI Responses API web+code tools]
         H2[OpenAI Chat Completions API]
+        H3[Gemini Interactions API Deep Research]
         I[OpenAI Chat API for Clarification]
         L[OpenAI Chat API for Instruction Builder]
         M[Open Deep Research smolagents + text browser]
@@ -59,6 +60,7 @@ graph TD
     D -- "Uses instruction builder from" --> J
     D -- "Makes API calls to" --> H
     D -- "Makes API calls to" --> H2
+    D -- "Makes API calls to" --> H3
     D -- "Orchestrates agents via" --> M
     
     G --> G1
@@ -80,7 +82,7 @@ The project is composed of four main layers:
 1.  **MCP Server (`mcp_server.py`)**: This is the entry point for external clients like Claude Code. It uses the `mcp.server.fastmcp` module from the official MCP Python SDK to expose the core research functionality as tools. It handles incoming requests, initializes the `DeepResearchAgent`, and formats the results for the client. Now includes three tools: `deep_research()`, `research_with_context()`, and `research_status()`.
 
 2.  **Core Logic (`agent.py`, `config.py`, `errors.py`)**: This layer contains the main business logic of the application.
-    *   `agent.py` is the heart of the project, managing provider-based research interactions and coordinating clarification workflows. Supports OpenAI (Responses API or Chat Completions API, controlled by `api_style`) when provider is `"openai"` and Open Deep Research (smolagents) when provider is `"open-deep-research"`. Chat Completions mode enables compatibility with any OpenAI-compatible provider (Perplexity, Groq, Ollama, vLLM, etc.).
+    *   `agent.py` is the heart of the project, managing provider-based research interactions and coordinating clarification workflows. Supports OpenAI (Responses API or Chat Completions API, controlled by `api_style`) when provider is `"openai"`, Gemini Deep Research via the Interactions API when provider is `"gemini"`, and Open Deep Research (smolagents) when provider is `"open-deep-research"`. Chat Completions mode enables compatibility with any OpenAI-compatible provider (Perplexity, Groq, Ollama, vLLM, etc.).
     *   `config.py` handles loading and validating configuration from environment variables, including provider selection and clarification settings.
     *   `errors.py` defines custom exception classes for better error handling.
 
@@ -97,6 +99,7 @@ The project is composed of four main layers:
 5.  **External Services**: This layer represents the external systems used:
     * Provider `openai` with `api_style = "responses"` (default): OpenAI Responses API (web search + code interpreter tools), OpenAI Chat API for clarification agents and instruction builder.
     * Provider `openai` with `api_style = "chat_completions"`: OpenAI Chat Completions API -- works with any OpenAI-compatible provider (Perplexity, Groq, Ollama, vLLM, etc.). No built-in tools (web_search_preview, code_interpreter); no background mode or polling.
+    * Provider `gemini`: Gemini Deep Research agent over the Interactions API. Background execution and polling are required; built-in Google Search and URL context are provided by Gemini.
     * Provider `open-deep-research`: smolagents stack with a text browser and search tools; optional OpenAI-compatible LLM endpoint via LiteLLM.
 
 ## File-by-File Breakdown
@@ -105,9 +108,13 @@ The project is composed of four main layers:
 
 -   **Purpose**: Contains the `DeepResearchAgent` class, which is the core component responsible for interacting with research providers based on configuration.
 -   **Key Functionality**:
-    -   `research()`: Orchestrates the research process. Builds enhanced instructions (if clarification enabled), then routes to OpenAI (Responses API or Chat Completions API based on `api_style`) or Open Deep Research based on `config.provider`.
+    -   `research()`: Orchestrates the research process. Builds enhanced instructions (if clarification enabled), then routes to OpenAI (Responses API or Chat Completions API based on `api_style`), Gemini Interactions API Deep Research, or Open Deep Research based on `config.provider`.
     -   `build_research_instruction()`: Converts basic queries into detailed research briefs using the instruction builder model (only when clarification is enabled).
     -   `_create_instruction_client()`: Creates OpenAI client for instruction builder using clarification settings or default config.
+    -   `_init_gemini()`: Initializes the Gemini `google-genai` client and Interactions resource with beta API settings.
+    -   `_run_gemini_research()`: Starts a Gemini Deep Research background interaction and normalizes the completed result.
+    -   `_wait_for_gemini_completion()`: Polls Gemini interaction status until completion, failure, or timeout.
+    -   `_extract_gemini_results()`: Parses Gemini interaction outputs into the project's standard report/citation format.
     -   `_run_chat_completions_research()`: Runs research via the Chat Completions API (synchronous call in executor, no polling).
     -   `_create_chat_completions_request()`: Retry-wrapped Chat Completions API call.
     -   `_extract_chat_completions_results()`: Parses Chat Completions response into the standard output dict.
@@ -188,7 +195,7 @@ The MCP server exposes three main tools to clients like Claude Code. Each tool a
 
 ### `deep_research()`
 
-**Purpose**: Performs autonomous deep research using the configured provider (OpenAI Responses API or Open Deep Research).
+**Purpose**: Performs autonomous deep research using the configured provider (OpenAI Responses API, Gemini Deep Research, or Open Deep Research).
 
 **Arguments**:
 - `query` (string, required): Research question or topic to investigate

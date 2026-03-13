@@ -9,8 +9,11 @@ USAGE EXAMPLES:
   # Basic research query
   uv run python cli/agent-cli.py research "What are the latest treatments for diabetes?"
 
-  # Research with specific model (recommended)
+  # Research with a specific model or agent
   uv run python cli/agent-cli.py research "Healthcare costs in the US" --model gpt-5-mini
+
+  # Gemini Deep Research
+  RESEARCH_PROVIDER=gemini uv run python cli/agent-cli.py research "Healthcare costs in the US" --model deep-research-pro-preview-12-2025
 
   # Research with clarification (interactive)
   uv run python cli/agent-cli.py research "Quantum computing" --clarify
@@ -80,19 +83,19 @@ async def research(query: str, model: str = "gpt-5-mini", clarify: bool = False)
         if clarify and config.enable_clarification:
             logger.info("Starting clarification process...")
             clarification_result = agent.start_clarification(query)
-            
+
             if clarification_result.get("needs_clarification", False):
                 logger.info(f"Reasoning: {clarification_result.get('reasoning', 'No reasoning provided')}")
                 logger.info("\nPlease answer the following clarifying questions:")
-                
+
                 questions = clarification_result.get("questions", [])
                 answers = []
-                
+
                 for i, question in enumerate(questions, 1):
                     logger.info(f"\n{i}. {question}")
                     answer = input("Your answer (or press Enter to skip): ").strip()
                     answers.append(answer if answer else "[No answer provided]")
-                
+
                 # Add answers and get enriched query
                 session_id = clarification_result.get("session_id")
                 if session_id:
@@ -107,9 +110,7 @@ async def research(query: str, model: str = "gpt-5-mini", clarify: bool = False)
                 logger.info("Proceeding with original query")
 
         # Perform research
-        result = await agent.research(
-            query=working_query, system_prompt=SYSTEM_PROMPT, include_code_interpreter=True
-        )
+        result = await agent.research(query=working_query, system_prompt=SYSTEM_PROMPT, include_code_interpreter=True)
 
         # Display results
         if result["status"] == "completed":
@@ -128,9 +129,7 @@ async def research(query: str, model: str = "gpt-5-mini", clarify: bool = False)
                 logger.info("CITATIONS")
                 logger.info("=" * 60)
                 for citation in result["citations"]:
-                    logger.info(
-                        f"{citation['index']}. [{citation['title']}]({citation['url']})"
-                    )
+                    logger.info(f"{citation['index']}. [{citation['title']}]({citation['url']})")
         elif result["status"] == "failed":
             logger.error(f"Research failed: {result.get('message', 'Unknown error')}")
             if result.get("error_code"):
@@ -158,9 +157,7 @@ async def check_config() -> None:
         config.validate()
 
         logger.info("Configuration is valid")
-        logger.info(
-            f"API Key: {'*' * 20}{config.api_key[-10:] if len(config.api_key) > 10 else '*' * len(config.api_key)}"
-        )
+        logger.info(f"API Key: {'*' * 20}{config.api_key[-10:] if len(config.api_key) > 10 else '*' * len(config.api_key)}")
         logger.info(f"Model: {config.model}")
         logger.info(f"Timeout: {config.timeout} seconds")
         logger.info(f"Poll interval: {config.poll_interval} seconds")
@@ -168,7 +165,7 @@ async def check_config() -> None:
 
     except Exception as e:
         logger.error(f"Configuration error: {e}")
-        logger.error("\nMake sure you have set the OPENAI_API_KEY environment variable")
+        logger.error("\nMake sure you have set the provider API key environment variable")
 
 
 def main():
@@ -177,25 +174,10 @@ def main():
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # Research command
-    research_parser = subparsers.add_parser(
-        "research", help="Perform research on a query"
-    )
+    research_parser = subparsers.add_parser("research", help="Perform research on a query")
     research_parser.add_argument("query", help="Research query")
-    research_parser.add_argument(
-        "--model",
-        default="gpt-5-mini",
-        choices=[
-            "gpt-5-mini",
-            "o3-deep-research-2025-06-26",
-            "o4-mini-deep-research-2025-06-26",
-        ],
-        help="Model to use for research",
-    )
-    research_parser.add_argument(
-        "--clarify",
-        action="store_true",
-        help="Enable interactive clarification mode to improve research quality",
-    )
+    research_parser.add_argument("--model", default="gpt-5-mini", help="Model or agent id to use for research")
+    research_parser.add_argument("--clarify", action="store_true", help="Enable interactive clarification mode to improve research quality")
 
     # List models command
     subparsers.add_parser("models", help="List available models")

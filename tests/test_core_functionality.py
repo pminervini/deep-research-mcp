@@ -59,6 +59,39 @@ def test_agent_initialization(test_config):
     assert hasattr(agent, "clarification_manager")
 
 
+def test_gemini_agent_initialization():
+    """Test Gemini agent initialization without making API calls."""
+    old_provider = os.environ.get("RESEARCH_PROVIDER")
+    old_model = os.environ.get("RESEARCH_MODEL")
+    old_api_key = os.environ.get("RESEARCH_API_KEY")
+
+    os.environ["RESEARCH_PROVIDER"] = "gemini"
+    os.environ["RESEARCH_MODEL"] = "deep-research-pro-preview-12-2025"
+    os.environ["RESEARCH_API_KEY"] = "gemini-test-key"
+
+    try:
+        config = ResearchConfig.from_env()
+        agent = DeepResearchAgent(config)
+        assert agent.config.provider == "gemini"
+        assert hasattr(agent, "gemini_interactions")
+        assert agent.instruction_client is None
+    finally:
+        if old_provider:
+            os.environ["RESEARCH_PROVIDER"] = old_provider
+        else:
+            os.environ.pop("RESEARCH_PROVIDER", None)
+
+        if old_model:
+            os.environ["RESEARCH_MODEL"] = old_model
+        else:
+            os.environ.pop("RESEARCH_MODEL", None)
+
+        if old_api_key:
+            os.environ["RESEARCH_API_KEY"] = old_api_key
+        else:
+            os.environ.pop("RESEARCH_API_KEY", None)
+
+
 @pytest.mark.asyncio
 async def test_agent_status_check(test_agent):
     """Test agent's get_task_status method"""
@@ -184,13 +217,13 @@ def test_instruction_builder_with_clarification_enabled():
     os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
     os.environ["ENABLE_CLARIFICATION"] = "true"
     os.environ["INSTRUCTION_BUILDER_MODEL"] = "gpt-5-mini"
-    
+
     config = ResearchConfig.from_env()
     agent = DeepResearchAgent(config)
-    
+
     assert agent.config.enable_clarification == True
     assert agent.instruction_client is not None
-    
+
     # Clean up environment
     del os.environ["ENABLE_CLARIFICATION"]
 

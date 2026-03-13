@@ -3,6 +3,7 @@
 
 # Core dependencies
 openai>=1.88
+google-genai>=1.55.0
 openai-agents>=0.0.19
 mcp[cli]>=1.17.0
 httpx>=0.25.0
