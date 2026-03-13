@@ -4,8 +4,6 @@
 Structured result models for research and task status operations.
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import Any

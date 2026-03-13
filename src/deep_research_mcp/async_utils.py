@@ -4,8 +4,6 @@
 Async helpers for running blocking SDK calls without stalling the event loop.
 """
 
-from __future__ import annotations
-
 import asyncio
 from collections.abc import Callable
 from typing import Any, TypeVar

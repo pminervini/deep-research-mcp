@@ -4,8 +4,6 @@
 Shared backend interface definitions.
 """
 
-from __future__ import annotations
-
 import logging
 
 from deep_research_mcp.config import ResearchConfig
