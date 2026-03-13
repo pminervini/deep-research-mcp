@@ -7,7 +7,7 @@ name = "deep-research-mcp"
 version = "0.1.0"
 description = "MCP server and agent for autonomous deep research workflows"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [{ name = "Deep Research MCP Contributors" }]
 dependencies = [
@@ -27,7 +27,6 @@ dependencies = [
     "pyyaml>=6.0",
     "structlog>=23.1.0",
     "tenacity>=8.2.0",
-    "toml>=0.10",
 ]
 
 [project.optional-dependencies]

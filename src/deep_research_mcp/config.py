@@ -6,12 +6,11 @@ Configuration management for Deep Research MCP.
 
 import logging
 import os
+import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
-
-import toml
 
 from deep_research_mcp.errors import ConfigurationError
 
@@ -31,8 +30,8 @@ def load_config_file(config_path: Optional[Path | str] = None) -> dict[str, Any]
         return {}
 
     logger.info("Loading configuration from %s", resolved_path)
-    with resolved_path.open("r", encoding="utf-8") as config_file:
-        config_data = toml.load(config_file)
+    with resolved_path.open("rb") as config_file:
+        config_data = tomllib.load(config_file)
 
     if not isinstance(config_data, dict):
         raise ConfigurationError(
