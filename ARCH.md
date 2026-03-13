@@ -144,7 +144,8 @@ The project is composed of four main layers:
 -   **Purpose**: Manages the application's configuration.
 -   **Key Functionality**:
     -   `ResearchConfig` (dataclass): Defines the configuration parameters for the agent, such as API key, model name, base URL, `api_style` (`"responses"` or `"chat_completions"`), timeout, poll interval, clarification settings, and instruction builder model.
-    -   `from_env()`: A class method to load configuration from environment variables. Configuration is loaded from a `~/.deep_research` TOML file that sets environment variables. This allows for easy configuration without hardcoding values. Now includes clarification and instruction builder settings.
+    -   `load()`: Explicitly reads `~/.deep_research` (or another provided TOML path), merges it with environment variable overrides, and returns a config object without mutating `os.environ`.
+    -   `from_env()`: A class method to load configuration from environment variables only.
     -   `validate()`: A method to validate the configuration to ensure that the provided values are valid.
 
 ### `src/deep_research_mcp/errors.py`

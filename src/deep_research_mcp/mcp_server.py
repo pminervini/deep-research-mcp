@@ -112,7 +112,7 @@ async def deep_research(query: Annotated[str, "Specific research question or top
 
     if not research_agent:
         try:
-            config = ResearchConfig.from_env()
+            config = ResearchConfig.load()
             config.validate()
             research_agent = DeepResearchAgent(config)
         except Exception as e:
@@ -278,7 +278,7 @@ async def research_with_context(session_id: Annotated[str, "Session ID from clar
 
     if not research_agent:
         try:
-            config = ResearchConfig.from_env()
+            config = ResearchConfig.load()
             config.validate()
             research_agent = DeepResearchAgent(config)
         except Exception as e:
@@ -390,7 +390,7 @@ def main():
 
     # Validate configuration on startup
     try:
-        config = ResearchConfig.from_env()
+        config = ResearchConfig.load()
         config.validate()
         logger.info(f"Configuration loaded successfully. Model: {config.model}")
     except Exception as e:

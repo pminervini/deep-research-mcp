@@ -69,7 +69,7 @@ async def research(query: str, model: str = "gpt-5-mini", clarify: bool = False)
 
     try:
         # Create config with specified model
-        config = ResearchConfig.from_env()
+        config = ResearchConfig.load()
         config.model = model
         if clarify:
             config.enable_clarification = True
@@ -153,7 +153,7 @@ async def check_config() -> None:
     logger.info("-" * 30)
 
     try:
-        config = ResearchConfig.from_env()
+        config = ResearchConfig.load()
         config.validate()
 
         logger.info("Configuration is valid")
