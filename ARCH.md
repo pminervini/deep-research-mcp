@@ -23,11 +23,18 @@ graph TD
         C[FastMCP]
     end
 
-    subgraph Core Logic
+    subgraph Orchestration
         D[agent.py]
         E[config.py]
         F[errors.py]
         G[clarification.py]
+    end
+
+    subgraph Provider Backends
+        P[backends/__init__.py]
+        P1[openai_backend.py]
+        P2[gemini_backend.py]
+        P3[open_deep_research_backend.py]
     end
 
     subgraph Clarification System
@@ -58,10 +65,14 @@ graph TD
     D -- "Handles" --> F
     D -- "Uses clarification from" --> G
     D -- "Uses instruction builder from" --> J
-    D -- "Makes API calls to" --> H
-    D -- "Makes API calls to" --> H2
-    D -- "Makes API calls to" --> H3
-    D -- "Orchestrates agents via" --> M
+    D -- "Delegates provider work to" --> P
+    P --> P1
+    P --> P2
+    P --> P3
+    P1 -- "Makes API calls to" --> H
+    P1 -- "Makes API calls to" --> H2
+    P2 -- "Makes API calls to" --> H3
+    P3 -- "Orchestrates agents via" --> M
     
     G --> G1
     G --> G2
@@ -77,12 +88,12 @@ graph TD
 
 ## Component Descriptions
 
-The project is composed of four main layers:
+The project is composed of five main layers:
 
 1.  **MCP Server (`mcp_server.py`)**: This is the entry point for external clients like Claude Code. It uses the `mcp.server.fastmcp` module from the official MCP Python SDK to expose the core research functionality as tools. It handles incoming requests, initializes the `DeepResearchAgent`, and formats the results for the client. Now includes three tools: `deep_research()`, `research_with_context()`, and `research_status()`.
 
-2.  **Core Logic (`agent.py`, `config.py`, `errors.py`)**: This layer contains the main business logic of the application.
-    *   `agent.py` is the heart of the project, managing provider-based research interactions and coordinating clarification workflows. Supports OpenAI (Responses API or Chat Completions API, controlled by `api_style`) when provider is `"openai"`, Gemini Deep Research via the Interactions API when provider is `"gemini"`, and Open Deep Research (smolagents) when provider is `"open-deep-research"`. Chat Completions mode enables compatibility with any OpenAI-compatible provider (Perplexity, Groq, Ollama, vLLM, etc.).
+2.  **Orchestration (`agent.py`, `config.py`, `errors.py`)**: This layer contains the application-facing orchestration logic.
+    *   `agent.py` owns the top-level research flow, optional instruction building, clarification integration, completion callbacks, and delegation to the configured backend. It no longer embeds provider-specific execution logic directly.
     *   `config.py` handles loading and validating configuration from environment variables, including provider selection and clarification settings.
     *   `errors.py` defines custom exception classes for better error handling.
 
@@ -96,7 +107,13 @@ The project is composed of four main layers:
     *   `InstructionBuilder` (in `agent.py`) converts basic queries into detailed research briefs using the instruction builder model.
     *   `PromptManager` manages loading and formatting of YAML-based prompt templates, including the instruction builder prompt.
 
-5.  **External Services**: This layer represents the external systems used:
+5.  **Provider Backends (`backends/`)**: This layer isolates provider-specific initialization, request execution, polling, and result extraction.
+    *   `backends/base.py` defines the backend interface used by `DeepResearchAgent`.
+    *   `backends/openai_backend.py` implements the OpenAI Responses API and Chat Completions flows, including citation extraction and background polling.
+    *   `backends/gemini_backend.py` implements Gemini Deep Research over the Interactions API, including polling and result normalization.
+    *   `backends/open_deep_research_backend.py` implements the Open Deep Research integration with smolagents and text-browser tooling.
+
+6.  **External Services**: This layer represents the external systems used:
     * Provider `openai` with `api_style = "responses"` (default): OpenAI Responses API (web search + code interpreter tools), OpenAI Chat API for clarification agents and instruction builder.
     * Provider `openai` with `api_style = "chat_completions"`: OpenAI Chat Completions API -- works with any OpenAI-compatible provider (Perplexity, Groq, Ollama, vLLM, etc.). No built-in tools (web_search_preview, code_interpreter); no background mode or polling.
     * Provider `gemini`: Gemini Deep Research agent over the Interactions API. Background execution and polling are required; built-in Google Search and URL context are provided by Gemini.
@@ -106,29 +123,66 @@ The project is composed of four main layers:
 
 ### `src/deep_research_mcp/agent.py`
 
--   **Purpose**: Contains the `DeepResearchAgent` class, which is the core component responsible for interacting with research providers based on configuration.
+-   **Purpose**: Contains the `DeepResearchAgent` class, which orchestrates research execution, clarification, instruction building, and callbacks.
 -   **Key Functionality**:
-    -   `research()`: Orchestrates the research process. Builds enhanced instructions (if clarification enabled), then routes to OpenAI (Responses API or Chat Completions API based on `api_style`), Gemini Interactions API Deep Research, or Open Deep Research based on `config.provider`.
+    -   `research()`: Orchestrates the research process. Builds enhanced instructions (if clarification enabled), delegates research execution to the configured backend, and optionally triggers completion callbacks.
+    -   `__getattr__()`: Proxies backend attributes for compatibility so existing callers can still access provider-specific clients and handles where needed.
     -   `build_research_instruction()`: Converts basic queries into detailed research briefs using the instruction builder model (only when clarification is enabled).
+    -   `build_research_instruction_async()`: Runs instruction building off the event loop in a worker thread.
     -   `_create_instruction_client()`: Creates OpenAI client for instruction builder using clarification settings or default config.
-    -   `_init_gemini()`: Initializes the Gemini `google-genai` client and Interactions resource with beta API settings.
-    -   `_run_gemini_research()`: Starts a Gemini Deep Research background interaction and normalizes the completed result.
-    -   `_wait_for_gemini_completion()`: Polls Gemini interaction status until completion, failure, or timeout.
-    -   `_extract_gemini_results()`: Parses Gemini interaction outputs into the project's standard report/citation format.
-    -   `_run_chat_completions_research()`: Runs research via the Chat Completions API (synchronous call in executor, no polling).
+    -   `_send_completion_callback()`: Sends a notification to a callback URL when the research is complete.
+    -   `get_task_status()`: Allows checking the status of a running research task.
+    -   `start_clarification()`: Initiates the clarification process using the ClarificationManager.
+    -   `start_clarification_async()`: Async clarification entry point that keeps blocking model calls off the event loop.
+    -   `add_clarification_answers()`: Adds user answers to clarification questions.
+    -   `get_enriched_query()`: Retrieves an enriched query based on clarification responses.
+    -   `get_enriched_query_async()`: Async enrichment lookup that keeps blocking model calls off the event loop.
+
+### `src/deep_research_mcp/backends/__init__.py`
+
+-   **Purpose**: Exposes the provider backend interface and backend factory.
+-   **Key Functionality**:
+    -   `build_research_backend()`: Selects the correct backend implementation for the configured provider.
+
+### `src/deep_research_mcp/backends/base.py`
+
+-   **Purpose**: Defines the shared backend contract used by the orchestration layer.
+-   **Key Functionality**:
+    -   `ResearchBackend`: Base interface for provider implementations.
+    -   `_combine_system_prompt()`: Shared helper for combining top-level system instructions with the user query.
+
+### `src/deep_research_mcp/backends/openai_backend.py`
+
+-   **Purpose**: Implements OpenAI Responses API and Chat Completions execution paths.
+-   **Key Functionality**:
+    -   `research()`: Routes between Responses API and Chat Completions mode based on `api_style`.
+    -   `_create_research_task()`: Starts an OpenAI background research task (Responses API) with retry logic.
+    -   `_wait_for_completion()`: Polls the Responses API task until completion, failure, or timeout.
+    -   `_extract_openai_results()`: Parses final OpenAI response and extracts report, citations, and metadata.
+    -   `_run_chat_completions_research()`: Runs research via the Chat Completions API.
     -   `_create_chat_completions_request()`: Retry-wrapped Chat Completions API call.
     -   `_extract_chat_completions_results()`: Parses Chat Completions response into the standard output dict.
     -   `_extract_chat_completions_citations()`: Multi-layer citation extraction (Perplexity-style, annotation-based, regex fallback).
-    -   `_create_openai_research_task()`: Starts an OpenAI background research task (Responses API) with retry logic.
+    -   `get_task_status()`: Returns OpenAI task status or an `unknown` status for Chat Completions mode.
+
+### `src/deep_research_mcp/backends/gemini_backend.py`
+
+-   **Purpose**: Implements Gemini Deep Research over the Interactions API.
+-   **Key Functionality**:
+    -   `_init_gemini()`: Initializes the Gemini `google-genai` client and Interactions resource with beta API settings.
+    -   `_run_research()`: Starts a Gemini Deep Research background interaction and normalizes the completed result.
+    -   `_wait_for_completion()`: Polls Gemini interaction status until completion, failure, or timeout.
+    -   `_extract_results()`: Parses Gemini interaction outputs into the project's standard report/citation format.
+    -   `get_task_status()`: Returns Gemini interaction status metadata.
+
+### `src/deep_research_mcp/backends/open_deep_research_backend.py`
+
+-   **Purpose**: Implements the Open Deep Research integration using smolagents and browser tools.
+-   **Key Functionality**:
     -   `_init_open_deep_research()`: Initializes smolagents model, browser, and tools for Open Deep Research.
-    -   `_run_open_deep_research()`: Executes the ODR manager/search agents and extracts a structured result.
-    -   `_wait_for_completion()`: Polls the API for the status of a research task until it is completed, fails, or times out.
-    -   `_send_completion_callback()`: Sends a notification to a callback URL when the research is complete.
-    -   `_extract_openai_results()`: Parses final OpenAI response and extracts report, citations, and metadata.
-    -   `get_task_status()`: Allows checking the status of a running research task.
-    -   `start_clarification()`: Initiates the clarification process using the ClarificationManager.
-    -   `add_clarification_answers()`: Adds user answers to clarification questions.
-    -   `get_enriched_query()`: Retrieves an enriched query based on clarification responses.
+    -   `_run_research()`: Executes the ODR manager/search agents and extracts a structured result.
+    -   `_extract_memory_details()`: Collects citations, search queries, and step counts from agent memory.
+    -   `get_task_status()`: Returns an `unknown` status because the provider does not support persistent task tracking.
 
 ### `src/deep_research_mcp/mcp_server.py`
 
