@@ -9,7 +9,7 @@ import logging
 import os
 from importlib import resources
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import yaml
 
@@ -32,7 +32,7 @@ class PromptManager:
             custom_prompts_dir: Optional custom directory for prompts.
                                If None, uses auto-discovery.
         """
-        self.prompts_cache: Dict[str, Dict[str, Any]] = {}
+        self.prompts_cache: dict[str, dict[str, Any]] = {}
         self.prompts_dir = self._discover_prompts_directory(custom_prompts_dir)
 
     def _discover_prompts_directory(
@@ -45,8 +45,7 @@ class PromptManager:
         1. Custom directory (if provided)
         2. Environment variable override
         3. User customization directory
-        4. Package bundled prompts
-        5. Development mode (relative to this file)
+        4. Bundled prompts next to this module
         """
         search_paths = []
 
@@ -62,8 +61,8 @@ class PromptManager:
         # Add user customization directory
         search_paths.append(Path.home() / ".deep_research" / "prompts")
 
-        # Add package bundled location (development mode)
-        search_paths.append(Path(__file__).parent / "prompts")
+        # Add package-local bundled prompts directory
+        search_paths.append(Path(__file__).resolve().parent)
 
         # Find first existing directory
         for path in search_paths:
@@ -76,24 +75,17 @@ class PromptManager:
         )
         return None
 
-    def _load_from_package_resources(self, category: str, name: str) -> Dict[str, Any]:
+    def _load_from_package_resources(self, category: str, name: str) -> dict[str, Any]:
         """
         Load prompt from package resources as fallback.
         """
         try:
-            # Modern importlib.resources API
-            if hasattr(resources, "files"):
-                files = resources.files("deep_research_mcp.prompts")
-                prompt_file = files / category / f"{name}.yaml"
-                content = prompt_file.read_text(encoding="utf-8")
-                return yaml.safe_load(content)
-            else:
-                # Fallback for Python 3.8
-                with resources.open_text(
-                    f"deep_research_mcp.prompts.{category}", f"{name}.yaml"
-                ) as f:
-                    return yaml.safe_load(f)
-        except (FileNotFoundError, AttributeError, ModuleNotFoundError) as e:
+            prompt_file = resources.files("deep_research_mcp.prompts").joinpath(
+                category, f"{name}.yaml"
+            )
+            content = prompt_file.read_text(encoding="utf-8")
+            return yaml.safe_load(content)
+        except (FileNotFoundError, ModuleNotFoundError) as e:
             logger.error(
                 f"Failed to load prompt {category}/{name} from package resources: {e}"
             )
@@ -101,7 +93,7 @@ class PromptManager:
                 f"Prompt file {category}/{name}.yaml not found in package resources"
             )
 
-    def _load_from_filesystem(self, category: str, name: str) -> Dict[str, Any]:
+    def _load_from_filesystem(self, category: str, name: str) -> dict[str, Any]:
         """
         Load prompt from filesystem.
         """
@@ -116,7 +108,7 @@ class PromptManager:
         with open(prompt_file, "r", encoding="utf-8") as f:
             return yaml.safe_load(f)
 
-    def _load_prompt_data(self, category: str, name: str) -> Dict[str, Any]:
+    def _load_prompt_data(self, category: str, name: str) -> dict[str, Any]:
         """
         Load prompt data from filesystem or package resources.
         """
