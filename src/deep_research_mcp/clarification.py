@@ -199,19 +199,6 @@ class ClarificationSession:
         self.answers: list[str] = []
         self.created_at = datetime.now(timezone.utc).isoformat()
 
-    def to_dict(self) -> dict[str, Any]:
-        """Convert session to dictionary for serialization"""
-        return {
-            "session_id": self.session_id,
-            "original_query": self.original_query,
-            "questions": self.questions,
-            "answers": self.answers,
-            "created_at": self.created_at,
-            "total_questions": len(self.questions),
-            "answered_questions": len(self.answers),
-            "is_complete": len(self.answers) >= len(self.questions),
-        }
-
 
 class ClarificationManager:
     """Manages the complete clarification pipeline"""
@@ -370,7 +357,3 @@ class ClarificationManager:
         return await self.clarifier_agent.enrich_query_async(
             session.original_query, qa_pairs
         )
-
-    def get_session(self, session_id: str) -> ClarificationSession | None:
-        """Get session by ID"""
-        return self._sessions.get(session_id)
