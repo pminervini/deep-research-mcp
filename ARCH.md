@@ -174,7 +174,6 @@ The project is composed of four main layers:
     -   `get_instruction_builder_prompt()`: Loads and formats the instruction builder prompt template with query substitution.
     -   `get_triage_prompt()`: Loads and formats the triage analysis prompt for clarification.
     -   `get_enrichment_prompt()`: Loads and formats the query enrichment prompt for clarification.
-    -   `list_available_prompts()`: Lists all available prompts by category for debugging and documentation.
 
 ### `src/deep_research_mcp/prompts/research/instruction_builder.yaml`
 
@@ -203,6 +202,7 @@ The MCP server exposes three main tools to clients like Claude Code. Each tool a
 - `system_instructions` (string, optional): Custom research approach instructions
 - `include_analysis` (boolean, optional, default=True): Enable code execution for data analysis and visualizations  
 - `request_clarification` (boolean, optional, default=False): Return clarifying questions instead of starting research
+- `callback_url` (string, optional): Webhook URL notified with a completion payload after research finishes
 
 **Returns**: String containing formatted markdown report
 
@@ -217,6 +217,7 @@ The MCP server exposes three main tools to clients like Claude Code. Each tool a
 - **Search queries executed**: [number]
 - **Citations found**: [number]
 - **Task ID**: [uuid]
+- **Execution time**: [seconds]
 
 ## Citations
 1. [Title](URL)
@@ -231,6 +232,7 @@ The MCP server exposes three main tools to clients like Claude Code. Each tool a
 **Original Query:** [query]
 **Why clarification is helpful:** [reasoning]
 **Session ID:** `[session_id]`
+**Created At:** [timestamp]
 
 **Please answer these questions to improve the research:**
 
@@ -291,6 +293,7 @@ Completed at: [timestamp]  # Only if completed
 - `answers` (list[string], required): Answers to clarifying questions in order
 - `system_instructions` (string, optional): Custom research approach instructions
 - `include_analysis` (boolean, optional, default=True): Enable code execution for analysis
+- `callback_url` (string, optional): Webhook URL notified with a completion payload after research finishes
 
 **Returns**: String containing formatted markdown report with enhanced context
 
@@ -313,6 +316,7 @@ Completed at: [timestamp]  # Only if completed
 - **Citations found**: [number]
 - **Task ID**: [uuid]
 - **Clarification Session**: [session_id]
+- **Execution time**: [seconds]
 
 ## Citations
 1. [Title](URL)

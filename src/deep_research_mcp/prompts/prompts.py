@@ -5,12 +5,13 @@ This module provides a PromptManager class that handles loading and formatting
 of YAML-based prompt templates with auto-discovery and package resource support.
 """
 
-import os
-import yaml
-from pathlib import Path
-from typing import Dict, Any, Optional, List
-from importlib import resources
 import logging
+import os
+from importlib import resources
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -191,36 +192,3 @@ class PromptManager:
     def get_instruction_builder_prompt(self, query: str) -> str:
         """Get the instruction builder prompt."""
         return self.get_prompt("research", "instruction_builder", query=query)
-
-    def list_available_prompts(self) -> Dict[str, List[str]]:
-        """
-        List all available prompts by category.
-
-        Returns:
-            Dictionary mapping categories to lists of prompt names
-        """
-        available = {}
-
-        if self.prompts_dir and self.prompts_dir.exists():
-            # Scan filesystem
-            for category_dir in self.prompts_dir.iterdir():
-                if category_dir.is_dir():
-                    category = category_dir.name
-                    prompts = [f.stem for f in category_dir.glob("*.yaml")]
-                    if prompts:
-                        available[category] = prompts
-        else:
-            # Scan package resources
-            try:
-                if hasattr(resources, "files"):
-                    files = resources.files("deep_research_mcp.prompts")
-                    for item in files.iterdir():
-                        if item.is_dir():
-                            category = item.name
-                            prompts = [f.stem for f in item.glob("*.yaml")]
-                            if prompts:
-                                available[category] = prompts
-            except Exception as e:
-                logger.warning(f"Could not scan package resources: {e}")
-
-        return available

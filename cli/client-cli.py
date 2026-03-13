@@ -77,7 +77,9 @@ async def _connect(url: str) -> AsyncIterator[ClientSession]:
             yield session
 
 
-async def _progress_callback(progress: float, total: float | None, message: str | None) -> None:
+async def _progress_callback(
+    progress: float, total: float | None, message: str | None
+) -> None:
     if total is not None and total > 0:
         pct = (progress / total) * 100.0
         print(f"[progress] {pct:5.1f}% {message or ''}")
@@ -96,7 +98,7 @@ def _render_call_tool_result(result: types.CallToolResult) -> str:
         return str(sc)
 
     parts: List[str] = []
-    for item in (result.content or []):
+    for item in result.content or []:
         if isinstance(item, types.TextContent):
             parts.append(item.text)
         else:
@@ -114,7 +116,11 @@ async def cmd_list_tools(url: str) -> int:
 
         print("Available tools:")
         for tool in tools.tools:
-            desc = (tool.description or "").strip().splitlines()[0] if tool.description else ""
+            desc = (
+                (tool.description or "").strip().splitlines()[0]
+                if tool.description
+                else ""
+            )
             print(f"- {tool.name}: {desc}")
         return 0
 
@@ -125,6 +131,7 @@ async def cmd_research(
     system_instructions: str,
     include_analysis: bool,
     request_clarification: bool,
+    callback_url: str,
 ) -> int:
     async with _connect(url) as session:
         print("Connected.")
@@ -134,10 +141,13 @@ async def cmd_research(
             "system_instructions": system_instructions,
             "include_analysis": include_analysis,
             "request_clarification": request_clarification,
+            "callback_url": callback_url,
         }
 
         print("Calling tool: deep_research ...")
-        result = await session.call_tool("deep_research", args, progress_callback=_progress_callback)
+        result = await session.call_tool(
+            "deep_research", args, progress_callback=_progress_callback
+        )
         if result.isError:
             print("Tool error:")
             print(_render_call_tool_result(result))
@@ -173,6 +183,7 @@ async def cmd_research_with_context(
     answers: List[str],
     system_instructions: str,
     include_analysis: bool,
+    callback_url: str,
 ) -> int:
     async with _connect(url) as session:
         print("Connected.")
@@ -185,6 +196,7 @@ async def cmd_research_with_context(
                 "answers": answers,
                 "system_instructions": system_instructions,
                 "include_analysis": include_analysis,
+                "callback_url": callback_url,
             },
             progress_callback=_progress_callback,
         )
@@ -229,12 +241,22 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Request clarifying questions instead of starting research",
     )
+    p_research.add_argument(
+        "--callback-url",
+        default="",
+        help="Optional webhook URL to notify when research completes",
+    )
 
     p_status = sub.add_parser("status", help="Check status of a research task")
     p_status.add_argument("task_id", help="Task ID returned by deep_research")
 
-    p_ctx = sub.add_parser("research-with-context", help="Run research_with_context with answers")
-    p_ctx.add_argument("session_id", help="Session ID returned by deep_research when requesting clarification")
+    p_ctx = sub.add_parser(
+        "research-with-context", help="Run research_with_context with answers"
+    )
+    p_ctx.add_argument(
+        "session_id",
+        help="Session ID returned by deep_research when requesting clarification",
+    )
     p_ctx.add_argument(
         "--answer",
         action="append",
@@ -252,6 +274,11 @@ def parse_args() -> argparse.Namespace:
         "--no-analysis",
         action="store_true",
         help="Disable code/analysis tools during research",
+    )
+    p_ctx.add_argument(
+        "--callback-url",
+        default="",
+        help="Optional webhook URL to notify when research completes",
     )
 
     return parser.parse_args()
@@ -272,6 +299,7 @@ def main() -> None:
                 system_instructions=args.system_instructions,
                 include_analysis=not args.no_analysis,
                 request_clarification=args.clarify,
+                callback_url=args.callback_url,
             )
         )
         raise SystemExit(rc)
@@ -288,6 +316,7 @@ def main() -> None:
                 answers=args.answers,
                 system_instructions=args.system_instructions,
                 include_analysis=not args.no_analysis,
+                callback_url=args.callback_url,
             )
         )
         raise SystemExit(rc)

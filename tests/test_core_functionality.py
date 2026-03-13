@@ -9,8 +9,6 @@ import os
 
 import pytest
 
-import deep_research_mcp.mcp_server as mcp_server
-
 from deep_research_mcp.agent import DeepResearchAgent
 from deep_research_mcp.config import ResearchConfig
 
@@ -119,58 +117,23 @@ async def test_research_dry_run(test_agent):
     # WARNING: This makes a REAL OpenAI Deep Research API call
     # It will take several minutes and costs real money
     # This is an integration test, not a unit test
-    result = await test_agent.research(query="Test research query for validation", system_prompt="This is a test system prompt", include_code_interpreter=False)
+    result = await test_agent.research(
+        query="Test research query for validation",
+        system_prompt="This is a test system prompt",
+        include_code_interpreter=False,
+    )
 
     # Check the result format
     assert isinstance(result, dict)
     assert "status" in result
 
 
-def test_clarification_methods(test_agent):
-    """Test clarification methods exist and are callable"""
-    assert hasattr(test_agent, "start_clarification")
-    assert hasattr(test_agent, "add_clarification_answers")
-    assert hasattr(test_agent, "get_enriched_query")
-
-    # Test basic clarification start (should work even without API key if clarification disabled)
+def test_start_clarification_returns_disabled_when_feature_off(test_agent):
+    """Test clarification returns a disabled response when the feature is off."""
     test_agent.config.enable_clarification = False  # Disable to avoid API calls
     result = test_agent.start_clarification("test query")
     assert isinstance(result, dict)
     assert result["needs_clarification"] == False
-
-
-def test_mcp_server_imports():
-    """Test that MCP server can import all required components"""
-    try:
-        # Test that the module imports successfully
-        assert hasattr(mcp_server, "deep_research")
-        assert hasattr(mcp_server, "research_with_context")
-        assert hasattr(mcp_server, "research_status")
-
-        # Check that the FastMCP instance exists
-        assert hasattr(mcp_server, "mcp"), "MCP server missing FastMCP instance"
-
-        # Check that main function exists
-        assert hasattr(mcp_server, "main"), "MCP server missing main function"
-    except ImportError as e:
-        pytest.fail(f"Failed to import MCP server components: {e}")
-
-
-def test_config_clarification_defaults():
-    """Test clarification configuration defaults"""
-    # Clean environment first
-    env_vars_to_clean = ["ENABLE_CLARIFICATION", "TRIAGE_MODEL", "CLARIFIER_MODEL"]
-    for var in env_vars_to_clean:
-        if var in os.environ:
-            del os.environ[var]
-
-    os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
-
-    # Test defaults
-    config = ResearchConfig.from_env()
-    assert config.enable_clarification == False  # Default is False
-    assert config.triage_model == "gpt-5-mini"
-    assert config.clarifier_model == "gpt-5-mini"
 
 
 def test_config_clarification_enabled():
@@ -243,12 +206,6 @@ def test_instruction_builder_prompt_loading(test_agent):
         assert "not found" in str(e).lower() or "no such file" in str(e).lower()
 
 
-def test_instruction_builder_method_exists(test_agent):
-    """Test that build_research_instruction method exists and is callable"""
-    assert hasattr(test_agent, "build_research_instruction")
-    assert callable(test_agent.build_research_instruction)
-
-
 @pytest.mark.asyncio
 async def test_instruction_builder_fallback(test_agent):
     """Test that instruction builder gracefully falls back to original query on error"""
@@ -283,7 +240,9 @@ def test_config_instruction_builder_env_override():
                 del os.environ["RESEARCH_MODEL"]
 
         if old_instruction_model:
-            os.environ["CLARIFICATION_INSTRUCTION_BUILDER_MODEL"] = old_instruction_model
+            os.environ["CLARIFICATION_INSTRUCTION_BUILDER_MODEL"] = (
+                old_instruction_model
+            )
         else:
             if "CLARIFICATION_INSTRUCTION_BUILDER_MODEL" in os.environ:
                 del os.environ["CLARIFICATION_INSTRUCTION_BUILDER_MODEL"]

@@ -21,9 +21,6 @@ USAGE EXAMPLES:
   # Check configuration
   uv run python cli/agent-cli.py config
 
-  # List available models
-  uv run python cli/agent-cli.py models
-
 EXAMPLE QUERIES:
   - "What are the current market trends for AI in healthcare?"
   - "Compare effectiveness of different COVID-19 vaccines"
@@ -56,8 +53,9 @@ Do:
 Be analytical, avoid generalities, and ensure that each section supports data-backed reasoning that could inform healthcare policy or financial modeling.
 """
 
-
-async def research(query: str, model: str = "gpt-5-mini", clarify: bool = False) -> None:
+async def research(
+    query: str, model: str = "gpt-5-mini", clarify: bool = False, callback_url: str = ""
+) -> None:
     """Use the research functionality"""
     logger = structlog.get_logger()
 
@@ -85,7 +83,9 @@ async def research(query: str, model: str = "gpt-5-mini", clarify: bool = False)
             clarification_result = agent.start_clarification(query)
 
             if clarification_result.get("needs_clarification", False):
-                logger.info(f"Reasoning: {clarification_result.get('reasoning', 'No reasoning provided')}")
+                logger.info(
+                    f"Reasoning: {clarification_result.get('reasoning', 'No reasoning provided')}"
+                )
                 logger.info("\nPlease answer the following clarifying questions:")
 
                 questions = clarification_result.get("questions", [])
@@ -106,11 +106,18 @@ async def research(query: str, model: str = "gpt-5-mini", clarify: bool = False)
                         logger.info(f"\nEnriched query: {working_query}")
                         logger.info("-" * 50)
             else:
-                logger.info(f"Reasoning: {clarification_result.get('reasoning', 'Query is sufficient')}")
+                logger.info(
+                    f"Reasoning: {clarification_result.get('reasoning', 'Query is sufficient')}"
+                )
                 logger.info("Proceeding with original query")
 
         # Perform research
-        result = await agent.research(query=working_query, system_prompt=SYSTEM_PROMPT, include_code_interpreter=True)
+        result = await agent.research(
+            query=working_query,
+            system_prompt=SYSTEM_PROMPT,
+            include_code_interpreter=True,
+            callback_url=callback_url or None,
+        )
 
         # Display results
         if result["status"] == "completed":
@@ -119,6 +126,8 @@ async def research(query: str, model: str = "gpt-5-mini", clarify: bool = False)
             logger.info(f"Total steps: {result['total_steps']}")
             logger.info(f"Search queries: {len(result['search_queries'])}")
             logger.info(f"Citations: {len(result['citations'])}")
+            if isinstance(result.get("execution_time"), (int, float)):
+                logger.info(f"Execution time: {result['execution_time']:.2f} seconds")
             logger.info("\n" + "=" * 60)
             logger.info("RESEARCH REPORT")
             logger.info("=" * 60)
@@ -129,7 +138,9 @@ async def research(query: str, model: str = "gpt-5-mini", clarify: bool = False)
                 logger.info("CITATIONS")
                 logger.info("=" * 60)
                 for citation in result["citations"]:
-                    logger.info(f"{citation['index']}. [{citation['title']}]({citation['url']})")
+                    logger.info(
+                        f"{citation['index']}. [{citation['title']}]({citation['url']})"
+                    )
         elif result["status"] == "failed":
             logger.error(f"Research failed: {result.get('message', 'Unknown error')}")
             if result.get("error_code"):
@@ -157,7 +168,12 @@ async def check_config() -> None:
         config.validate()
 
         logger.info("Configuration is valid")
-        logger.info(f"API Key: {'*' * 20}{config.api_key[-10:] if len(config.api_key) > 10 else '*' * len(config.api_key)}")
+        if config.api_key:
+            logger.info(
+                f"API Key: {'*' * 20}{config.api_key[-10:] if len(config.api_key) > 10 else '*' * len(config.api_key)}"
+            )
+        else:
+            logger.info("API Key: not set")
         logger.info(f"Model: {config.model}")
         logger.info(f"Timeout: {config.timeout} seconds")
         logger.info(f"Poll interval: {config.poll_interval} seconds")
@@ -165,7 +181,9 @@ async def check_config() -> None:
 
     except Exception as e:
         logger.error(f"Configuration error: {e}")
-        logger.error("\nMake sure you have set the provider API key environment variable")
+        logger.error(
+            "\nMake sure you have set the provider API key environment variable"
+        )
 
 
 def main():
@@ -174,13 +192,23 @@ def main():
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # Research command
-    research_parser = subparsers.add_parser("research", help="Perform research on a query")
+    research_parser = subparsers.add_parser(
+        "research", help="Perform research on a query"
+    )
     research_parser.add_argument("query", help="Research query")
-    research_parser.add_argument("--model", default="gpt-5-mini", help="Model or agent id to use for research")
-    research_parser.add_argument("--clarify", action="store_true", help="Enable interactive clarification mode to improve research quality")
-
-    # List models command
-    subparsers.add_parser("models", help="List available models")
+    research_parser.add_argument(
+        "--model", default="gpt-5-mini", help="Model or agent id to use for research"
+    )
+    research_parser.add_argument(
+        "--clarify",
+        action="store_true",
+        help="Enable interactive clarification mode to improve research quality",
+    )
+    research_parser.add_argument(
+        "--callback-url",
+        default="",
+        help="Optional webhook URL to notify when research completes",
+    )
 
     # Check config command
     subparsers.add_parser("config", help="Check configuration")
@@ -192,7 +220,7 @@ def main():
         return
 
     if args.command == "research":
-        asyncio.run(research(args.query, args.model, args.clarify))
+        asyncio.run(research(args.query, args.model, args.clarify, args.callback_url))
     elif args.command == "config":
         asyncio.run(check_config())
 

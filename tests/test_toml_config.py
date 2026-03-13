@@ -5,27 +5,16 @@ Tests for TOML configuration loading.
 """
 
 import os
-import toml
-import io
 
 from deep_research_mcp.config import ResearchConfig, load_config_file
-
-
-def test_toml_functionality():
-    """Test TOML loading works properly"""
-    # Test simple TOML parsing
-    test_toml = 'research_model = "gpt-5-mini"\nenable_clarification = true'
-
-    config = toml.load(io.StringIO(test_toml))
-
-    assert config["research_model"] == "gpt-5-mini"
-    assert config["enable_clarification"] == True
 
 
 def test_load_config_file_is_side_effect_free(tmp_path):
     """Test TOML loading returns data without mutating environment variables."""
     config_path = tmp_path / ".deep_research"
-    config_path.write_text("[research]\nmodel = \"file-model\"\nprovider = \"gemini\"\n", encoding="utf-8")
+    config_path.write_text(
+        '[research]\nmodel = "file-model"\nprovider = "gemini"\n', encoding="utf-8"
+    )
 
     original_model = os.environ.get("RESEARCH_MODEL")
     os.environ.pop("RESEARCH_MODEL", None)
@@ -44,9 +33,19 @@ def test_load_config_file_is_side_effect_free(tmp_path):
 def test_load_merges_toml_with_environment_overrides(tmp_path):
     """Test explicit config loading merges TOML values with environment overrides."""
     config_path = tmp_path / ".deep_research"
-    config_path.write_text("[research]\nprovider = \"gemini\"\nmodel = \"file-model\"\ntimeout = 45\n[clarification]\nenable = true\ntriage_model = \"file-triage\"\n", encoding="utf-8")
+    config_path.write_text(
+        '[research]\nprovider = "gemini"\nmodel = "file-model"\ntimeout = 45\n[clarification]\nenable = true\ntriage_model = "file-triage"\n',
+        encoding="utf-8",
+    )
 
-    config = ResearchConfig.load(config_path=config_path, env={"RESEARCH_MODEL": "env-model", "RESEARCH_TIMEOUT": "90", "CLARIFICATION_CLARIFIER_MODEL": "env-clarifier"})
+    config = ResearchConfig.load(
+        config_path=config_path,
+        env={
+            "RESEARCH_MODEL": "env-model",
+            "RESEARCH_TIMEOUT": "90",
+            "CLARIFICATION_CLARIFIER_MODEL": "env-clarifier",
+        },
+    )
 
     assert config.provider == "gemini"
     assert config.model == "env-model"
@@ -58,7 +57,9 @@ def test_load_merges_toml_with_environment_overrides(tmp_path):
 
 def test_from_env_only_uses_explicit_environment_values():
     """Test env-only loading does not require or implicitly read TOML configuration."""
-    config = ResearchConfig.from_env(env={"RESEARCH_MODEL": "env-only-model", "ENABLE_CLARIFICATION": "true"})
+    config = ResearchConfig.from_env(
+        env={"RESEARCH_MODEL": "env-only-model", "ENABLE_CLARIFICATION": "true"}
+    )
 
     assert config.provider == "openai"
     assert config.model == "env-only-model"
@@ -147,34 +148,6 @@ def test_toml_boolean_parsing():
             del os.environ["RESEARCH_MODEL"]
 
 
-def test_toml_vs_legacy_format():
-    """Test that both TOML and legacy formats work conceptually"""
-    # This test just ensures the basic structures work
-
-    # TOML style (would be in file)
-    toml_style = {
-        "research_model": "gpt-5-mini",
-        "enable_clarification": True,
-        "research": {"timeout": 1800, "poll_interval": 30},
-    }
-
-    # Legacy style (environment variables)
-    legacy_style = {
-        "RESEARCH_MODEL": "gpt-5-mini",
-        "ENABLE_CLARIFICATION": "true",
-        "RESEARCH_TIMEOUT": "1800",
-        "RESEARCH_POLL_INTERVAL": "30",
-    }
-
-    # Test that both can represent the same data
-    assert toml_style["research_model"] == legacy_style["RESEARCH_MODEL"]
-    assert (
-        str(toml_style["enable_clarification"]).lower()
-        == legacy_style["ENABLE_CLARIFICATION"]
-    )
-    assert str(toml_style["research"]["timeout"]) == legacy_style["RESEARCH_TIMEOUT"]
-
-
 def test_config_defaults():
     """Test configuration defaults are correct"""
     # Clean environment
@@ -201,6 +174,7 @@ def test_config_defaults():
         config = ResearchConfig.from_env()
 
         # Test defaults
+        assert config.provider == "openai"
         assert config.enable_clarification == False  # Default should be False
         assert config.triage_model == "gpt-5-mini"  # Default
         assert config.clarifier_model == "gpt-5-mini"  # Default
@@ -208,6 +182,7 @@ def test_config_defaults():
         assert config.timeout == 1800.0  # Default
         assert config.poll_interval == 30.0  # Default
         assert config.max_retries == 3  # Default
+        assert config.log_level == "INFO"
 
     finally:
         # Restore environment
