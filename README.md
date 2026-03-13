@@ -4,7 +4,7 @@ A Python-based agent that integrates research providers with Claude Code through
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.11+
 - [uv](https://docs.astral.sh/uv/) installed
 - One of:
   - OpenAI API access (Responses API models, e.g., `o4-mini-deep-research-2025-06-26`)

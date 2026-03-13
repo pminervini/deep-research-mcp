@@ -17,7 +17,7 @@
 - Lint/format/type-check: `uv run black .`, `uv run pylint src/deep_research_mcp tests`, `uv run mypy src/deep_research_mcp`.
 
 ## Coding Style & Naming Conventions
-- Python 3.10+, 4-space indentation, use type hints in new/changed code.
+- Python 3.11+, 4-space indentation, use type hints in new/changed code.
 - Format with `black` defaults; keep imports and docstrings idiomatic.
 - Keep every import, method/function call, and `assert` statement on a single line.
 - Naming: snake_case for modules/functions, PascalCase for classes, UPPER_CASE for constants.
