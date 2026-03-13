@@ -121,35 +121,33 @@ async def research(
         )
 
         # Display results
-        if result["status"] == "completed":
+        if result.status == "completed":
             logger.info("Research completed successfully!")
-            logger.info(f"Task ID: {result['task_id']}")
-            logger.info(f"Total steps: {result['total_steps']}")
-            logger.info(f"Search queries: {len(result['search_queries'])}")
-            logger.info(f"Citations: {len(result['citations'])}")
-            if isinstance(result.get("execution_time"), (int, float)):
-                logger.info(f"Execution time: {result['execution_time']:.2f} seconds")
+            logger.info(f"Task ID: {result.task_id}")
+            logger.info(f"Total steps: {result.total_steps}")
+            logger.info(f"Search queries: {len(result.search_queries)}")
+            logger.info(f"Citations: {len(result.citations)}")
+            if isinstance(result.execution_time, (int, float)):
+                logger.info(f"Execution time: {result.execution_time:.2f} seconds")
             logger.info("\n" + "=" * 60)
             logger.info("RESEARCH REPORT")
             logger.info("=" * 60)
-            logger.info(result["final_report"])
+            logger.info(result.final_report)
 
-            if result["citations"]:
+            if result.citations:
                 logger.info("\n" + "=" * 60)
                 logger.info("CITATIONS")
                 logger.info("=" * 60)
-                for citation in result["citations"]:
-                    logger.info(
-                        f"{citation['index']}. [{citation['title']}]({citation['url']})"
-                    )
-        elif result["status"] == "failed":
-            logger.error(f"Research failed: {result.get('message', 'Unknown error')}")
-            if result.get("error_code"):
-                logger.error(f"Error code: {result['error_code']}")
-            if result.get("task_id"):
-                logger.error(f"Task ID: {result['task_id']}")
+                for citation in result.citations:
+                    logger.info(f"{citation.index}. [{citation.title}]({citation.url})")
+        elif result.status == "failed":
+            logger.error(f"Research failed: {result.message or 'Unknown error'}")
+            if result.error_code:
+                logger.error(f"Error code: {result.error_code}")
+            if result.task_id:
+                logger.error(f"Task ID: {result.task_id}")
         else:
-            logger.error(f"Research error: {result.get('message', 'Unknown error')}")
+            logger.error(f"Research error: {result.message or 'Unknown error'}")
 
     except ResearchError as e:
         logger.error(f"Research error: {e}")
