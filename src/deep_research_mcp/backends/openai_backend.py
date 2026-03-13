@@ -12,6 +12,7 @@ from typing import Any
 
 import httpx
 from openai import AuthenticationError, OpenAI
+from openai.types.chat import ChatCompletionMessageParam
 from tenacity import (
     retry,
     retry_if_not_exception_type,
@@ -77,7 +78,7 @@ class OpenAIResearchBackend(ResearchBackend):
             response = await run_blocking(self.client.responses.retrieve, task_id)
             return ResearchTaskStatus(
                 task_id=task_id,
-                status=response.status,
+                status=response.status or "unknown",
                 created_at=getattr(response, "created_at", None),
                 completed_at=getattr(response, "completed_at", None),
             )
@@ -130,7 +131,7 @@ class OpenAIResearchBackend(ResearchBackend):
                 "code_interpreter is not available with Chat Completions API; ignoring"
             )
 
-        messages: list[dict[str, str]] = []
+        messages: list[ChatCompletionMessageParam] = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": query})
@@ -164,7 +165,7 @@ class OpenAIResearchBackend(ResearchBackend):
         reraise=True,
     )
     def _create_chat_completions_request(
-        self, client: OpenAI, messages: list[dict[str, str]]
+        self, client: OpenAI, messages: list[ChatCompletionMessageParam]
     ):
         """Retry-wrapped Chat Completions API call."""
         return client.chat.completions.create(

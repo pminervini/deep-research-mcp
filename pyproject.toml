@@ -94,3 +94,16 @@ disable = [
     "unused-variable",
     "wrong-import-order",
 ]
+
+[tool.mypy]
+python_version = "3.11"
+
+[[tool.mypy.overrides]]
+module = [
+    "huggingface_hub",
+    "open_deep_research",
+    "open_deep_research.*",
+    "smolagents",
+    "yaml",
+]
+ignore_missing_imports = true

@@ -45,7 +45,7 @@ import argparse
 import asyncio
 import logging
 from contextlib import suppress
-from typing import Annotated
+from typing import Annotated, Literal, cast
 
 from mcp.server.fastmcp import Context, FastMCP
 
@@ -58,6 +58,8 @@ from deep_research_mcp.results import ResearchResult
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+LogLevelName = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+VALID_LOG_LEVELS: set[str] = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 
 DEFAULT_RESEARCH_SYSTEM_PROMPT = """You are a professional researcher preparing a structured, data-driven report.
 Requirements:
@@ -93,9 +95,12 @@ mcp = FastMCP(
 def _apply_logging_config(log_level: str) -> None:
     """Apply configured log level to the root logger and FastMCP settings."""
     normalized_log_level = log_level.upper()
-    logging.getLogger().setLevel(normalized_log_level)
-    logger.setLevel(normalized_log_level)
-    mcp.settings.log_level = normalized_log_level
+    if normalized_log_level not in VALID_LOG_LEVELS:
+        normalized_log_level = "INFO"
+    typed_log_level = cast(LogLevelName, normalized_log_level)
+    logging.getLogger().setLevel(typed_log_level)
+    logger.setLevel(typed_log_level)
+    mcp.settings.log_level = typed_log_level
 
 
 def _build_research_agent() -> DeepResearchAgent:
