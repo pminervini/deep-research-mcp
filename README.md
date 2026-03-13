@@ -289,6 +289,7 @@ async def main():
     print(f"Report: {result['final_report']}")
     print(f"Citations: {result['citations']}")
     print(f"Research steps: {result['reasoning_steps']}")
+    print(f"Execution time: {result['execution_time']:.2f}s")
 
 # Run the research
 asyncio.run(main())
@@ -410,6 +411,7 @@ The main class for performing research operations.
 
 - `research(query, system_prompt=None, include_code_interpreter=True, callback_url=None)`
   - Performs deep research on a query
+  - `callback_url`: optional webhook notified when research completes
   - Returns: Dictionary with final report, citations, and metadata
 
 - `get_task_status(task_id)`

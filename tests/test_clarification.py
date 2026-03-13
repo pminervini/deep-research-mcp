@@ -9,7 +9,12 @@ import pytest
 import os
 
 from deep_research_mcp.config import ResearchConfig
-from deep_research_mcp.clarification import TriageAgent, ClarifierAgent, ClarificationManager, ClarificationSession
+from deep_research_mcp.clarification import (
+    TriageAgent,
+    ClarifierAgent,
+    ClarificationManager,
+    ClarificationSession,
+)
 
 
 @pytest.fixture
@@ -54,6 +59,7 @@ def test_clarification_session():
     # Test to_dict
     session_dict = session.to_dict()
     assert session_dict["session_id"] == "test-123"
+    assert session_dict["created_at"] is not None
     assert session_dict["total_questions"] == 3
     assert session_dict["answered_questions"] == 0
     assert session_dict["is_complete"] == False

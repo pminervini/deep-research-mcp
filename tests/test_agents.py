@@ -12,19 +12,32 @@ import pytest
 
 from deep_research_mcp.config import ResearchConfig
 
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
+@pytest.mark.api
+@pytest.mark.integration
 # ("open-deep-research", "openai/qwen/qwen3-coder-30b", "responses"),
-@pytest.mark.parametrize("provider,model,api_style", [("openai", "gpt-5-mini", "responses"), ("openai", "gpt-5-mini", "chat_completions")])
+@pytest.mark.parametrize(
+    "provider,model,api_style",
+    [
+        ("openai", "gpt-5-mini", "responses"),
+        ("openai", "gpt-5-mini", "chat_completions"),
+    ],
+)
 async def test_mcp_server_with_providers(provider, model, api_style):
     await run_provider_check(provider, model, api_style=api_style)
 
 
 async def run_provider_check(provider, model, api_style="responses"):
-    logger.info(f"=== Starting test for provider={provider}, model={model}, api_style={api_style} ===")
+    logger.info(
+        f"=== Starting test for provider={provider}, model={model}, api_style={api_style} ==="
+    )
 
     # Prepare environment for this run
     old_provider = os.environ.get("PROVIDER")
@@ -33,7 +46,9 @@ async def run_provider_check(provider, model, api_style="responses"):
     old_enable_clar = os.environ.get("ENABLE_CLARIFICATION")
     old_api_style = os.environ.get("RESEARCH_API_STYLE")
 
-    logger.info(f"Setting environment: PROVIDER={provider}, RESEARCH_MODEL={model}, RESEARCH_API_STYLE={api_style}")
+    logger.info(
+        f"Setting environment: PROVIDER={provider}, RESEARCH_MODEL={model}, RESEARCH_API_STYLE={api_style}"
+    )
     os.environ["PROVIDER"] = provider
     os.environ["RESEARCH_PROVIDER"] = provider
     os.environ["RESEARCH_MODEL"] = model
@@ -44,7 +59,9 @@ async def run_provider_check(provider, model, api_style="responses"):
         # Confirm config resolve reflects our desired provider/model
         logger.info("Loading ResearchConfig from environment...")
         cfg = ResearchConfig.from_env()
-        logger.info(f"Config loaded: provider={cfg.provider}, model={cfg.model}, api_style={cfg.api_style}")
+        logger.info(
+            f"Config loaded: provider={cfg.provider}, model={cfg.model}, api_style={cfg.api_style}"
+        )
 
         assert cfg.provider == provider
         assert cfg.api_style == api_style
@@ -60,9 +77,15 @@ async def run_provider_check(provider, model, api_style="responses"):
         mcp_server.research_agent = None
 
         # Run deep research for real (no mocks/mocks)
-        logger.info(f"Starting deep_research call for provider: {provider} (api_style={api_style})")
+        logger.info(
+            f"Starting deep_research call for provider: {provider} (api_style={api_style})"
+        )
         logger.info("This may take several minutes...")
-        result = await mcp_server.deep_research(query="Sanity check query for provider: " + provider, system_instructions="Keep it brief; this is a test run.", include_analysis=False)
+        result = await mcp_server.deep_research(
+            query="Sanity check query for provider: " + provider,
+            system_instructions="Keep it brief; this is a test run.",
+            include_analysis=False,
+        )
         logger.info(f"deep_research completed. Result length: {len(result)} chars")
 
         # Always returns a string: either a report or a clear error
@@ -70,7 +93,12 @@ async def run_provider_check(provider, model, api_style="responses"):
         assert isinstance(result, str)
 
         # We accept both success or informative failure depending on env/services
-        acceptable_indicators = ("Research Report:", "Research failed:", "Failed to initialize research agent", "Unexpected error:")
+        acceptable_indicators = (
+            "Research Report:",
+            "Research failed:",
+            "Failed to initialize research agent",
+            "Unexpected error:",
+        )
         logger.info("Checking for acceptable result indicators...")
         assert any(ind in result for ind in acceptable_indicators)
         logger.info(f"Test PASSED for provider={provider} (api_style={api_style})")
@@ -101,17 +129,34 @@ async def run_provider_check(provider, model, api_style="responses"):
             os.environ.pop("RESEARCH_API_STYLE", None)
         else:
             os.environ["RESEARCH_API_STYLE"] = old_api_style
-        logger.info(f"=== Finished test for provider={provider} (api_style={api_style}) ===")
+        logger.info(
+            f"=== Finished test for provider={provider} (api_style={api_style}) ==="
+        )
 
 
 def main() -> None:
     import argparse
     import asyncio
 
-    parser = argparse.ArgumentParser(description="Run the deep research provider integration check without pytest.")
-    parser.add_argument("--provider", default="openai", help="Research provider to validate (default: openai).")
-    parser.add_argument("--model", default="gpt-5-mini", help="Model identifier to use for the provider (default: gpt-5-mini).")
-    parser.add_argument("--api-style", default="responses", choices=["responses", "chat_completions"], help="API style to use (default: responses).")
+    parser = argparse.ArgumentParser(
+        description="Run the deep research provider integration check without pytest."
+    )
+    parser.add_argument(
+        "--provider",
+        default="openai",
+        help="Research provider to validate (default: openai).",
+    )
+    parser.add_argument(
+        "--model",
+        default="gpt-5-mini",
+        help="Model identifier to use for the provider (default: gpt-5-mini).",
+    )
+    parser.add_argument(
+        "--api-style",
+        default="responses",
+        choices=["responses", "chat_completions"],
+        help="API style to use (default: responses).",
+    )
 
     args = parser.parse_args()
     asyncio.run(run_provider_check(args.provider, args.model, api_style=args.api_style))

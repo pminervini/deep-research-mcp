@@ -5,6 +5,7 @@
 import os
 import pytest
 from deep_research_mcp.config import ResearchConfig
+from deep_research_mcp.errors import ConfigurationError
 
 
 def test_config_creation_with_overrides():
@@ -13,7 +14,14 @@ def test_config_creation_with_overrides():
     if not api_key:
         pytest.skip("OPENAI_API_KEY not set")
 
-    config = ResearchConfig(api_key=api_key, model="gpt-5-mini", timeout=120.0, poll_interval=5.0, max_retries=7, log_level="DEBUG")
+    config = ResearchConfig(
+        api_key=api_key,
+        model="gpt-5-mini",
+        timeout=120.0,
+        poll_interval=5.0,
+        max_retries=7,
+        log_level="DEBUG",
+    )
 
     assert config.api_key == api_key
     assert config.model == "gpt-5-mini"
@@ -24,25 +32,36 @@ def test_config_creation_with_overrides():
 
 
 def test_validate_with_valid_model():
-    """Test validation with a valid model"""
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        pytest.skip("OPENAI_API_KEY not set")
-
-    config = ResearchConfig(api_key=api_key, model="gpt-5-mini")
+    """Test validation accepts a basic local config."""
+    config = ResearchConfig(model="gpt-5-mini")
     assert config.validate() is True
 
 
-def test_validate_with_invalid_model():
-    """Test validation with an explicit test model"""
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        pytest.skip("OPENAI_API_KEY not set")
+@pytest.mark.parametrize(
+    ("field_name", "field_value", "error_message"),
+    [
+        ("timeout", 0.0, "Timeout must be positive"),
+        ("poll_interval", 0.0, "Poll interval must be positive"),
+        ("max_retries", -1, "Max retries must be non-negative"),
+    ],
+)
+def test_validate_rejects_invalid_runtime_limits(
+    field_name: str, field_value: float | int, error_message: str
+):
+    """Test validation rejects invalid timing and retry values."""
+    config = ResearchConfig(model="gpt-5-mini")
+    setattr(config, field_name, field_value)
 
-    config = ResearchConfig(api_key=api_key, model="gpt-5-mini")
+    with pytest.raises(ConfigurationError, match=error_message):
+        config.validate()
 
-    # Validation is local-only; provider/model runtime checks happen during research calls.
-    assert config.validate() is True
+
+def test_validate_with_invalid_log_level():
+    """Test validation rejects invalid log levels."""
+    config = ResearchConfig(model="gpt-5-mini", log_level="not-a-level")
+
+    with pytest.raises(ConfigurationError, match="Invalid log level"):
+        config.validate()
 
 
 def test_config_with_custom_endpoint():
@@ -52,7 +71,9 @@ def test_config_with_custom_endpoint():
         pytest.skip("OPENAI_API_KEY not set")
 
     custom_endpoint = "https://api.custom-provider.com/v1"
-    config = ResearchConfig(api_key=api_key, base_url=custom_endpoint, model="gpt-5-mini")
+    config = ResearchConfig(
+        api_key=api_key, base_url=custom_endpoint, model="gpt-5-mini"
+    )
 
     assert config.api_key == api_key
     assert config.base_url == custom_endpoint
@@ -92,7 +113,12 @@ def test_config_with_clarification_base_url():
         pytest.skip("OPENAI_API_KEY not set")
 
     clarification_endpoint = "https://api.clarification.com/v1"
-    config = ResearchConfig(api_key=api_key, model="gpt-5-mini", enable_clarification=True, clarification_base_url=clarification_endpoint)
+    config = ResearchConfig(
+        api_key=api_key,
+        model="gpt-5-mini",
+        enable_clarification=True,
+        clarification_base_url=clarification_endpoint,
+    )
 
     assert config.api_key == api_key
     assert config.clarification_base_url == clarification_endpoint
@@ -128,7 +154,12 @@ def test_from_env_with_clarification_base_url():
 def test_config_with_clarification_api_key():
     """Test config with separate clarification API key"""
     clarification_api_key = "sk-clarification-test-key"
-    config = ResearchConfig(api_key="sk-main-test-key", model="gpt-5-mini", enable_clarification=True, clarification_api_key=clarification_api_key)
+    config = ResearchConfig(
+        api_key="sk-main-test-key",
+        model="gpt-5-mini",
+        enable_clarification=True,
+        clarification_api_key=clarification_api_key,
+    )
 
     assert config.api_key == "sk-main-test-key"
     assert config.clarification_api_key == clarification_api_key
@@ -167,7 +198,9 @@ def test_config_with_instruction_builder_model():
     if not api_key:
         pytest.skip("OPENAI_API_KEY not set")
 
-    config = ResearchConfig(api_key=api_key, model="gpt-5-mini", instruction_builder_model="gpt-5-mini")
+    config = ResearchConfig(
+        api_key=api_key, model="gpt-5-mini", instruction_builder_model="gpt-5-mini"
+    )
 
     assert config.api_key == api_key
     assert config.instruction_builder_model == "gpt-5-mini"
@@ -177,7 +210,9 @@ def test_config_with_instruction_builder_model():
 def test_from_env_with_instruction_builder_model():
     """Test loading instruction_builder_model from environment variables"""
     old_model = os.environ.get("RESEARCH_MODEL")
-    old_instruction_builder_model = os.environ.get("CLARIFICATION_INSTRUCTION_BUILDER_MODEL")
+    old_instruction_builder_model = os.environ.get(
+        "CLARIFICATION_INSTRUCTION_BUILDER_MODEL"
+    )
 
     os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
     os.environ["CLARIFICATION_INSTRUCTION_BUILDER_MODEL"] = "gpt-5-mini"
@@ -193,7 +228,9 @@ def test_from_env_with_instruction_builder_model():
             del os.environ["RESEARCH_MODEL"]
 
         if old_instruction_builder_model:
-            os.environ["CLARIFICATION_INSTRUCTION_BUILDER_MODEL"] = old_instruction_builder_model
+            os.environ["CLARIFICATION_INSTRUCTION_BUILDER_MODEL"] = (
+                old_instruction_builder_model
+            )
         else:
             if "CLARIFICATION_INSTRUCTION_BUILDER_MODEL" in os.environ:
                 del os.environ["CLARIFICATION_INSTRUCTION_BUILDER_MODEL"]
@@ -250,8 +287,6 @@ def test_api_style_invalid_value_rejected():
     os.environ["RESEARCH_API_STYLE"] = "invalid_value"
 
     try:
-        from deep_research_mcp.errors import ConfigurationError
-
         with pytest.raises(ConfigurationError, match="Invalid api_style"):
             ResearchConfig.from_env()
     finally:
@@ -263,7 +298,9 @@ def test_api_style_invalid_value_rejected():
 
 def test_api_style_chat_completions_skips_api_key_validation():
     """Test that API key validation is skipped for chat_completions mode"""
-    config = ResearchConfig(api_key="ppl-perplexity-key", model="gpt-5-mini", api_style="chat_completions")
+    config = ResearchConfig(
+        api_key="ppl-perplexity-key", model="gpt-5-mini", api_style="chat_completions"
+    )
     # Should not raise despite non-sk- prefix
     assert config.validate() is True
 

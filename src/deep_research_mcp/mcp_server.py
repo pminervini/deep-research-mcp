@@ -45,7 +45,7 @@ import argparse
 import asyncio
 import logging
 from contextlib import suppress
-from typing import Annotated, Optional
+from typing import Annotated, Any, Optional
 
 from mcp.server.fastmcp import Context, FastMCP
 
@@ -62,23 +62,73 @@ logger = logging.getLogger(__name__)
 research_agent: Optional[DeepResearchAgent] = None
 
 # Initialize FastMCP server at module level with metadata
-mcp = FastMCP(name=f"deep-research (v{__version__})", instructions=("Deep Research MCP Server - Autonomous research agent with web search, " "data analysis, and citation capabilities. Supports OpenAI Responses API, " "OpenAI Chat Completions API (compatible with Perplexity, Groq, Ollama, " "and other providers), Gemini Deep Research via the Interactions API, " "and Open Deep Research. Use deep_research for " "comprehensive research queries, research_with_context for " "clarification-enhanced research, and research_status to monitor " "long-running tasks."), website_url="https://github.com/pminervini/deep-research-mcp", debug=False, log_level="INFO")
+mcp = FastMCP(
+    name=f"deep-research (v{__version__})",
+    instructions=(
+        "Deep Research MCP Server - Autonomous research agent with web search, "
+        "data analysis, and citation capabilities. Supports OpenAI Responses API, "
+        "OpenAI Chat Completions API (compatible with Perplexity, Groq, Ollama, "
+        "and other providers), Gemini Deep Research via the Interactions API, "
+        "and Open Deep Research. Use deep_research for "
+        "comprehensive research queries, research_with_context for "
+        "clarification-enhanced research, and research_status to monitor "
+        "long-running tasks."
+    ),
+    website_url="https://github.com/pminervini/deep-research-mcp",
+    debug=False,
+    log_level="INFO",
+)
 
 
-async def _progress_heartbeat(ctx: Context, label: str, interval_seconds: int = 60) -> None:
+def _apply_logging_config(log_level: str) -> None:
+    """Apply configured log level to the root logger and FastMCP settings."""
+    normalized_log_level = log_level.upper()
+    logging.getLogger().setLevel(normalized_log_level)
+    logger.setLevel(normalized_log_level)
+    mcp.settings.log_level = normalized_log_level
+
+
+def _build_research_agent() -> DeepResearchAgent:
+    """Load configuration, apply logging, and construct a research agent."""
+    config = ResearchConfig.load()
+    config.validate()
+    _apply_logging_config(config.log_level)
+    return DeepResearchAgent(config)
+
+
+def _format_execution_time_line(result: dict[str, Any]) -> str:
+    """Format execution time for markdown output when available."""
+    execution_time = result.get("execution_time")
+    if isinstance(execution_time, (int, float)):
+        return f"- **Execution time**: {execution_time:.2f} seconds\n"
+    return ""
+
+
+async def _progress_heartbeat(
+    ctx: Context, label: str, interval_seconds: int = 60
+) -> None:
     """Send periodic heartbeat updates to keep long jobs alive."""
     minutes = 1
     while True:
         await asyncio.sleep(interval_seconds)
         try:
-            await ctx.report_progress(progress=minutes, message=f"{label} ({minutes} minute{'s' if minutes != 1 else ''})")
+            await ctx.report_progress(
+                progress=minutes,
+                message=f"{label} ({minutes} minute{'s' if minutes != 1 else ''})",
+            )
         except Exception:
             logger.debug("Progress heartbeat failed", exc_info=True)
             return
         minutes += 1
 
 
-async def _safe_report_progress(ctx: Context, *, progress: float, total: Optional[float] = None, message: Optional[str] = None) -> None:
+async def _safe_report_progress(
+    ctx: Context,
+    *,
+    progress: float,
+    total: Optional[float] = None,
+    message: Optional[str] = None,
+) -> None:
     """Best-effort progress reporting helper."""
     try:
         await ctx.report_progress(progress=progress, total=total, message=message)
@@ -88,7 +138,29 @@ async def _safe_report_progress(ctx: Context, *, progress: float, total: Optiona
 
 # Define the actual async functions that will be wrapped by FastMCP
 @mcp.tool()
-async def deep_research(query: Annotated[str, "Specific research question or topic. Examples: 'Latest quantum computing breakthroughs in 2024', 'Compare renewable energy adoption rates globally', 'Analyze Tesla's financial performance vs competitors'"], system_instructions: Annotated[str, "Custom research approach instructions. Examples: 'Focus on peer-reviewed sources only', 'Include financial data and charts', 'Prioritize recent developments from 2024-2025'. Leave empty for balanced analysis."] = "", include_analysis: Annotated[bool, "Enable code execution for data analysis, calculations, and visualizations. Useful for: statistical analysis, creating charts/graphs, processing datasets. Set to False for text-only research."] = True, request_clarification: Annotated[bool, "When True, analyze the query and return clarifying questions instead of starting research. Use this to improve research quality for ambiguous queries."] = False, ctx: Optional[Context] = None) -> str:
+async def deep_research(
+    query: Annotated[
+        str,
+        "Specific research question or topic. Examples: 'Latest quantum computing breakthroughs in 2024', 'Compare renewable energy adoption rates globally', 'Analyze Tesla's financial performance vs competitors'",
+    ],
+    system_instructions: Annotated[
+        str,
+        "Custom research approach instructions. Examples: 'Focus on peer-reviewed sources only', 'Include financial data and charts', 'Prioritize recent developments from 2024-2025'. Leave empty for balanced analysis.",
+    ] = "",
+    include_analysis: Annotated[
+        bool,
+        "Enable code execution for data analysis, calculations, and visualizations. Useful for: statistical analysis, creating charts/graphs, processing datasets. Set to False for text-only research.",
+    ] = True,
+    request_clarification: Annotated[
+        bool,
+        "When True, analyze the query and return clarifying questions instead of starting research. Use this to improve research quality for ambiguous queries.",
+    ] = False,
+    callback_url: Annotated[
+        str,
+        "Optional webhook URL notified with a completion payload when the research finishes. Leave empty to disable callbacks.",
+    ] = "",
+    ctx: Optional[Context] = None,
+) -> str:
     """
     Performs autonomous deep research using the configured provider with web search and analysis capabilities.
 
@@ -112,9 +184,7 @@ async def deep_research(query: Annotated[str, "Specific research question or top
 
     if not research_agent:
         try:
-            config = ResearchConfig.load()
-            config.validate()
-            research_agent = DeepResearchAgent(config)
+            research_agent = _build_research_agent()
         except Exception as e:
             return f"Failed to initialize research agent: {str(e)}"
 
@@ -137,8 +207,12 @@ You can proceed with the research using the same query."""
             # Format clarifying questions for Claude Code
             questions = clarification_result.get("questions", [])
             session_id = clarification_result.get("session_id", "")
+            created_at = clarification_result.get("created_at", "")
 
-            questions_formatted = "\n".join([f"{i+1}. {q}" for i, q in enumerate(questions)])
+            questions_formatted = "\n".join(
+                [f"{i+1}. {q}" for i, q in enumerate(questions)]
+            )
+            created_at_line = f"\n**Created At:** {created_at}\n" if created_at else ""
 
             return f"""# Clarifying Questions Needed
 
@@ -147,6 +221,7 @@ You can proceed with the research using the same query."""
 **Why clarification is helpful:** {clarification_result.get('reasoning', 'Additional context will improve research quality')}
 
 **Session ID:** `{session_id}`
+{created_at_line}
 
 **Please answer these questions to improve the research:**
 
@@ -167,18 +242,34 @@ You can proceed with the research using the same query."""
         heartbeat_task: Optional[asyncio.Task] = None
 
         if ctx:
-            await _safe_report_progress(ctx, progress=0, message="Research started...", total=None)
-            heartbeat_task = asyncio.create_task(_progress_heartbeat(ctx, "Research in progress"))
+            await _safe_report_progress(
+                ctx, progress=0, message="Research started...", total=None
+            )
+            heartbeat_task = asyncio.create_task(
+                _progress_heartbeat(ctx, "Research in progress")
+            )
 
         try:
-            result = await research_agent.research(query=query, system_prompt=system_prompt, include_code_interpreter=include_analysis)
+            result = await research_agent.research(
+                query=query,
+                system_prompt=system_prompt,
+                include_code_interpreter=include_analysis,
+                callback_url=callback_url or None,
+            )
         except ResearchError:
             if ctx:
-                await _safe_report_progress(ctx, progress=1, total=1, message="Research ended with provider error")
+                await _safe_report_progress(
+                    ctx,
+                    progress=1,
+                    total=1,
+                    message="Research ended with provider error",
+                )
             raise
         except Exception:
             if ctx:
-                await _safe_report_progress(ctx, progress=1, total=1, message="Research ended unexpectedly")
+                await _safe_report_progress(
+                    ctx, progress=1, total=1, message="Research ended unexpectedly"
+                )
             raise
         finally:
             if heartbeat_task:
@@ -188,7 +279,9 @@ You can proceed with the research using the same query."""
 
         if result["status"] == "completed":
             if ctx:
-                await _safe_report_progress(ctx, progress=1, total=1, message="Research completed successfully")
+                await _safe_report_progress(
+                    ctx, progress=1, total=1, message="Research completed successfully"
+                )
             formatted_result = f"""# Research Report: {query}
 
 {result['final_report']}
@@ -198,17 +291,25 @@ You can proceed with the research using the same query."""
 - **Search queries executed**: {len(result['search_queries'])}
 - **Citations found**: {len(result['citations'])}
 - **Task ID**: {result['task_id']}
+{_format_execution_time_line(result)}
 
 ## Citations
 """
             for citation in result["citations"]:
-                formatted_result += f"{citation['index']}. [{citation['title']}]({citation['url']})\n"
+                formatted_result += (
+                    f"{citation['index']}. [{citation['title']}]({citation['url']})\n"
+                )
 
             return formatted_result
         else:
             failure_message = result.get("message", "Unknown error")
             if ctx:
-                await _safe_report_progress(ctx, progress=1, total=1, message=f"Research failed: {failure_message}")
+                await _safe_report_progress(
+                    ctx,
+                    progress=1,
+                    total=1,
+                    message=f"Research failed: {failure_message}",
+                )
             return f"Research failed: {failure_message}"
 
     except ResearchError as e:
@@ -220,7 +321,12 @@ You can proceed with the research using the same query."""
 
 
 @mcp.tool()
-async def research_status(task_id: Annotated[str, "Research task ID returned by deep_research tool. Format: UUID string like 'abc123-def456-ghi789'"]) -> str:
+async def research_status(
+    task_id: Annotated[
+        str,
+        "Research task ID returned by deep_research tool. Format: UUID string like 'abc123-def456-ghi789'",
+    ],
+) -> str:
     """
     Check the current status and progress of a running research task.
 
@@ -258,7 +364,29 @@ async def research_status(task_id: Annotated[str, "Research task ID returned by 
 
 
 @mcp.tool()
-async def research_with_context(session_id: Annotated[str, "Session ID from clarification request. Get this from the deep_research tool when request_clarification=True"], answers: Annotated[list[str], "List of answers to the clarifying questions, in the same order as the questions were presented"], system_instructions: Annotated[str, "Custom research approach instructions. Examples: 'Focus on peer-reviewed sources only', 'Include financial data and charts', 'Prioritize recent developments from 2024-2025'. Leave empty for balanced analysis."] = "", include_analysis: Annotated[bool, "Enable code execution for data analysis, calculations, and visualizations. Useful for: statistical analysis, creating charts/graphs, processing datasets. Set to False for text-only research."] = True, ctx: Optional[Context] = None) -> str:
+async def research_with_context(
+    session_id: Annotated[
+        str,
+        "Session ID from clarification request. Get this from the deep_research tool when request_clarification=True",
+    ],
+    answers: Annotated[
+        list[str],
+        "List of answers to the clarifying questions, in the same order as the questions were presented",
+    ],
+    system_instructions: Annotated[
+        str,
+        "Custom research approach instructions. Examples: 'Focus on peer-reviewed sources only', 'Include financial data and charts', 'Prioritize recent developments from 2024-2025'. Leave empty for balanced analysis.",
+    ] = "",
+    include_analysis: Annotated[
+        bool,
+        "Enable code execution for data analysis, calculations, and visualizations. Useful for: statistical analysis, creating charts/graphs, processing datasets. Set to False for text-only research.",
+    ] = True,
+    callback_url: Annotated[
+        str,
+        "Optional webhook URL notified with a completion payload when the research finishes. Leave empty to disable callbacks.",
+    ] = "",
+    ctx: Optional[Context] = None,
+) -> str:
     """
     Perform research using an enriched query based on clarification answers.
 
@@ -278,9 +406,7 @@ async def research_with_context(session_id: Annotated[str, "Session ID from clar
 
     if not research_agent:
         try:
-            config = ResearchConfig.load()
-            config.validate()
-            research_agent = DeepResearchAgent(config)
+            research_agent = _build_research_agent()
         except Exception as e:
             return f"Failed to initialize research agent: {str(e)}"
 
@@ -313,19 +439,38 @@ async def research_with_context(session_id: Annotated[str, "Session ID from clar
         heartbeat_task: Optional[asyncio.Task] = None
 
         if ctx:
-            await _safe_report_progress(ctx, progress=0, total=None, message="Research with context started...")
-            heartbeat_task = asyncio.create_task(_progress_heartbeat(ctx, "Research with context in progress"))
+            await _safe_report_progress(
+                ctx, progress=0, total=None, message="Research with context started..."
+            )
+            heartbeat_task = asyncio.create_task(
+                _progress_heartbeat(ctx, "Research with context in progress")
+            )
 
         try:
             # Perform research with enriched query
-            result = await research_agent.research(query=enriched_query, system_prompt=system_prompt, include_code_interpreter=include_analysis)
+            result = await research_agent.research(
+                query=enriched_query,
+                system_prompt=system_prompt,
+                include_code_interpreter=include_analysis,
+                callback_url=callback_url or None,
+            )
         except ResearchError:
             if ctx:
-                await _safe_report_progress(ctx, progress=1, total=1, message="Contextual research ended with provider error")
+                await _safe_report_progress(
+                    ctx,
+                    progress=1,
+                    total=1,
+                    message="Contextual research ended with provider error",
+                )
             raise
         except Exception:
             if ctx:
-                await _safe_report_progress(ctx, progress=1, total=1, message="Contextual research ended unexpectedly")
+                await _safe_report_progress(
+                    ctx,
+                    progress=1,
+                    total=1,
+                    message="Contextual research ended unexpectedly",
+                )
             raise
         finally:
             if heartbeat_task:
@@ -335,7 +480,12 @@ async def research_with_context(session_id: Annotated[str, "Session ID from clar
 
         if result["status"] == "completed":
             if ctx:
-                await _safe_report_progress(ctx, progress=1, total=1, message="Contextual research completed successfully")
+                await _safe_report_progress(
+                    ctx,
+                    progress=1,
+                    total=1,
+                    message="Contextual research completed successfully",
+                )
             # Format for Claude Code consumption
             formatted_result = f"""# Enhanced Research Report
 
@@ -355,17 +505,25 @@ async def research_with_context(session_id: Annotated[str, "Session ID from clar
 - **Citations found**: {len(result['citations'])}
 - **Task ID**: {result['task_id']}
 - **Clarification Session**: {session_id}
+{_format_execution_time_line(result)}
 
 ## Citations
 """
             for citation in result["citations"]:
-                formatted_result += f"{citation['index']}. [{citation['title']}]({citation['url']})\n"
+                formatted_result += (
+                    f"{citation['index']}. [{citation['title']}]({citation['url']})\n"
+                )
 
             return formatted_result
         else:
             failure_message = result.get("message", "Unknown error")
             if ctx:
-                await _safe_report_progress(ctx, progress=1, total=1, message=f"Contextual research failed: {failure_message}")
+                await _safe_report_progress(
+                    ctx,
+                    progress=1,
+                    total=1,
+                    message=f"Contextual research failed: {failure_message}",
+                )
             return f"Research failed: {result.get('message', 'Unknown error')}"
 
     except Exception as e:
@@ -380,9 +538,23 @@ def main():
     In HTTP mode you can customize ``--host`` and ``--port``.
     """
     parser = argparse.ArgumentParser(description="Deep Research MCP Server")
-    parser.add_argument("--transport", choices=["stdio", "http"], default="stdio", help="Transport type for MCP server (default: stdio)")
-    parser.add_argument("--host", default="127.0.0.1", help="Host to bind for HTTP transport (default: 127.0.0.1)")
-    parser.add_argument("--port", type=int, default=8080, help="Port to bind for HTTP transport (default: 8080)")
+    parser.add_argument(
+        "--transport",
+        choices=["stdio", "http"],
+        default="stdio",
+        help="Transport type for MCP server (default: stdio)",
+    )
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind for HTTP transport (default: 127.0.0.1)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8080,
+        help="Port to bind for HTTP transport (default: 8080)",
+    )
 
     args = parser.parse_args()
 
@@ -392,10 +564,13 @@ def main():
     try:
         config = ResearchConfig.load()
         config.validate()
+        _apply_logging_config(config.log_level)
         logger.info(f"Configuration loaded successfully. Model: {config.model}")
     except Exception as e:
         logger.error(f"Configuration error: {e}")
-        logger.error("Please ensure provider credentials are set in your ~/.deep_research file or environment variables")
+        logger.error(
+            "Please ensure provider credentials are set in your ~/.deep_research file or environment variables"
+        )
         return
 
     # Update host and port settings for HTTP transport
