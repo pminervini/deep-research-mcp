@@ -178,7 +178,6 @@ async def check_config() -> None:
         logger.info(f"Model: {config.model}")
         logger.info(f"Timeout: {config.timeout} seconds")
         logger.info(f"Poll interval: {config.poll_interval} seconds")
-        logger.info(f"Max retries: {config.max_retries}")
 
     except Exception as e:
         logger.error(f"Configuration error: {e}")

@@ -89,7 +89,6 @@ class ResearchConfig:
     api_style: str = "responses"
     timeout: float = 1800.0
     poll_interval: float = 30.0
-    max_retries: int = 3
     log_level: str = "INFO"
     enable_clarification: bool = False
     triage_model: str = "gpt-5-mini"
@@ -210,10 +209,6 @@ class ResearchConfig:
                 )
                 or cls.poll_interval
             ),
-            max_retries=int(
-                get_setting_first("RESEARCH_MAX_RETRIES", default=str(cls.max_retries))
-                or cls.max_retries
-            ),
             log_level=get_setting_first("LOGGING_LEVEL", default=cls.log_level)
             or cls.log_level,
             enable_clarification=get_bool_setting(
@@ -246,9 +241,6 @@ class ResearchConfig:
 
         if self.poll_interval <= 0:
             raise ConfigurationError("Poll interval must be positive")
-
-        if self.max_retries < 0:
-            raise ConfigurationError("Max retries must be non-negative")
 
         normalized_log_level = self.log_level.upper()
         if not isinstance(logging.getLevelName(normalized_log_level), int):
