@@ -5,6 +5,7 @@ This short guide is for Claude Code (claude.ai/code) when working with this repo
 Code Style
 - NO EMOJIS in any Python or Markdown files.
 - Keep every import, method/function call, and `assert` statement on a single line.
+- Prefer f-strings over `%s`-style string interpolation, including in logging calls.
 
 Authoritative Docs
 - Overview, setup, configuration, and usage: see README.md.
