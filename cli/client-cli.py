@@ -61,8 +61,9 @@ Notes:
 
 import argparse
 import asyncio
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, List, Optional
+from typing import Any
 
 from mcp import ClientSession, types
 from mcp.client.streamable_http import streamablehttp_client
@@ -97,7 +98,7 @@ def _render_call_tool_result(result: types.CallToolResult) -> str:
             return val if isinstance(val, str) else str(val)
         return str(sc)
 
-    parts: List[str] = []
+    parts: list[str] = []
     for item in result.content or []:
         if isinstance(item, types.TextContent):
             parts.append(item.text)
@@ -180,7 +181,7 @@ async def cmd_status(url: str, task_id: str) -> int:
 async def cmd_research_with_context(
     url: str,
     session_id: str,
-    answers: List[str],
+    answers: list[str],
     system_instructions: str,
     include_analysis: bool,
     callback_url: str,

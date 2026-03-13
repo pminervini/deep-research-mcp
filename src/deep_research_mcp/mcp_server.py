@@ -45,7 +45,7 @@ import argparse
 import asyncio
 import logging
 from contextlib import suppress
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
 from mcp.server.fastmcp import Context, FastMCP
 
@@ -59,7 +59,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Global agent instance
-research_agent: Optional[DeepResearchAgent] = None
+research_agent: DeepResearchAgent | None = None
 
 # Initialize FastMCP server at module level with metadata
 mcp = FastMCP(
@@ -126,8 +126,8 @@ async def _safe_report_progress(
     ctx: Context,
     *,
     progress: float,
-    total: Optional[float] = None,
-    message: Optional[str] = None,
+    total: float | None = None,
+    message: str | None = None,
 ) -> None:
     """Best-effort progress reporting helper."""
     try:
@@ -159,7 +159,7 @@ async def deep_research(
         str,
         "Optional webhook URL notified with a completion payload when the research finishes. Leave empty to disable callbacks.",
     ] = "",
-    ctx: Optional[Context] = None,
+    ctx: Context | None = None,
 ) -> str:
     """
     Performs autonomous deep research using the configured provider with web search and analysis capabilities.
@@ -239,7 +239,7 @@ You can proceed with the research using the same query."""
         - Be analytical and avoid generalities
         """
 
-        heartbeat_task: Optional[asyncio.Task] = None
+        heartbeat_task: asyncio.Task[None] | None = None
 
         if ctx:
             await _safe_report_progress(
@@ -385,7 +385,7 @@ async def research_with_context(
         str,
         "Optional webhook URL notified with a completion payload when the research finishes. Leave empty to disable callbacks.",
     ] = "",
-    ctx: Optional[Context] = None,
+    ctx: Context | None = None,
 ) -> str:
     """
     Perform research using an enriched query based on clarification answers.
@@ -436,7 +436,7 @@ async def research_with_context(
         - Be analytical and avoid generalities
         """
 
-        heartbeat_task: Optional[asyncio.Task] = None
+        heartbeat_task: asyncio.Task[None] | None = None
 
         if ctx:
             await _safe_report_progress(

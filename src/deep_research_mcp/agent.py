@@ -12,7 +12,7 @@ import asyncio
 import logging
 import time
 import warnings
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 from openai import AuthenticationError, OpenAI
@@ -225,10 +225,10 @@ Additionally, if after some searching you find out that you need more informatio
     async def research(
         self,
         query: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         include_code_interpreter: bool = True,
-        callback_url: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        callback_url: str | None = None,
+    ) -> dict[str, Any]:
         """
         Perform deep research on a query with full async handling
 
@@ -250,7 +250,7 @@ Additionally, if after some searching you find out that you need more informatio
         else:
             enhanced_query = query
 
-        result: Dict[str, Any]
+        result: dict[str, Any]
         if self.config.provider in {"openai"}:
             # Route based on api_style
             if self.config.api_style == "chat_completions":
@@ -319,8 +319,8 @@ Additionally, if after some searching you find out that you need more informatio
         return result
 
     async def _run_open_deep_research(
-        self, query: str, system_prompt: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, query: str, system_prompt: str | None = None
+    ) -> dict[str, Any]:
         """Run open-deep-research agent asynchronously"""
         import uuid
 
@@ -334,15 +334,12 @@ Additionally, if after some searching you find out that you need more informatio
         start_time = time.time()
 
         try:
-            # Run the agent synchronously in an executor to avoid blocking
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None, self.manager_agent.run, augmented_query
-            )
+            # Run the synchronous agent in a worker thread to avoid blocking.
+            result = await asyncio.to_thread(self.manager_agent.run, augmented_query)
 
             # Extract citations from the agent's memory/search results
-            citations = []
-            search_queries = []
+            citations: list[dict[str, Any]] = []
+            search_queries: list[str] = []
 
             # Try to extract search queries and citations from agent memory
             if hasattr(self.manager_agent, "memory") and hasattr(
@@ -406,9 +403,9 @@ Additionally, if after some searching you find out that you need more informatio
     async def _run_gemini_research(
         self,
         query: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         include_code_interpreter: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run Gemini Deep Research via the Interactions API."""
         if include_code_interpreter:
             self.logger.debug(
@@ -419,7 +416,7 @@ Additionally, if after some searching you find out that you need more informatio
         if system_prompt:
             request_input = f"{system_prompt}\n\n{query}"
 
-        request_kwargs: Dict[str, Any] = {
+        request_kwargs: dict[str, Any] = {
             "agent": self.config.model or GEMINI_DEEP_RESEARCH_AGENT,
             "background": True,
             "input": request_input,
@@ -493,7 +490,7 @@ Additionally, if after some searching you find out that you need more informatio
 
         return f"Research task {interaction.id} ended with status {interaction.status}"
 
-    def _extract_gemini_results(self, interaction) -> Dict[str, Any]:
+    def _extract_gemini_results(self, interaction) -> dict[str, Any]:
         """Extract and structure final results (Gemini Interactions API)."""
         if interaction.status != "completed":
             return {
@@ -510,8 +507,8 @@ Additionally, if after some searching you find out that you need more informatio
                 "task_id": interaction.id,
             }
 
-        source_lookup: Dict[str, Dict[str, str]] = {}
-        search_queries: List[str] = []
+        source_lookup: dict[str, dict[str, str]] = {}
+        search_queries: list[str] = []
         reasoning_steps = 0
         final_report = ""
 
@@ -541,7 +538,7 @@ Additionally, if after some searching you find out that you need more informatio
                             "url": result.url,
                         }
 
-        citations = []
+        citations: list[dict[str, Any]] = []
         seen_urls = set()
         text_output = next(
             (
@@ -602,9 +599,9 @@ Additionally, if after some searching you find out that you need more informatio
     async def _run_chat_completions_research(
         self,
         query: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         include_code_interpreter: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run research using the Chat Completions API (synchronous call, no polling)."""
         import uuid
 
@@ -614,7 +611,7 @@ Additionally, if after some searching you find out that you need more informatio
             )
 
         # Build messages in Chat Completions format
-        messages: List[Dict[str, str]] = []
+        messages: list[dict[str, str]] = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": query})
@@ -629,10 +626,9 @@ Additionally, if after some searching you find out that you need more informatio
                 timeout=httpx.Timeout(self.config.timeout, connect=10.0),
             )
 
-            # Run the synchronous API call in an executor to avoid blocking
-            loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(
-                None, lambda: self._create_chat_completions_request(client, messages)
+            # Run the synchronous API call in a worker thread to avoid blocking.
+            response = await asyncio.to_thread(
+                self._create_chat_completions_request, client, messages
             )
 
             elapsed = time.time() - start_time
@@ -654,7 +650,7 @@ Additionally, if after some searching you find out that you need more informatio
         reraise=True,
     )
     def _create_chat_completions_request(
-        self, client: OpenAI, messages: List[Dict[str, str]]
+        self, client: OpenAI, messages: list[dict[str, str]]
     ):
         """Retry-wrapped Chat Completions API call."""
         return client.chat.completions.create(
@@ -663,7 +659,7 @@ Additionally, if after some searching you find out that you need more informatio
 
     def _extract_chat_completions_results(
         self, response, elapsed_time: float
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Parse Chat Completions response into the standard output dict."""
         content = response.choices[0].message.content if response.choices else ""
         citations = self._extract_chat_completions_citations(response, content)
@@ -681,11 +677,11 @@ Additionally, if after some searching you find out that you need more informatio
 
     def _extract_chat_completions_citations(
         self, response, text: str
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Multi-layer citation extraction for Chat Completions responses."""
         import re
 
-        citations: List[Dict[str, Any]] = []
+        citations: list[dict[str, Any]] = []
         seen_urls: set = set()
 
         # 1. Perplexity-style: response.citations (list of URLs)
@@ -751,10 +747,10 @@ Additionally, if after some searching you find out that you need more informatio
         reraise=True,
     )
     async def _create_openai_research_task(
-        self, input_messages: List[Dict], tools: List[Dict]
-    ) -> Dict[str, Any]:
+        self, input_messages: list[dict[str, Any]], tools: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """Create research task with retry logic (OpenAI)"""
-        response: Dict[str, Any] = self.client.responses.create(
+        response: dict[str, Any] = self.client.responses.create(
             model=self.config.model,
             input=input_messages,
             tools=tools,
@@ -765,13 +761,13 @@ Additionally, if after some searching you find out that you need more informatio
         self.logger.info(f"Research task started: {response.id}")
         return response
 
-    async def _wait_for_completion(self, task_id: str) -> Dict[str, Any]:
+    async def _wait_for_completion(self, task_id: str) -> dict[str, Any]:
         """Poll for task completion with timeout"""
         start_time = time.time()
 
         while time.time() - start_time < self.config.timeout:
             try:
-                response: Dict[str, Any] = self.client.responses.retrieve(task_id)
+                response: dict[str, Any] = self.client.responses.retrieve(task_id)
 
                 if response.status == "completed":
                     self.logger.info(f"Research completed: {task_id}")
@@ -812,7 +808,7 @@ Additionally, if after some searching you find out that you need more informatio
         )
 
     async def _send_completion_callback(
-        self, callback_url: str, response_data: Dict[str, Any]
+        self, callback_url: str, response_data: dict[str, Any]
     ):
         """Send completion notification to callback URL"""
         try:
@@ -827,7 +823,7 @@ Additionally, if after some searching you find out that you need more informatio
         except Exception as e:
             self.logger.error(f"Failed to send callback to {callback_url}: {e}")
 
-    def _extract_openai_results(self, response) -> Dict[str, Any]:
+    def _extract_openai_results(self, response) -> dict[str, Any]:
         """Extract and structure final results (OpenAI)"""
         # Handle failed responses
         if response.status == "failed":
@@ -858,7 +854,7 @@ Additionally, if after some searching you find out that you need more informatio
         final_report = final_output.content[0].text if final_output.content else ""
 
         # Extract citations
-        citations = []
+        citations: list[dict[str, Any]] = []
         if final_output.content and final_output.content[0].annotations:
             for i, annotation in enumerate(final_output.content[0].annotations):
                 # Handle different annotation types using the type discriminator
@@ -936,7 +932,7 @@ Additionally, if after some searching you find out that you need more informatio
             "task_id": response.id,
         }
 
-    async def get_task_status(self, task_id: str) -> Dict[str, Any]:
+    async def get_task_status(self, task_id: str) -> dict[str, Any]:
         """Check the status of a research task"""
         if (
             self.config.provider in {"openai"}
@@ -990,7 +986,7 @@ Additionally, if after some searching you find out that you need more informatio
                 "error": f"Provider {self.config.provider} not supported",
             }
 
-    def start_clarification(self, user_query: str) -> Dict[str, Any]:
+    def start_clarification(self, user_query: str) -> dict[str, Any]:
         """
         Start clarification process for a query
 
@@ -1003,8 +999,8 @@ Additionally, if after some searching you find out that you need more informatio
         return self.clarification_manager.start_clarification(user_query)
 
     def add_clarification_answers(
-        self, session_id: str, answers: List[str]
-    ) -> Dict[str, Any]:
+        self, session_id: str, answers: list[str]
+    ) -> dict[str, Any]:
         """
         Add answers to clarification questions
 
@@ -1017,7 +1013,7 @@ Additionally, if after some searching you find out that you need more informatio
         """
         return self.clarification_manager.add_answers(session_id, answers)
 
-    def get_enriched_query(self, session_id: str) -> Optional[str]:
+    def get_enriched_query(self, session_id: str) -> str | None:
         """
         Get enriched query from clarification session
 

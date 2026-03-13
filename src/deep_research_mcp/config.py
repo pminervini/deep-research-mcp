@@ -4,13 +4,15 @@
 Configuration management for Deep Research MCP.
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from deep_research_mcp.errors import ConfigurationError
 
@@ -19,7 +21,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_CONFIG_PATH = Path.home() / ".deep_research"
 
 
-def load_config_file(config_path: Optional[Path | str] = None) -> dict[str, Any]:
+def load_config_file(config_path: Path | str | None = None) -> dict[str, Any]:
     """Load configuration data from a TOML file without mutating process state."""
     resolved_path = (
         Path(config_path) if config_path is not None else DEFAULT_CONFIG_PATH
@@ -60,8 +62,8 @@ def flatten_config_data(
 
 
 def build_settings_map(
-    config_data: Optional[Mapping[str, Any]] = None,
-    env: Optional[Mapping[str, str]] = None,
+    config_data: Mapping[str, Any] | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     """Merge file-backed config with environment values, giving precedence to env."""
     settings: dict[str, str] = {}
@@ -80,8 +82,8 @@ def build_settings_map(
 class ResearchConfig:
     """Configuration for Deep Research agent"""
 
-    api_key: Optional[str] = None
-    base_url: Optional[str] = None
+    api_key: str | None = None
+    base_url: str | None = None
     provider: str = "openai"
     model: str = "o4-mini-deep-research-2025-06-26"
     api_style: str = "responses"
@@ -92,33 +94,31 @@ class ResearchConfig:
     enable_clarification: bool = False
     triage_model: str = "gpt-5-mini"
     clarifier_model: str = "gpt-5-mini"
-    clarification_base_url: Optional[str] = None
-    clarification_api_key: Optional[str] = None
+    clarification_base_url: str | None = None
+    clarification_api_key: str | None = None
     instruction_builder_model: str = "gpt-5-mini"
 
     @classmethod
-    def from_env(cls, env: Optional[Mapping[str, str]] = None) -> "ResearchConfig":
+    def from_env(cls, env: Mapping[str, str] | None = None) -> ResearchConfig:
         """Create configuration from environment values only."""
         return cls._from_settings_map(build_settings_map(env=env))
 
     @classmethod
     def load(
         cls,
-        config_path: Optional[Path | str] = None,
-        env: Optional[Mapping[str, str]] = None,
-    ) -> "ResearchConfig":
+        config_path: Path | str | None = None,
+        env: Mapping[str, str] | None = None,
+    ) -> ResearchConfig:
         """Create configuration by explicitly loading TOML config plus environment overrides."""
         return cls._from_settings_map(
             build_settings_map(config_data=load_config_file(config_path), env=env)
         )
 
     @classmethod
-    def _from_settings_map(cls, settings: Mapping[str, str]) -> "ResearchConfig":
+    def _from_settings_map(cls, settings: Mapping[str, str]) -> ResearchConfig:
         """Create configuration from a merged settings map."""
 
-        def get_setting_first(
-            *keys: str, default: Optional[str] = None
-        ) -> Optional[str]:
+        def get_setting_first(*keys: str, default: str | None = None) -> str | None:
             for key in keys:
                 value = settings.get(key)
                 if value is not None:
