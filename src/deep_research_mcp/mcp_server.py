@@ -59,6 +59,15 @@ from deep_research_mcp.results import ResearchResult
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+DEFAULT_RESEARCH_SYSTEM_PROMPT = """You are a professional researcher preparing a structured, data-driven report.
+Requirements:
+- Focus on data-rich insights with specific figures and statistics
+- Include tables and visualizations when appropriate
+- Prioritize peer-reviewed sources and authoritative data
+- Use inline citations throughout
+- Be analytical and avoid generalities
+"""
+
 # Global agent instance
 research_agent: DeepResearchAgent | None = None
 
@@ -95,6 +104,16 @@ def _build_research_agent() -> DeepResearchAgent:
     config.validate()
     _apply_logging_config(config.log_level)
     return DeepResearchAgent(config)
+
+
+def _ensure_research_agent() -> DeepResearchAgent:
+    """Reuse the shared research agent instance, creating it on demand."""
+    global research_agent
+
+    if not research_agent:
+        research_agent = _build_research_agent()
+
+    return research_agent
 
 
 def _format_execution_time_line(result: ResearchResult) -> str:
@@ -135,6 +154,145 @@ async def _safe_report_progress(
         await ctx.report_progress(progress=progress, total=total, message=message)
     except Exception:
         logger.debug("Failed to report progress", exc_info=True)
+
+
+def _resolve_system_prompt(system_instructions: str) -> str:
+    """Resolve tool-provided system instructions against the default prompt."""
+    return system_instructions or DEFAULT_RESEARCH_SYSTEM_PROMPT
+
+
+def _render_citations(result: ResearchResult) -> str:
+    """Render citations as a markdown list."""
+    return "\n".join(
+        f"{citation.index}. [{citation.title}]({citation.url})"
+        for citation in result.citations
+    )
+
+
+def _render_research_markdown(
+    *,
+    title: str,
+    result: ResearchResult,
+    intro_lines: list[str] | None = None,
+    extra_metadata_lines: list[str] | None = None,
+) -> str:
+    """Render a research result into the MCP markdown response format."""
+    metadata_lines = [
+        f"- **Total research steps**: {result.total_steps}",
+        f"- **Search queries executed**: {len(result.search_queries)}",
+        f"- **Citations found**: {len(result.citations)}",
+        f"- **Task ID**: {result.task_id}",
+    ]
+
+    if extra_metadata_lines:
+        metadata_lines.extend(extra_metadata_lines)
+
+    execution_time_line = _format_execution_time_line(result).rstrip()
+    if execution_time_line:
+        metadata_lines.append(execution_time_line)
+
+    markdown_lines = [f"# {title}", ""]
+
+    if intro_lines:
+        markdown_lines.extend(intro_lines)
+        markdown_lines.append("")
+
+    markdown_lines.extend(
+        [
+            result.final_report,
+            "",
+            "## Research Metadata",
+            *metadata_lines,
+            "",
+            "## Citations",
+        ]
+    )
+
+    citations = _render_citations(result)
+    if citations:
+        markdown_lines.append(citations)
+
+    return "\n".join(markdown_lines)
+
+
+async def _run_research_with_progress(
+    *,
+    agent: DeepResearchAgent,
+    query: str,
+    system_instructions: str,
+    include_analysis: bool,
+    callback_url: str,
+    ctx: Context | None,
+    start_message: str,
+    heartbeat_label: str,
+    provider_error_message: str,
+    unexpected_error_message: str,
+) -> ResearchResult:
+    """Run research while managing progress reporting and heartbeats."""
+    heartbeat_task: asyncio.Task[None] | None = None
+
+    if ctx:
+        await _safe_report_progress(ctx, progress=0, message=start_message, total=None)
+        heartbeat_task = asyncio.create_task(_progress_heartbeat(ctx, heartbeat_label))
+
+    try:
+        return await agent.research(
+            query=query,
+            system_prompt=_resolve_system_prompt(system_instructions),
+            include_code_interpreter=include_analysis,
+            callback_url=callback_url or None,
+        )
+    except ResearchError:
+        if ctx:
+            await _safe_report_progress(
+                ctx, progress=1, total=1, message=provider_error_message
+            )
+        raise
+    except Exception:
+        if ctx:
+            await _safe_report_progress(
+                ctx, progress=1, total=1, message=unexpected_error_message
+            )
+        raise
+    finally:
+        if heartbeat_task:
+            heartbeat_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await heartbeat_task
+
+
+async def _finalize_research_response(
+    *,
+    result: ResearchResult,
+    ctx: Context | None,
+    success_message: str,
+    progress_failure_template: str,
+    title: str,
+    intro_lines: list[str] | None = None,
+    extra_metadata_lines: list[str] | None = None,
+) -> str:
+    """Convert a completed research run into the tool's final string response."""
+    if result.is_completed:
+        if ctx:
+            await _safe_report_progress(
+                ctx, progress=1, total=1, message=success_message
+            )
+        return _render_research_markdown(
+            title=title,
+            result=result,
+            intro_lines=intro_lines,
+            extra_metadata_lines=extra_metadata_lines,
+        )
+
+    failure_message = result.message or "Unknown error"
+    if ctx:
+        await _safe_report_progress(
+            ctx,
+            progress=1,
+            total=1,
+            message=progress_failure_template.format(failure_message=failure_message),
+        )
+    return f"Research failed: {failure_message}"
 
 
 # Define the actual async functions that will be wrapped by FastMCP
@@ -183,16 +341,15 @@ async def deep_research(
     """
     global research_agent
 
-    if not research_agent:
-        try:
-            research_agent = _build_research_agent()
-        except Exception as e:
-            return f"Failed to initialize research agent: {str(e)}"
+    try:
+        agent = _ensure_research_agent()
+    except Exception as e:
+        return f"Failed to initialize research agent: {str(e)}"
 
     try:
         # Handle clarification request
         if request_clarification:
-            clarification_result = research_agent.start_clarification(query)
+            clarification_result = agent.start_clarification(query)
 
             if not clarification_result.get("needs_clarification", False):
                 return f"""# Query Analysis
@@ -230,88 +387,25 @@ You can proceed with the research using the same query."""
 
 **Instructions:** Use the `research_with_context` tool with your answers and the session ID above to proceed with enhanced research."""
 
-        system_prompt = system_instructions or """
-        You are a professional researcher preparing a structured, data-driven report.
-        Requirements:
-        - Focus on data-rich insights with specific figures and statistics
-        - Include tables and visualizations when appropriate  
-        - Prioritize peer-reviewed sources and authoritative data
-        - Use inline citations throughout
-        - Be analytical and avoid generalities
-        """
-
-        heartbeat_task: asyncio.Task[None] | None = None
-
-        if ctx:
-            await _safe_report_progress(
-                ctx, progress=0, message="Research started...", total=None
-            )
-            heartbeat_task = asyncio.create_task(
-                _progress_heartbeat(ctx, "Research in progress")
-            )
-
-        try:
-            result = await research_agent.research(
-                query=query,
-                system_prompt=system_prompt,
-                include_code_interpreter=include_analysis,
-                callback_url=callback_url or None,
-            )
-        except ResearchError:
-            if ctx:
-                await _safe_report_progress(
-                    ctx,
-                    progress=1,
-                    total=1,
-                    message="Research ended with provider error",
-                )
-            raise
-        except Exception:
-            if ctx:
-                await _safe_report_progress(
-                    ctx, progress=1, total=1, message="Research ended unexpectedly"
-                )
-            raise
-        finally:
-            if heartbeat_task:
-                heartbeat_task.cancel()
-                with suppress(asyncio.CancelledError):
-                    await heartbeat_task
-
-        if result.is_completed:
-            if ctx:
-                await _safe_report_progress(
-                    ctx, progress=1, total=1, message="Research completed successfully"
-                )
-            formatted_result = f"""# Research Report: {query}
-
-{result.final_report}
-
-## Research Metadata
-- **Total research steps**: {result.total_steps}
-- **Search queries executed**: {len(result.search_queries)}
-- **Citations found**: {len(result.citations)}
-- **Task ID**: {result.task_id}
-{_format_execution_time_line(result)}
-
-## Citations
-"""
-            for citation in result.citations:
-                formatted_result += (
-                    f"{citation.index}. [{citation.title}]({citation.url})\n"
-                )
-
-            return formatted_result
-        else:
-            failure_message = result.message or "Unknown error"
-            if ctx:
-                await _safe_report_progress(
-                    ctx,
-                    progress=1,
-                    total=1,
-                    message=f"Research failed: {failure_message}",
-                )
-            return f"Research failed: {failure_message}"
+        result = await _run_research_with_progress(
+            agent=agent,
+            query=query,
+            system_instructions=system_instructions,
+            include_analysis=include_analysis,
+            callback_url=callback_url,
+            ctx=ctx,
+            start_message="Research started...",
+            heartbeat_label="Research in progress",
+            provider_error_message="Research ended with provider error",
+            unexpected_error_message="Research ended unexpectedly",
+        )
+        return await _finalize_research_response(
+            result=result,
+            ctx=ctx,
+            success_message="Research completed successfully",
+            progress_failure_template="Research failed: {failure_message}",
+            title=f"Research Report: {query}",
+        )
 
     except ResearchError as e:
         logger.error(f"Research error: {e}")
@@ -408,127 +502,55 @@ async def research_with_context(
     """
     global research_agent
 
-    if not research_agent:
-        try:
-            research_agent = _build_research_agent()
-        except Exception as e:
-            return f"Failed to initialize research agent: {str(e)}"
+    try:
+        agent = _ensure_research_agent()
+    except Exception as e:
+        return f"Failed to initialize research agent: {str(e)}"
 
     try:
         # Add answers to the clarification session
-        status_result = research_agent.add_clarification_answers(session_id, answers)
+        status_result = agent.add_clarification_answers(session_id, answers)
 
         if "error" in status_result:
             return f"Error with clarification session: {status_result['error']}"
 
         # Get enriched query
-        enriched_query = research_agent.get_enriched_query(session_id)
+        enriched_query = agent.get_enriched_query(session_id)
 
         if not enriched_query:
             return f"Could not retrieve enriched query for session {session_id}. Please check the session ID."
 
         logger.info(f"Using enriched query: {enriched_query}")
 
-        # Prepare system prompt
-        system_prompt = system_instructions or """
-        You are a professional researcher preparing a structured, data-driven report.
-        Requirements:
-        - Focus on data-rich insights with specific figures and statistics
-        - Include tables and visualizations when appropriate  
-        - Prioritize peer-reviewed sources and authoritative data
-        - Use inline citations throughout
-        - Be analytical and avoid generalities
-        """
-
-        heartbeat_task: asyncio.Task[None] | None = None
-
-        if ctx:
-            await _safe_report_progress(
-                ctx, progress=0, total=None, message="Research with context started..."
-            )
-            heartbeat_task = asyncio.create_task(
-                _progress_heartbeat(ctx, "Research with context in progress")
-            )
-
-        try:
-            # Perform research with enriched query
-            result = await research_agent.research(
-                query=enriched_query,
-                system_prompt=system_prompt,
-                include_code_interpreter=include_analysis,
-                callback_url=callback_url or None,
-            )
-        except ResearchError:
-            if ctx:
-                await _safe_report_progress(
-                    ctx,
-                    progress=1,
-                    total=1,
-                    message="Contextual research ended with provider error",
-                )
-            raise
-        except Exception:
-            if ctx:
-                await _safe_report_progress(
-                    ctx,
-                    progress=1,
-                    total=1,
-                    message="Contextual research ended unexpectedly",
-                )
-            raise
-        finally:
-            if heartbeat_task:
-                heartbeat_task.cancel()
-                with suppress(asyncio.CancelledError):
-                    await heartbeat_task
-
-        if result.is_completed:
-            if ctx:
-                await _safe_report_progress(
-                    ctx,
-                    progress=1,
-                    total=1,
-                    message="Contextual research completed successfully",
-                )
-            # Format for Claude Code consumption
-            formatted_result = f"""# Enhanced Research Report
-
-**Original Query Enhanced With User Context**
-
-**Enriched Query:** {enriched_query}
-
-**User Clarifications Provided:** {len(answers)} answers
-
----
-
-{result.final_report}
-
-## Research Metadata
-- **Total research steps**: {result.total_steps}
-- **Search queries executed**: {len(result.search_queries)}
-- **Citations found**: {len(result.citations)}
-- **Task ID**: {result.task_id}
-- **Clarification Session**: {session_id}
-{_format_execution_time_line(result)}
-
-## Citations
-"""
-            for citation in result.citations:
-                formatted_result += (
-                    f"{citation.index}. [{citation.title}]({citation.url})\n"
-                )
-
-            return formatted_result
-        else:
-            failure_message = result.message or "Unknown error"
-            if ctx:
-                await _safe_report_progress(
-                    ctx,
-                    progress=1,
-                    total=1,
-                    message=f"Contextual research failed: {failure_message}",
-                )
-            return f"Research failed: {failure_message}"
+        result = await _run_research_with_progress(
+            agent=agent,
+            query=enriched_query,
+            system_instructions=system_instructions,
+            include_analysis=include_analysis,
+            callback_url=callback_url,
+            ctx=ctx,
+            start_message="Research with context started...",
+            heartbeat_label="Research with context in progress",
+            provider_error_message="Contextual research ended with provider error",
+            unexpected_error_message="Contextual research ended unexpectedly",
+        )
+        return await _finalize_research_response(
+            result=result,
+            ctx=ctx,
+            success_message="Contextual research completed successfully",
+            progress_failure_template="Contextual research failed: {failure_message}",
+            title="Enhanced Research Report",
+            intro_lines=[
+                "**Original Query Enhanced With User Context**",
+                "",
+                f"**Enriched Query:** {enriched_query}",
+                "",
+                f"**User Clarifications Provided:** {len(answers)} answers",
+                "",
+                "---",
+            ],
+            extra_metadata_lines=[f"- **Clarification Session**: {session_id}"],
+        )
 
     except Exception as e:
         logger.error(f"Error in research_with_context: {e}")
