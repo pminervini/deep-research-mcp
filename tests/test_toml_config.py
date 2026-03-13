@@ -8,7 +8,7 @@ import os
 import toml
 import io
 
-from deep_research_mcp.config import ResearchConfig
+from deep_research_mcp.config import ResearchConfig, load_config_file
 
 
 def test_toml_functionality():
@@ -20,6 +20,49 @@ def test_toml_functionality():
 
     assert config["research_model"] == "gpt-5-mini"
     assert config["enable_clarification"] == True
+
+
+def test_load_config_file_is_side_effect_free(tmp_path):
+    """Test TOML loading returns data without mutating environment variables."""
+    config_path = tmp_path / ".deep_research"
+    config_path.write_text("[research]\nmodel = \"file-model\"\nprovider = \"gemini\"\n", encoding="utf-8")
+
+    original_model = os.environ.get("RESEARCH_MODEL")
+    os.environ.pop("RESEARCH_MODEL", None)
+
+    try:
+        config_data = load_config_file(config_path)
+        assert config_data["research"]["model"] == "file-model"
+        assert "RESEARCH_MODEL" not in os.environ
+    finally:
+        if original_model is None:
+            os.environ.pop("RESEARCH_MODEL", None)
+        else:
+            os.environ["RESEARCH_MODEL"] = original_model
+
+
+def test_load_merges_toml_with_environment_overrides(tmp_path):
+    """Test explicit config loading merges TOML values with environment overrides."""
+    config_path = tmp_path / ".deep_research"
+    config_path.write_text("[research]\nprovider = \"gemini\"\nmodel = \"file-model\"\ntimeout = 45\n[clarification]\nenable = true\ntriage_model = \"file-triage\"\n", encoding="utf-8")
+
+    config = ResearchConfig.load(config_path=config_path, env={"RESEARCH_MODEL": "env-model", "RESEARCH_TIMEOUT": "90", "CLARIFICATION_CLARIFIER_MODEL": "env-clarifier"})
+
+    assert config.provider == "gemini"
+    assert config.model == "env-model"
+    assert config.timeout == 90.0
+    assert config.enable_clarification == True
+    assert config.triage_model == "file-triage"
+    assert config.clarifier_model == "env-clarifier"
+
+
+def test_from_env_only_uses_explicit_environment_values():
+    """Test env-only loading does not require or implicitly read TOML configuration."""
+    config = ResearchConfig.from_env(env={"RESEARCH_MODEL": "env-only-model", "ENABLE_CLARIFICATION": "true"})
+
+    assert config.provider == "openai"
+    assert config.model == "env-only-model"
+    assert config.enable_clarification == True
 
 
 def test_config_with_environment_variables():

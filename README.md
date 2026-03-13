@@ -48,6 +48,8 @@ pip install -e .
 
 Create a `~/.deep_research` file in your home directory using TOML format.
 
+Library note: `ResearchConfig.load()` explicitly reads this file and applies environment variable overrides. `ResearchConfig.from_env()` reads environment variables only.
+
 Common settings:
 
 ```toml
@@ -272,7 +274,7 @@ from deep_research_mcp.config import ResearchConfig
 
 async def main():
     # Initialize configuration
-    config = ResearchConfig.from_env()
+    config = ResearchConfig.load()
     
     # Create agent
     agent = DeepResearchAgent(config)

@@ -5,9 +5,9 @@
 Configuration CLI for Deep Research MCP.
 
 This script loads configuration exactly the same way the project does:
-- Reads ~/.deep_research (TOML) on import via deep_research_mcp.config
-- Flattens TOML into environment variables
-- Constructs a ResearchConfig using ResearchConfig.from_env()
+- Explicitly reads ~/.deep_research (TOML)
+- Merges TOML values with environment variable overrides
+- Constructs a ResearchConfig without mutating process environment state
 - Optionally validates and prints the configuration
 
 Usage:
@@ -22,7 +22,7 @@ import sys
 from dataclasses import asdict
 from typing import Any, Dict
 
-from deep_research_mcp.config import load_config_file, ResearchConfig
+from deep_research_mcp.config import ResearchConfig
 
 import logging
 
@@ -70,10 +70,7 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    load_config_file()
-
-    # Load config exactly as the project does
-    cfg = ResearchConfig.from_env()
+    cfg = ResearchConfig.load()
     if not args.no_validate:
         # Validation matches project behavior used before running components
         cfg.validate()

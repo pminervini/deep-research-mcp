@@ -7,8 +7,12 @@ a full Claude Code MCP integration.
 """
 
 import os
+import sys
+from pathlib import Path
 
 import pytest
+from mcp import ClientSession
+from mcp.client.stdio import StdioServerParameters, stdio_client
 
 # Import the underlying functions directly
 from deep_research_mcp import __version__
@@ -90,6 +94,27 @@ async def test_research_with_context():
     assert isinstance(result, str)
     # Should contain error about session not found or initialization failure
     assert "Session fake-session-id not found" in result or "Failed to initialize research agent" in result
+
+
+@pytest.mark.asyncio
+async def test_stdio_server_initializes_and_exposes_tools():
+    """Test stdio MCP handshake used by Claude Code."""
+    server = StdioServerParameters(command=sys.executable, args=["-m", "deep_research_mcp.mcp_server"], env=dict(os.environ), cwd=Path(__file__).resolve().parents[1])
+
+    async with stdio_client(server) as (read_stream, write_stream):
+        async with ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
+
+            tools = await session.list_tools()
+            tool_names = {tool.name for tool in tools.tools}
+            assert {"deep_research", "research_status", "research_with_context"} <= tool_names
+
+            result = await session.call_tool("research_status", {"task_id": "fake-task-id"})
+            assert result.isError is False
+
+            text_items = [item.text for item in (result.content or []) if hasattr(item, "text")]
+            rendered_text = "\n".join(text_items)
+            assert "Research agent not initialized" in rendered_text or "Error checking status" in rendered_text
 
 
 def test_mcp_server_structure():
