@@ -1,5 +1,7 @@
 # Deep Research MCP
 
+[![CI](https://img.shields.io/github/actions/workflow/status/pminervini/deep-research-mcp/ci.yml?branch=main&label=CI)](https://github.com/pminervini/deep-research-mcp/actions/workflows/ci.yml)
+
 A Python-based agent that integrates research providers with Claude Code through the Model Context Protocol (MCP). It supports OpenAI (Responses API with web search and code interpreter, or Chat Completions API for broad provider compatibility), Gemini Deep Research via the Interactions API, and the open-source Open Deep Research stack (based on smolagents).
 
 ## Prerequisites
