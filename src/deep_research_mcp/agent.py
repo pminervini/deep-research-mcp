@@ -10,6 +10,7 @@ Deep Research) to perform deep research tasks with optional clarification workfl
 
 import asyncio
 import logging
+import re
 import time
 import warnings
 from typing import Any
@@ -30,6 +31,11 @@ from deep_research_mcp.clarification import (
 from deep_research_mcp.config import ResearchConfig
 from deep_research_mcp.errors import ResearchError, TaskTimeoutError, ConfigurationError
 from deep_research_mcp.prompts.prompts import PromptManager
+from deep_research_mcp.results import (
+    ResearchCitation,
+    ResearchResult,
+    ResearchTaskStatus,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -228,7 +234,7 @@ Additionally, if after some searching you find out that you need more informatio
         system_prompt: str | None = None,
         include_code_interpreter: bool = True,
         callback_url: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> ResearchResult:
         """
         Perform deep research on a query with full async handling
 
@@ -250,7 +256,7 @@ Additionally, if after some searching you find out that you need more informatio
         else:
             enhanced_query = query
 
-        result: dict[str, Any]
+        result: ResearchResult
         if self.config.provider in {"openai"}:
             # Route based on api_style
             if self.config.api_style == "chat_completions":
@@ -293,14 +299,14 @@ Additionally, if after some searching you find out that you need more informatio
                     final_response = await self._wait_for_completion(response.id)
                     result = self._extract_openai_results(final_response)
                 except ResearchError as e:
-                    result = {"status": "failed", "message": str(e)}
+                    result = ResearchResult.failed(message=str(e))
         elif self.config.provider in {"gemini"}:
             try:
                 result = await self._run_gemini_research(
                     enhanced_query, system_prompt, include_code_interpreter
                 )
             except ResearchError as e:
-                result = {"status": "failed", "message": str(e)}
+                result = ResearchResult.failed(message=str(e))
         elif self.config.provider in {"open-deep-research"}:
             # Use open-deep-research agent
             result = await self._run_open_deep_research(enhanced_query, system_prompt)
@@ -309,18 +315,18 @@ Additionally, if after some searching you find out that you need more informatio
                 f"Provider '{self.config.provider}' is not supported yet"
             )
 
-        if "execution_time" not in result:
-            result["execution_time"] = time.time() - start_time
+        if result.execution_time is None:
+            result.execution_time = time.time() - start_time
 
         # Send callback if provided
-        if callback_url and result.get("status") == "completed":
+        if callback_url and result.is_completed:
             await self._send_completion_callback(callback_url, result)
 
         return result
 
     async def _run_open_deep_research(
         self, query: str, system_prompt: str | None = None
-    ) -> dict[str, Any]:
+    ) -> ResearchResult:
         """Run open-deep-research agent asynchronously"""
         import uuid
 
@@ -338,7 +344,7 @@ Additionally, if after some searching you find out that you need more informatio
             result = await asyncio.to_thread(self.manager_agent.run, augmented_query)
 
             # Extract citations from the agent's memory/search results
-            citations: list[dict[str, Any]] = []
+            citations: list[ResearchCitation] = []
             search_queries: list[str] = []
 
             # Try to extract search queries and citations from agent memory
@@ -359,18 +365,14 @@ Additionally, if after some searching you find out that you need more informatio
                         for obs in step.observations:
                             if isinstance(obs, str) and "http" in obs:
                                 # Extract URLs from the observation
-                                import re
-
                                 urls = re.findall(r"https?://[^\s\)]+", obs)
-                                for i, url in enumerate(urls):
+                                for url in urls:
                                     citations.append(
-                                        {
-                                            "index": len(citations) + 1,
-                                            "title": f"Source {len(citations) + 1}",
-                                            "url": url.rstrip(".,;:"),
-                                            "start_char": 0,
-                                            "end_char": 0,
-                                        }
+                                        ResearchCitation(
+                                            index=len(citations) + 1,
+                                            title=f"Source {len(citations) + 1}",
+                                            url=url.rstrip(".,;:"),
+                                        )
                                     )
 
             # Get total steps
@@ -380,32 +382,28 @@ Additionally, if after some searching you find out that you need more informatio
                 else 0
             )
 
-            return {
-                "status": "completed",
-                "final_report": str(result),
-                "citations": citations,
-                "reasoning_steps": total_steps,
-                "search_queries": search_queries,
-                "total_steps": total_steps,
-                "task_id": task_id,
-                "execution_time": time.time() - start_time,
-            }
+            return ResearchResult.completed(
+                task_id=task_id,
+                final_report=str(result),
+                citations=citations,
+                reasoning_steps=total_steps,
+                search_queries=search_queries,
+                total_steps=total_steps,
+                execution_time=time.time() - start_time,
+            )
 
         except Exception as e:
             self.logger.error(f"Open Deep Research error: {e}")
-            return {
-                "status": "failed",
-                "message": str(e),
-                "task_id": task_id,
-                "execution_time": time.time() - start_time,
-            }
+            return ResearchResult.failed(
+                message=str(e), task_id=task_id, execution_time=time.time() - start_time
+            )
 
     async def _run_gemini_research(
         self,
         query: str,
         system_prompt: str | None = None,
         include_code_interpreter: bool = True,
-    ) -> dict[str, Any]:
+    ) -> ResearchResult:
         """Run Gemini Deep Research via the Interactions API."""
         if include_code_interpreter:
             self.logger.debug(
@@ -490,22 +488,19 @@ Additionally, if after some searching you find out that you need more informatio
 
         return f"Research task {interaction.id} ended with status {interaction.status}"
 
-    def _extract_gemini_results(self, interaction) -> dict[str, Any]:
+    def _extract_gemini_results(self, interaction) -> ResearchResult:
         """Extract and structure final results (Gemini Interactions API)."""
         if interaction.status != "completed":
-            return {
-                "status": "failed",
-                "message": self._extract_gemini_failure_message(interaction),
-                "task_id": interaction.id,
-            }
+            return ResearchResult.failed(
+                message=self._extract_gemini_failure_message(interaction),
+                task_id=interaction.id,
+            )
 
         outputs = getattr(interaction, "outputs", None) or []
         if not outputs:
-            return {
-                "status": "error",
-                "message": "No output received",
-                "task_id": interaction.id,
-            }
+            return ResearchResult.error(
+                message="No output received", task_id=interaction.id
+            )
 
         source_lookup: dict[str, dict[str, str]] = {}
         search_queries: list[str] = []
@@ -538,7 +533,7 @@ Additionally, if after some searching you find out that you need more informatio
                             "url": result.url,
                         }
 
-        citations: list[dict[str, Any]] = []
+        citations: list[ResearchCitation] = []
         seen_urls = set()
         text_output = next(
             (
@@ -563,13 +558,13 @@ Additionally, if after some searching you find out that you need more informatio
                     continue
                 seen_urls.add(citation_url)
                 citations.append(
-                    {
-                        "index": len(citations) + 1,
-                        "title": citation_info["title"],
-                        "url": citation_url,
-                        "start_char": getattr(annotation, "start_index", 0) or 0,
-                        "end_char": getattr(annotation, "end_index", 0) or 0,
-                    }
+                    ResearchCitation(
+                        index=len(citations) + 1,
+                        title=citation_info["title"],
+                        url=citation_url,
+                        start_char=getattr(annotation, "start_index", 0) or 0,
+                        end_char=getattr(annotation, "end_index", 0) or 0,
+                    )
                 )
 
         for citation_info in source_lookup.values():
@@ -577,31 +572,28 @@ Additionally, if after some searching you find out that you need more informatio
                 continue
             seen_urls.add(citation_info["url"])
             citations.append(
-                {
-                    "index": len(citations) + 1,
-                    "title": citation_info["title"],
-                    "url": citation_info["url"],
-                    "start_char": 0,
-                    "end_char": 0,
-                }
+                ResearchCitation(
+                    index=len(citations) + 1,
+                    title=citation_info["title"],
+                    url=citation_info["url"],
+                )
             )
 
-        return {
-            "status": "completed",
-            "final_report": final_report,
-            "citations": citations,
-            "reasoning_steps": reasoning_steps,
-            "search_queries": search_queries,
-            "total_steps": len(outputs),
-            "task_id": interaction.id,
-        }
+        return ResearchResult.completed(
+            task_id=interaction.id,
+            final_report=final_report,
+            citations=citations,
+            reasoning_steps=reasoning_steps,
+            search_queries=search_queries,
+            total_steps=len(outputs),
+        )
 
     async def _run_chat_completions_research(
         self,
         query: str,
         system_prompt: str | None = None,
         include_code_interpreter: bool = True,
-    ) -> dict[str, Any]:
+    ) -> ResearchResult:
         """Run research using the Chat Completions API (synchronous call, no polling)."""
         import uuid
 
@@ -636,12 +628,11 @@ Additionally, if after some searching you find out that you need more informatio
 
         except Exception as e:
             self.logger.error(f"Chat Completions research error: {e}")
-            return {
-                "status": "failed",
-                "message": str(e),
-                "task_id": str(uuid.uuid4()),
-                "execution_time": time.time() - start_time,
-            }
+            return ResearchResult.failed(
+                message=str(e),
+                task_id=str(uuid.uuid4()),
+                execution_time=time.time() - start_time,
+            )
 
     @retry(
         stop=stop_after_attempt(3),
@@ -659,29 +650,24 @@ Additionally, if after some searching you find out that you need more informatio
 
     def _extract_chat_completions_results(
         self, response, elapsed_time: float
-    ) -> dict[str, Any]:
+    ) -> ResearchResult:
         """Parse Chat Completions response into the standard output dict."""
         content = response.choices[0].message.content if response.choices else ""
         citations = self._extract_chat_completions_citations(response, content)
 
-        return {
-            "status": "completed",
-            "final_report": content,
-            "citations": citations,
-            "reasoning_steps": 0,
-            "search_queries": [],
-            "total_steps": 1,
-            "task_id": response.id,
-            "execution_time": elapsed_time,
-        }
+        return ResearchResult.completed(
+            task_id=response.id,
+            final_report=content,
+            citations=citations,
+            total_steps=1,
+            execution_time=elapsed_time,
+        )
 
     def _extract_chat_completions_citations(
         self, response, text: str
-    ) -> list[dict[str, Any]]:
+    ) -> list[ResearchCitation]:
         """Multi-layer citation extraction for Chat Completions responses."""
-        import re
-
-        citations: list[dict[str, Any]] = []
+        citations: list[ResearchCitation] = []
         seen_urls: set = set()
 
         # 1. Perplexity-style: response.citations (list of URLs)
@@ -691,13 +677,11 @@ Additionally, if after some searching you find out that you need more informatio
                 if isinstance(url, str) and url not in seen_urls:
                     seen_urls.add(url)
                     citations.append(
-                        {
-                            "index": len(citations) + 1,
-                            "title": f"Source {len(citations) + 1}",
-                            "url": url,
-                            "start_char": 0,
-                            "end_char": 0,
-                        }
+                        ResearchCitation(
+                            index=len(citations) + 1,
+                            title=f"Source {len(citations) + 1}",
+                            url=url,
+                        )
                     )
 
         # 2. Annotation-based: message.annotations
@@ -710,15 +694,15 @@ Additionally, if after some searching you find out that you need more informatio
                     if url and url not in seen_urls:
                         seen_urls.add(url)
                         citations.append(
-                            {
-                                "index": len(citations) + 1,
-                                "title": getattr(
+                            ResearchCitation(
+                                index=len(citations) + 1,
+                                title=getattr(
                                     annotation, "title", f"Source {len(citations) + 1}"
                                 ),
-                                "url": url,
-                                "start_char": getattr(annotation, "start_index", 0),
-                                "end_char": getattr(annotation, "end_index", 0),
-                            }
+                                url=url,
+                                start_char=getattr(annotation, "start_index", 0),
+                                end_char=getattr(annotation, "end_index", 0),
+                            )
                         )
 
         # 3. Regex fallback: extract URLs from response text
@@ -729,13 +713,11 @@ Additionally, if after some searching you find out that you need more informatio
                 if url not in seen_urls:
                     seen_urls.add(url)
                     citations.append(
-                        {
-                            "index": len(citations) + 1,
-                            "title": f"Source {len(citations) + 1}",
-                            "url": url,
-                            "start_char": 0,
-                            "end_char": 0,
-                        }
+                        ResearchCitation(
+                            index=len(citations) + 1,
+                            title=f"Source {len(citations) + 1}",
+                            url=url,
+                        )
                     )
 
         return citations
@@ -748,9 +730,9 @@ Additionally, if after some searching you find out that you need more informatio
     )
     async def _create_openai_research_task(
         self, input_messages: list[dict[str, Any]], tools: list[dict[str, Any]]
-    ) -> dict[str, Any]:
+    ) -> Any:
         """Create research task with retry logic (OpenAI)"""
-        response: dict[str, Any] = self.client.responses.create(
+        response = self.client.responses.create(
             model=self.config.model,
             input=input_messages,
             tools=tools,
@@ -761,13 +743,13 @@ Additionally, if after some searching you find out that you need more informatio
         self.logger.info(f"Research task started: {response.id}")
         return response
 
-    async def _wait_for_completion(self, task_id: str) -> dict[str, Any]:
+    async def _wait_for_completion(self, task_id: str) -> Any:
         """Poll for task completion with timeout"""
         start_time = time.time()
 
         while time.time() - start_time < self.config.timeout:
             try:
-                response: dict[str, Any] = self.client.responses.retrieve(task_id)
+                response = self.client.responses.retrieve(task_id)
 
                 if response.status == "completed":
                     self.logger.info(f"Research completed: {task_id}")
@@ -808,22 +790,22 @@ Additionally, if after some searching you find out that you need more informatio
         )
 
     async def _send_completion_callback(
-        self, callback_url: str, response_data: dict[str, Any]
-    ):
+        self, callback_url: str, response_data: ResearchResult
+    ) -> None:
         """Send completion notification to callback URL"""
         try:
             async with httpx.AsyncClient() as client:
                 payload = {
                     "status": "completed",
-                    "task_id": response_data.get("task_id"),
+                    "task_id": response_data.task_id,
                     "timestamp": time.time(),
-                    "result_preview": response_data.get("final_report", "")[:500],
+                    "result_preview": response_data.final_report[:500],
                 }
                 await client.post(callback_url, json=payload, timeout=30)
         except Exception as e:
             self.logger.error(f"Failed to send callback to {callback_url}: {e}")
 
-    def _extract_openai_results(self, response) -> dict[str, Any]:
+    def _extract_openai_results(self, response) -> ResearchResult:
         """Extract and structure final results (OpenAI)"""
         # Handle failed responses
         if response.status == "failed":
@@ -831,76 +813,75 @@ Additionally, if after some searching you find out that you need more informatio
             if error_details:
                 # Handle different error object types
                 if hasattr(error_details, "get"):
-                    return {
-                        "status": "failed",
-                        "message": error_details.get("message", "Unknown error"),
-                        "error_code": error_details.get("code"),
-                        "task_id": response.id,
-                    }
-                else:
-                    return {
-                        "status": "failed",
-                        "message": str(error_details),
-                        "task_id": response.id,
-                    }
-            else:
-                return {"status": "failed", "message": f"Task failed: {response.id}"}
+                    return ResearchResult.failed(
+                        message=error_details.get("message", "Unknown error"),
+                        task_id=response.id,
+                        error_code=error_details.get("code"),
+                    )
+                return ResearchResult.failed(
+                    message=str(error_details), task_id=response.id
+                )
+            return ResearchResult.failed(
+                message=f"Task failed: {response.id}", task_id=response.id
+            )
 
         if not response.output:
-            return {"status": "error", "message": "No output received"}
+            return ResearchResult.error(
+                message="No output received", task_id=response.id
+            )
 
         # Get final report (last output item)
         final_output = response.output[-1]
         final_report = final_output.content[0].text if final_output.content else ""
 
         # Extract citations
-        citations: list[dict[str, Any]] = []
+        citations: list[ResearchCitation] = []
         if final_output.content and final_output.content[0].annotations:
             for i, annotation in enumerate(final_output.content[0].annotations):
                 # Handle different annotation types using the type discriminator
                 if annotation.type == "url_citation":
                     # Web search citation - has all fields we need
                     citations.append(
-                        {
-                            "index": i + 1,
-                            "title": annotation.title,
-                            "url": annotation.url,
-                            "start_char": annotation.start_index,
-                            "end_char": annotation.end_index,
-                        }
+                        ResearchCitation(
+                            index=i + 1,
+                            title=annotation.title,
+                            url=annotation.url,
+                            start_char=annotation.start_index,
+                            end_char=annotation.end_index,
+                        )
                     )
                 elif annotation.type == "file_citation":
                     # File citation - use filename as title, create file:// URL
                     citations.append(
-                        {
-                            "index": i + 1,
-                            "title": f"File: {annotation.filename}",
-                            "url": f"file://{annotation.file_id}/{annotation.filename}",
-                            "start_char": annotation.index,
-                            "end_char": annotation.index,
-                        }
+                        ResearchCitation(
+                            index=i + 1,
+                            title=f"File: {annotation.filename}",
+                            url=f"file://{annotation.file_id}/{annotation.filename}",
+                            start_char=annotation.index,
+                            end_char=annotation.index,
+                        )
                     )
                 elif annotation.type == "container_file_citation":
                     # Container file citation - use filename as title
                     citations.append(
-                        {
-                            "index": i + 1,
-                            "title": f"Container File: {annotation.filename}",
-                            "url": f"container://{annotation.container_id}/{annotation.file_id}/{annotation.filename}",
-                            "start_char": annotation.start_index,
-                            "end_char": annotation.end_index,
-                        }
+                        ResearchCitation(
+                            index=i + 1,
+                            title=f"Container File: {annotation.filename}",
+                            url=f"container://{annotation.container_id}/{annotation.file_id}/{annotation.filename}",
+                            start_char=annotation.start_index,
+                            end_char=annotation.end_index,
+                        )
                     )
                 elif annotation.type == "file_path":
                     # File path citation - minimal info
                     citations.append(
-                        {
-                            "index": i + 1,
-                            "title": f"File Path: {annotation.file_id}",
-                            "url": f"file://{annotation.file_id}",
-                            "start_char": annotation.index,
-                            "end_char": annotation.index,
-                        }
+                        ResearchCitation(
+                            index=i + 1,
+                            title=f"File Path: {annotation.file_id}",
+                            url=f"file://{annotation.file_id}",
+                            start_char=annotation.index,
+                            end_char=annotation.index,
+                        )
                     )
                 else:
                     # Unknown annotation type - log and skip
@@ -922,39 +903,37 @@ Additionally, if after some searching you find out that you need more informatio
             if item.type == "web_search_call" and hasattr(item, "action")
         ]
 
-        return {
-            "status": "completed",
-            "final_report": final_report,
-            "citations": citations,
-            "reasoning_steps": len(reasoning_steps),
-            "search_queries": search_queries,
-            "total_steps": len(response.output),
-            "task_id": response.id,
-        }
+        return ResearchResult.completed(
+            task_id=response.id,
+            final_report=final_report,
+            citations=citations,
+            reasoning_steps=len(reasoning_steps),
+            search_queries=search_queries,
+            total_steps=len(response.output),
+        )
 
-    async def get_task_status(self, task_id: str) -> dict[str, Any]:
+    async def get_task_status(self, task_id: str) -> ResearchTaskStatus:
         """Check the status of a research task"""
         if (
             self.config.provider in {"openai"}
             and self.config.api_style == "chat_completions"
         ):
-            return {
-                "task_id": task_id,
-                "status": "unknown",
-                "message": "Task status tracking not available with Chat Completions API",
-            }
+            return ResearchTaskStatus.unknown(
+                task_id=task_id,
+                message="Task status tracking not available with Chat Completions API",
+            )
         if self.config.provider in {"openai"}:
             try:
                 response = self.client.responses.retrieve(task_id)
-                return {
-                    "task_id": task_id,
-                    "status": response.status,
-                    "created_at": getattr(response, "created_at", None),
-                    "completed_at": getattr(response, "completed_at", None),
-                }
+                return ResearchTaskStatus(
+                    task_id=task_id,
+                    status=response.status,
+                    created_at=getattr(response, "created_at", None),
+                    completed_at=getattr(response, "completed_at", None),
+                )
             except Exception as e:
                 self.logger.error(f"Error checking status for task {task_id}: {e}")
-                return {"task_id": task_id, "status": "error", "error": str(e)}
+                return ResearchTaskStatus.error_status(task_id=task_id, error=str(e))
         elif self.config.provider in {"gemini"}:
             try:
                 interaction = self.gemini_interactions.get(task_id)
@@ -963,28 +942,24 @@ Additionally, if after some searching you find out that you need more informatio
                     if interaction.status in GEMINI_TERMINAL_STATUSES
                     else None
                 )
-                return {
-                    "task_id": task_id,
-                    "status": interaction.status,
-                    "created_at": getattr(interaction, "created", None),
-                    "completed_at": completed_at,
-                }
+                return ResearchTaskStatus(
+                    task_id=task_id,
+                    status=interaction.status,
+                    created_at=getattr(interaction, "created", None),
+                    completed_at=completed_at,
+                )
             except Exception as e:
                 self.logger.error(f"Error checking status for task {task_id}: {e}")
-                return {"task_id": task_id, "status": "error", "error": str(e)}
+                return ResearchTaskStatus.error_status(task_id=task_id, error=str(e))
         elif self.config.provider in {"open-deep-research"}:
             # For open-deep-research, we don't have persistent task tracking
-            return {
-                "task_id": task_id,
-                "status": "unknown",
-                "message": "Task status tracking not available for open-deep-research provider",
-            }
-        else:
-            return {
-                "task_id": task_id,
-                "status": "error",
-                "error": f"Provider {self.config.provider} not supported",
-            }
+            return ResearchTaskStatus.unknown(
+                task_id=task_id,
+                message="Task status tracking not available for open-deep-research provider",
+            )
+        return ResearchTaskStatus.error_status(
+            task_id=task_id, error=f"Provider {self.config.provider} not supported"
+        )
 
     def start_clarification(self, user_query: str) -> dict[str, Any]:
         """

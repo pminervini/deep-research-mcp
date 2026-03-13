@@ -11,6 +11,7 @@ import pytest
 
 from deep_research_mcp.agent import DeepResearchAgent
 from deep_research_mcp.config import ResearchConfig
+from deep_research_mcp.results import ResearchResult, ResearchTaskStatus
 
 
 @pytest.fixture
@@ -99,9 +100,8 @@ async def test_agent_status_check(test_agent):
 
     # Test with a fake task ID - should handle gracefully
     status = await test_agent.get_task_status("fake-task-id-123")
-    assert isinstance(status, dict)
-    assert "task_id" in status
-    assert status["task_id"] == "fake-task-id-123"
+    assert isinstance(status, ResearchTaskStatus)
+    assert status.task_id == "fake-task-id-123"
 
 
 @pytest.mark.asyncio
@@ -124,8 +124,8 @@ async def test_research_dry_run(test_agent):
     )
 
     # Check the result format
-    assert isinstance(result, dict)
-    assert "status" in result
+    assert isinstance(result, ResearchResult)
+    assert result.status in {"completed", "failed", "error"}
 
 
 def test_start_clarification_returns_disabled_when_feature_off(test_agent):
