@@ -4,6 +4,7 @@
 OpenAI provider backend.
 """
 
+import asyncio
 import re
 import time
 import uuid

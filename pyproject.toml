@@ -60,3 +60,37 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 deep_research_mcp = ["prompts/**/*.yaml"]
+
+[tool.pylint.main]
+fail-under = 10
+
+[tool.pylint.format]
+max-line-length = 240
+
+[tool.pylint."messages control"]
+disable = [
+    "broad-exception-caught",
+    "consider-using-from-import",
+    "duplicate-code",
+    "global-statement",
+    "global-variable-not-assigned",
+    "import-error",
+    "import-outside-toplevel",
+    "invalid-name",
+    "logging-fstring-interpolation",
+    "missing-function-docstring",
+    "no-name-in-module",
+    "redefined-outer-name",
+    "singleton-comparison",
+    "too-few-public-methods",
+    "too-many-arguments",
+    "too-many-branches",
+    "too-many-instance-attributes",
+    "too-many-locals",
+    "too-many-nested-blocks",
+    "too-many-positional-arguments",
+    "too-many-statements",
+    "unused-argument",
+    "unused-variable",
+    "wrong-import-order",
+]

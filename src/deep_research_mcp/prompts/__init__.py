@@ -1,4 +1,5 @@
-# Package marker for prompts directory
+"""Prompt helpers exposed by the prompts package."""
+
 from .prompts import PromptManager
 
 __all__ = ["PromptManager"]

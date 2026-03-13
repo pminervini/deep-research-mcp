@@ -89,7 +89,7 @@ class PromptManager:
             )
             raise FileNotFoundError(
                 f"Prompt file {category}/{name}.yaml not found in package resources"
-            )
+            ) from e
 
     def _load_from_filesystem(self, category: str, name: str) -> dict[str, Any]:
         """
@@ -164,7 +164,7 @@ class PromptManager:
         except KeyError as e:
             raise ValueError(
                 f"Template variable {e} not provided for prompt {category}/{name}"
-            )
+            ) from e
 
     def get_triage_prompt(self, user_query: str) -> str:
         """Get the triage analysis prompt."""
