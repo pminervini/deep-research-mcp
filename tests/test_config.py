@@ -13,14 +13,7 @@ def test_config_creation_with_overrides():
     if not api_key:
         pytest.skip("OPENAI_API_KEY not set")
 
-    config = ResearchConfig(
-        api_key=api_key,
-        model="gpt-5-mini",
-        timeout=120.0,
-        poll_interval=5.0,
-        max_retries=7,
-        log_level="DEBUG",
-    )
+    config = ResearchConfig(api_key=api_key, model="gpt-5-mini", timeout=120.0, poll_interval=5.0, max_retries=7, log_level="DEBUG")
 
     assert config.api_key == api_key
     assert config.model == "gpt-5-mini"
@@ -59,11 +52,7 @@ def test_config_with_custom_endpoint():
         pytest.skip("OPENAI_API_KEY not set")
 
     custom_endpoint = "https://api.custom-provider.com/v1"
-    config = ResearchConfig(
-        api_key=api_key,
-        base_url=custom_endpoint,
-        model="gpt-5-mini",
-    )
+    config = ResearchConfig(api_key=api_key, base_url=custom_endpoint, model="gpt-5-mini")
 
     assert config.api_key == api_key
     assert config.base_url == custom_endpoint
@@ -103,12 +92,7 @@ def test_config_with_clarification_base_url():
         pytest.skip("OPENAI_API_KEY not set")
 
     clarification_endpoint = "https://api.clarification.com/v1"
-    config = ResearchConfig(
-        api_key=api_key,
-        model="gpt-5-mini",
-        enable_clarification=True,
-        clarification_base_url=clarification_endpoint,
-    )
+    config = ResearchConfig(api_key=api_key, model="gpt-5-mini", enable_clarification=True, clarification_base_url=clarification_endpoint)
 
     assert config.api_key == api_key
     assert config.clarification_base_url == clarification_endpoint
@@ -144,12 +128,7 @@ def test_from_env_with_clarification_base_url():
 def test_config_with_clarification_api_key():
     """Test config with separate clarification API key"""
     clarification_api_key = "sk-clarification-test-key"
-    config = ResearchConfig(
-        api_key="sk-main-test-key",
-        model="gpt-5-mini",
-        enable_clarification=True,
-        clarification_api_key=clarification_api_key,
-    )
+    config = ResearchConfig(api_key="sk-main-test-key", model="gpt-5-mini", enable_clarification=True, clarification_api_key=clarification_api_key)
 
     assert config.api_key == "sk-main-test-key"
     assert config.clarification_api_key == clarification_api_key
@@ -188,11 +167,7 @@ def test_config_with_instruction_builder_model():
     if not api_key:
         pytest.skip("OPENAI_API_KEY not set")
 
-    config = ResearchConfig(
-        api_key=api_key,
-        model="gpt-5-mini",
-        instruction_builder_model="gpt-5-mini",
-    )
+    config = ResearchConfig(api_key=api_key, model="gpt-5-mini", instruction_builder_model="gpt-5-mini")
 
     assert config.api_key == api_key
     assert config.instruction_builder_model == "gpt-5-mini"
@@ -288,11 +263,7 @@ def test_api_style_invalid_value_rejected():
 
 def test_api_style_chat_completions_skips_api_key_validation():
     """Test that API key validation is skipped for chat_completions mode"""
-    config = ResearchConfig(
-        api_key="ppl-perplexity-key",
-        model="gpt-5-mini",
-        api_style="chat_completions",
-    )
+    config = ResearchConfig(api_key="ppl-perplexity-key", model="gpt-5-mini", api_style="chat_completions")
     # Should not raise despite non-sk- prefix
     assert config.validate() is True
 
@@ -314,6 +285,106 @@ def test_api_style_chat_completions_default_model():
             os.environ["RESEARCH_API_STYLE"] = old_api_style
         else:
             os.environ.pop("RESEARCH_API_STYLE", None)
+
+        if old_model:
+            os.environ["RESEARCH_MODEL"] = old_model
+        else:
+            os.environ.pop("RESEARCH_MODEL", None)
+
+
+def test_gemini_provider_defaults():
+    """Test Gemini provider default model and endpoint resolution."""
+    old_provider = os.environ.get("RESEARCH_PROVIDER")
+    old_model = os.environ.get("RESEARCH_MODEL")
+    old_base_url = os.environ.get("RESEARCH_BASE_URL")
+
+    os.environ["RESEARCH_PROVIDER"] = "gemini"
+    os.environ.pop("RESEARCH_MODEL", None)
+    os.environ.pop("RESEARCH_BASE_URL", None)
+
+    try:
+        config = ResearchConfig.from_env()
+        assert config.provider == "gemini"
+        assert config.model == "deep-research-pro-preview-12-2025"
+        assert config.base_url == "https://generativelanguage.googleapis.com"
+    finally:
+        if old_provider:
+            os.environ["RESEARCH_PROVIDER"] = old_provider
+        else:
+            os.environ.pop("RESEARCH_PROVIDER", None)
+
+        if old_model:
+            os.environ["RESEARCH_MODEL"] = old_model
+        else:
+            os.environ.pop("RESEARCH_MODEL", None)
+
+        if old_base_url:
+            os.environ["RESEARCH_BASE_URL"] = old_base_url
+        else:
+            os.environ.pop("RESEARCH_BASE_URL", None)
+
+
+def test_gemini_api_key_aliases():
+    """Test Gemini provider API key aliases."""
+    old_provider = os.environ.get("RESEARCH_PROVIDER")
+    old_research_api_key = os.environ.get("RESEARCH_API_KEY")
+    old_gemini_api_key = os.environ.get("GEMINI_API_KEY")
+    old_google_api_key = os.environ.get("GOOGLE_API_KEY")
+
+    os.environ["RESEARCH_PROVIDER"] = "gemini"
+    os.environ.pop("RESEARCH_API_KEY", None)
+    os.environ["GEMINI_API_KEY"] = "gemini-key"
+    os.environ.pop("GOOGLE_API_KEY", None)
+
+    try:
+        config = ResearchConfig.from_env()
+        assert config.api_key == "gemini-key"
+    finally:
+        if old_provider:
+            os.environ["RESEARCH_PROVIDER"] = old_provider
+        else:
+            os.environ.pop("RESEARCH_PROVIDER", None)
+
+        if old_research_api_key:
+            os.environ["RESEARCH_API_KEY"] = old_research_api_key
+        else:
+            os.environ.pop("RESEARCH_API_KEY", None)
+
+        if old_gemini_api_key:
+            os.environ["GEMINI_API_KEY"] = old_gemini_api_key
+        else:
+            os.environ.pop("GEMINI_API_KEY", None)
+
+        if old_google_api_key:
+            os.environ["GOOGLE_API_KEY"] = old_google_api_key
+        else:
+            os.environ.pop("GOOGLE_API_KEY", None)
+
+
+def test_provider_alias_env_var():
+    """Test backward-compatible PROVIDER env var support."""
+    old_provider = os.environ.get("PROVIDER")
+    old_research_provider = os.environ.get("RESEARCH_PROVIDER")
+    old_model = os.environ.get("RESEARCH_MODEL")
+
+    os.environ["PROVIDER"] = "gemini"
+    os.environ.pop("RESEARCH_PROVIDER", None)
+    os.environ.pop("RESEARCH_MODEL", None)
+
+    try:
+        config = ResearchConfig.from_env()
+        assert config.provider == "gemini"
+        assert config.model == "deep-research-pro-preview-12-2025"
+    finally:
+        if old_provider:
+            os.environ["PROVIDER"] = old_provider
+        else:
+            os.environ.pop("PROVIDER", None)
+
+        if old_research_provider:
+            os.environ["RESEARCH_PROVIDER"] = old_research_provider
+        else:
+            os.environ.pop("RESEARCH_PROVIDER", None)
 
         if old_model:
             os.environ["RESEARCH_MODEL"] = old_model

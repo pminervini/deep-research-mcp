@@ -1,6 +1,6 @@
 # Deep Research MCP
 
-A Python-based agent that integrates research providers with Claude Code through the Model Context Protocol (MCP). It supports OpenAI (Responses API with web search and code interpreter, or Chat Completions API for broad provider compatibility) and the open-source Open Deep Research stack (based on smolagents).
+A Python-based agent that integrates research providers with Claude Code through the Model Context Protocol (MCP). It supports OpenAI (Responses API with web search and code interpreter, or Chat Completions API for broad provider compatibility), Gemini Deep Research via the Interactions API, and the open-source Open Deep Research stack (based on smolagents).
 
 ## Prerequisites
 
@@ -8,6 +8,7 @@ A Python-based agent that integrates research providers with Claude Code through
 - [uv](https://docs.astral.sh/uv/) installed
 - One of:
   - OpenAI API access (Responses API models, e.g., `o4-mini-deep-research-2025-06-26`)
+  - Gemini API access with the Interactions API / Deep Research agent enabled
   - Open Deep Research dependencies (installed via `uv sync --extra open-deep-research`)
 - Claude Code, or any other assistant supporting MCP integration
 
@@ -51,11 +52,11 @@ Common settings:
 
 ```toml
 [research]                                  # Core Deep Research functionality
-provider = "openai"                         # Available options: "openai", "open-deep-research" -- defaults to "openai"
-api_style = "responses"                     # "responses" (default) or "chat_completions" -- use "chat_completions" for Perplexity, Groq, Ollama, etc.
-model = "o4-mini-deep-research-2025-06-26"  # OpenAI: model identifier; ODR: LiteLLM model identifier, e.g., openai/qwen/qwen3-coder-30b
-api_key = "sk-your-api-key"                 # API key, optional
-base_url = "https://api.openai.com/v1"      # OpenAI: OpenAI-compatible endpoint; ODR: LiteLLM-compatible endpoint, e.g., http://localhost:1234/v1
+provider = "openai"                         # Available options: "openai", "gemini", "open-deep-research" -- defaults to "openai"
+api_style = "responses"                     # Only applies to provider="openai"; use "chat_completions" for Perplexity, Groq, Ollama, etc.
+model = "o4-mini-deep-research-2025-06-26"  # OpenAI: model identifier; Gemini: agent id; ODR: LiteLLM model identifier, e.g., openai/qwen/qwen3-coder-30b
+api_key = "your-api-key"                    # API key, optional
+base_url = "https://api.openai.com/v1"      # OpenAI: OpenAI-compatible endpoint; Gemini: https://generativelanguage.googleapis.com; ODR: LiteLLM-compatible endpoint
 
 # Task behavior
 timeout = 1800
@@ -83,6 +84,19 @@ provider = "openai"
 model = "o4-mini-deep-research-2025-06-26"  # OpenAI model
 api_key = "sk-..."                          # Defaults to OPENAI_API_KEY
 base_url = "https://api.openai.com/v1"      # OpenAI-compatible endpoint
+timeout = 1800
+poll_interval = 30
+max_retries = 3
+```
+
+Gemini Deep Research provider example:
+
+```toml
+[research]
+provider = "gemini"
+model = "deep-research-pro-preview-12-2025"     # Gemini Deep Research agent id
+api_key = "AIza..."                             # Defaults to GEMINI_API_KEY or GOOGLE_API_KEY
+base_url = "https://generativelanguage.googleapis.com"
 timeout = 1800
 poll_interval = 30
 max_retries = 3
@@ -228,7 +242,8 @@ Or manually add to your `~/.gemini/settings.json` file:
       "command": "uv",
       "args": ["run", "--directory", "/path/to/deep-research-mcp", "deep-research-mcp"],
       "env": {
-        "OPENAI_API_KEY": "$OPENAI_API_KEY"
+        "RESEARCH_PROVIDER": "gemini",
+        "GEMINI_API_KEY": "$GEMINI_API_KEY"
       }
     }
   }
@@ -347,6 +362,8 @@ clarification_api_key = "sk-your-clarification-api-key-here"   # Optional custom
 clarification_base_url = "https://custom-api.example.com/v1"   # Optional custom endpoint for clarification models
 ```
 
+Clarification and instruction-building remain OpenAI-compatible chat flows. If your main research provider is `gemini` or `open-deep-research`, set `clarification_api_key` / `clarification_base_url` explicitly, or provide `OPENAI_API_KEY` / `OPENAI_BASE_URL` in the environment for those helper models.
+
 ### Usage Flow
 
 1. **Start Clarification**:
@@ -415,21 +432,22 @@ Configuration class for the research agent.
 
 #### Parameters
 
-- `provider`: Research provider (`openai` or `open-deep-research`; default: `openai`)
-- `api_style`: API style for the `openai` provider (`responses` or `chat_completions`; default: `responses`). Use `chat_completions` for Perplexity, Groq, Ollama, and other OpenAI-compatible providers.
+- `provider`: Research provider (`openai`, `gemini`, or `open-deep-research`; default: `openai`)
+- `api_style`: API style for the `openai` provider (`responses` or `chat_completions`; default: `responses`). Ignored for `gemini` and `open-deep-research`.
 - `model`: Model identifier
   - OpenAI: Responses model (e.g., `gpt-5-mini`)
+  - Gemini: Deep Research agent id (for example `deep-research-pro-preview-12-2025`)
   - Open Deep Research: LiteLLM model id (e.g., `openai/qwen/qwen3-coder-30b`)
-- `api_key`: API key for the configured endpoint (optional). Defaults to env `OPENAI_API_KEY`.
-- `base_url`: OpenAI-compatible API base URL (optional). Defaults to env `OPENAI_BASE_URL`.
+- `api_key`: API key for the configured endpoint (optional). Defaults to env `OPENAI_API_KEY` for `openai`, `GEMINI_API_KEY` / `GOOGLE_API_KEY` for `gemini`.
+- `base_url`: Provider API base URL (optional). Defaults to `https://api.openai.com/v1` for `openai`, `https://generativelanguage.googleapis.com` for `gemini`, and `http://localhost:1234/v1` for `open-deep-research`.
 - `timeout`: Maximum time for research in seconds (default: 1800)
 - `poll_interval`: Polling interval in seconds (default: 30)
 - `max_retries`: Maximum retry attempts (default: 3)
 - `enable_clarification`: Enable clarifying questions (default: False)
 - `triage_model`: Model for query analysis (default: `gpt-5-mini`)
 - `clarifier_model`: Model for query enrichment (default: `gpt-5-mini`)
-- `clarification_api_key`: Custom API key for clarification models (optional, defaults to `api_key`)
-- `clarification_base_url`: Custom OpenAI-compatible endpoint for clarification models (optional, defaults to `base_url`)
+- `clarification_api_key`: Custom API key for clarification models (optional; defaults to the main OpenAI credentials when `provider=openai`, otherwise falls back to env `OPENAI_API_KEY` if present)
+- `clarification_base_url`: Custom OpenAI-compatible endpoint for clarification models (optional; defaults to the main OpenAI endpoint when `provider=openai`, otherwise falls back to env `OPENAI_BASE_URL` if present)
 
 ## Development
 

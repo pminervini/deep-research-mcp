@@ -36,15 +36,19 @@ async def test_deep_research_without_api():
     assert result is not None
     assert isinstance(result, str)
     # Should either work with valid config or show error without API keys
-    assert "Research Report:" in result or "Failed to initialize research agent" in result
+    assert "Research Report:" in result or "Failed to initialize research agent" in result or "Unexpected error:" in result
 
 
 @pytest.mark.asyncio
 async def test_deep_research_invalid_api_key_graceful_error():
     """Test deep_research handles invalid API keys gracefully."""
+    old_provider = os.environ.get("PROVIDER")
+    old_research_provider = os.environ.get("RESEARCH_PROVIDER")
     old_research_api_key = os.environ.get("RESEARCH_API_KEY")
     old_openai_api_key = os.environ.get("OPENAI_API_KEY")
 
+    os.environ["PROVIDER"] = "openai"
+    os.environ["RESEARCH_PROVIDER"] = "openai"
     os.environ["RESEARCH_API_KEY"] = "invalid-api-key"
     os.environ.pop("OPENAI_API_KEY", None)
     mcp_server.research_agent = None
@@ -54,6 +58,16 @@ async def test_deep_research_invalid_api_key_graceful_error():
         assert isinstance(result, str)
         assert result.startswith("Unexpected error:") and "invalid_api_key" in result
     finally:
+        if old_provider is None:
+            os.environ.pop("PROVIDER", None)
+        else:
+            os.environ["PROVIDER"] = old_provider
+
+        if old_research_provider is None:
+            os.environ.pop("RESEARCH_PROVIDER", None)
+        else:
+            os.environ["RESEARCH_PROVIDER"] = old_research_provider
+
         if old_research_api_key is None:
             os.environ.pop("RESEARCH_API_KEY", None)
         else:

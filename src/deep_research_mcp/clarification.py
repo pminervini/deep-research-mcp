@@ -6,6 +6,7 @@ Based on https://cookbook.openai.com/examples/deep_research_api/introduction_to_
 """
 
 import logging
+import os
 import uuid
 from typing import Dict, Any, List, Optional
 from openai import OpenAI
@@ -17,6 +18,32 @@ from deep_research_mcp.config import ResearchConfig
 from deep_research_mcp.prompts import PromptManager
 
 logger = logging.getLogger(__name__)
+
+
+def build_clarification_client_kwargs(config: ResearchConfig) -> Dict[str, str]:
+    """Build OpenAI client kwargs for clarification and instruction-building flows."""
+    kwargs: Dict[str, str] = {}
+
+    api_key = config.clarification_api_key
+    if not api_key:
+        if config.provider in {"openai"}:
+            api_key = config.api_key
+        else:
+            api_key = os.environ.get("OPENAI_API_KEY")
+
+    base_url = config.clarification_base_url
+    if not base_url:
+        if config.provider in {"openai"}:
+            base_url = config.base_url
+        else:
+            base_url = os.environ.get("OPENAI_BASE_URL")
+
+    if api_key:
+        kwargs["api_key"] = api_key
+    if base_url:
+        kwargs["base_url"] = base_url
+
+    return kwargs
 
 
 class TriageResponse(BaseModel):
@@ -31,25 +58,11 @@ class TriageResponse(BaseModel):
 class TriageAgent:
     """Analyzes queries to determine if clarification is needed"""
 
-    def __init__(
-        self, config: ResearchConfig, prompt_manager: Optional[PromptManager] = None
-    ):
+    def __init__(self, config: ResearchConfig, prompt_manager: Optional[PromptManager] = None):
         self.config = config
         self.prompt_manager = prompt_manager or PromptManager()
 
-        # Initialize OpenAI client with custom endpoint if provided
-        kwargs = {}
-        # Use clarification-specific API key if provided, otherwise fall back to general api_key
-        if config.clarification_api_key:
-            kwargs["api_key"] = config.clarification_api_key
-        elif config.api_key:
-            kwargs["api_key"] = config.api_key
-        # Use clarification-specific base URL if provided, otherwise fall back to general base_url
-        if config.clarification_base_url:
-            kwargs["base_url"] = config.clarification_base_url
-        elif config.base_url:
-            kwargs["base_url"] = config.base_url
-        openai_client = OpenAI(**kwargs)
+        openai_client = OpenAI(**build_clarification_client_kwargs(config))
         self.client = instructor.from_openai(openai_client)
 
     def analyze_query(self, user_query: str) -> Dict[str, Any]:
@@ -64,50 +77,25 @@ class TriageAgent:
         triage_prompt = self.prompt_manager.get_triage_prompt(user_query=user_query)
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.config.triage_model,
-                messages=[{"role": "user", "content": triage_prompt}],
-                response_model=TriageResponse,
-            )
+            response = self.client.chat.completions.create(model=self.config.triage_model, messages=[{"role": "user", "content": triage_prompt}], response_model=TriageResponse)
 
             result = response.model_dump()
-            logger.info(
-                f"Triage assessment: {result.get('query_assessment', 'No assessment')}"
-            )
+            logger.info(f"Triage assessment: {result.get('query_assessment', 'No assessment')}")
             return result
 
         except Exception as e:
             logger.error(f"Triage agent error: {e}")
-            return {
-                "needs_clarification": False,
-                "reasoning": f"Triage agent error: {str(e)}",
-                "potential_clarifications": [],
-                "query_assessment": "Error during assessment",
-            }
+            return {"needs_clarification": False, "reasoning": f"Triage agent error: {str(e)}", "potential_clarifications": [], "query_assessment": "Error during assessment"}
 
 
 class ClarifierAgent:
     """Enriches queries based on user responses to clarifying questions"""
 
-    def __init__(
-        self, config: ResearchConfig, prompt_manager: Optional[PromptManager] = None
-    ):
+    def __init__(self, config: ResearchConfig, prompt_manager: Optional[PromptManager] = None):
         self.config = config
         self.prompt_manager = prompt_manager or PromptManager()
 
-        # Initialize OpenAI client with custom endpoint if provided
-        openai_kwargs = {}
-        # Use clarification-specific API key if provided, otherwise fall back to general api_key
-        if config.clarification_api_key:
-            openai_kwargs["api_key"] = config.clarification_api_key
-        elif config.api_key:
-            openai_kwargs["api_key"] = config.api_key
-        # Use clarification-specific base URL if provided, otherwise fall back to general base_url
-        if config.clarification_base_url:
-            openai_kwargs["base_url"] = config.clarification_base_url
-        elif config.base_url:
-            openai_kwargs["base_url"] = config.base_url
-        openai_client = OpenAI(**openai_kwargs)
+        openai_client = OpenAI(**build_clarification_client_kwargs(config))
         self.client = instructor.from_openai(openai_client)
 
     def enrich_query(self, user_query: str, qa_pairs: List[Dict[str, str]]) -> str:
@@ -129,19 +117,12 @@ class ClarifierAgent:
             if qa.get("answer") and qa["answer"].strip():
                 enriched_context.append(f"Q: {qa['question']}\nA: {qa['answer']}")
             else:
-                enriched_context.append(
-                    f"Q: {qa['question']}\nA: [No specific preference provided]"
-                )
+                enriched_context.append(f"Q: {qa['question']}\nA: [No specific preference provided]")
 
-        enrichment_prompt = self.prompt_manager.get_enrichment_prompt(
-            user_query=user_query, enriched_context=chr(10).join(enriched_context)
-        )
+        enrichment_prompt = self.prompt_manager.get_enrichment_prompt(user_query=user_query, enriched_context=chr(10).join(enriched_context))
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.config.clarifier_model,
-                messages=[{"role": "user", "content": enrichment_prompt}],
-            )
+            response = self.client.chat.completions.create(model=self.config.clarifier_model, messages=[{"role": "user", "content": enrichment_prompt}])
 
             enriched_query = response.choices[0].message.content.strip()
             logger.info(f"Query enriched successfully")
@@ -165,23 +146,13 @@ class ClarificationSession:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert session to dictionary for serialization"""
-        return {
-            "session_id": self.session_id,
-            "original_query": self.original_query,
-            "questions": self.questions,
-            "answers": self.answers,
-            "total_questions": len(self.questions),
-            "answered_questions": len(self.answers),
-            "is_complete": len(self.answers) >= len(self.questions),
-        }
+        return {"session_id": self.session_id, "original_query": self.original_query, "questions": self.questions, "answers": self.answers, "total_questions": len(self.questions), "answered_questions": len(self.answers), "is_complete": len(self.answers) >= len(self.questions)}
 
 
 class ClarificationManager:
     """Manages the complete clarification pipeline"""
 
-    def __init__(
-        self, config: ResearchConfig, prompt_manager: Optional[PromptManager] = None
-    ):
+    def __init__(self, config: ResearchConfig, prompt_manager: Optional[PromptManager] = None):
         self.config = config
         self.prompt_manager = prompt_manager or PromptManager()
         self.triage_agent = TriageAgent(config, self.prompt_manager)
@@ -196,10 +167,7 @@ class ClarificationManager:
             Dictionary with clarification status and questions
         """
         if not self.config.enable_clarification:
-            return {
-                "needs_clarification": False,
-                "reasoning": "Clarification is disabled in configuration",
-            }
+            return {"needs_clarification": False, "reasoning": "Clarification is disabled in configuration"}
 
         # Analyze query with triage agent
         triage_result = self.triage_agent.analyze_query(user_query)
@@ -238,13 +206,7 @@ class ClarificationManager:
         session = self._sessions[session_id]
         session.answers = answers
 
-        return {
-            "session_id": session_id,
-            "status": "answers_recorded",
-            "total_questions": len(session.questions),
-            "answered_questions": len(session.answers),
-            "is_complete": len(session.answers) >= len(session.questions),
-        }
+        return {"session_id": session_id, "status": "answers_recorded", "total_questions": len(session.questions), "answered_questions": len(session.answers), "is_complete": len(session.answers) >= len(session.questions)}
 
     def get_enriched_query(self, session_id: str) -> Optional[str]:
         """
@@ -268,9 +230,7 @@ class ClarificationManager:
             qa_pairs.append({"question": question, "answer": answer})
 
         # Generate enriched query
-        enriched_query = self.clarifier_agent.enrich_query(
-            session.original_query, qa_pairs
-        )
+        enriched_query = self.clarifier_agent.enrich_query(session.original_query, qa_pairs)
 
         # Clean up session (optional - could keep for debugging)
         # del self._sessions[session_id]
