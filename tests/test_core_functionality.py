@@ -55,6 +55,8 @@ def test_agent_initialization(test_config):
     """Test agent initialization"""
     agent = DeepResearchAgent(test_config)
     assert agent.config == test_config
+    assert hasattr(agent, "backend")
+    assert hasattr(agent, "client")
     assert hasattr(agent, "clarification_manager")
 
 
@@ -72,6 +74,7 @@ def test_gemini_agent_initialization():
         config = ResearchConfig.from_env()
         agent = DeepResearchAgent(config)
         assert agent.config.provider == "gemini"
+        assert hasattr(agent, "backend")
         assert hasattr(agent, "gemini_interactions")
         assert agent.instruction_client is None
     finally:
