@@ -24,6 +24,7 @@ from tenacity import (
     wait_exponential,
 )
 
+from deep_research_mcp.async_utils import run_blocking
 from deep_research_mcp.clarification import (
     ClarificationManager,
     build_clarification_client_kwargs,
@@ -252,7 +253,7 @@ Additionally, if after some searching you find out that you need more informatio
 
         # Build enhanced research instruction using instruction builder model only if clarification is enabled
         if self.config.enable_clarification:
-            enhanced_query = self.build_research_instruction(query)
+            enhanced_query = await self.build_research_instruction_async(query)
         else:
             enhanced_query = query
 
@@ -421,7 +422,9 @@ Additionally, if after some searching you find out that you need more informatio
             "store": True,
         }
 
-        interaction = self.gemini_interactions.create(**request_kwargs)
+        interaction = await run_blocking(
+            self.gemini_interactions.create, **request_kwargs
+        )
         self.logger.info(f"Research task started: {interaction.id}")
         final_interaction = await self._wait_for_gemini_completion(interaction.id)
         return self._extract_gemini_results(final_interaction)
@@ -432,7 +435,7 @@ Additionally, if after some searching you find out that you need more informatio
 
         while time.time() - start_time < self.config.timeout:
             try:
-                interaction = self.gemini_interactions.get(task_id)
+                interaction = await run_blocking(self.gemini_interactions.get, task_id)
 
                 if interaction.status == "completed":
                     self.logger.info(f"Research completed: {task_id}")
@@ -457,7 +460,7 @@ Additionally, if after some searching you find out that you need more informatio
 
         self.logger.warning(f"Task {task_id} timed out, attempting cancellation")
         try:
-            self.gemini_interactions.cancel(task_id)
+            await run_blocking(self.gemini_interactions.cancel, task_id)
         except Exception:
             pass
 
@@ -732,7 +735,8 @@ Additionally, if after some searching you find out that you need more informatio
         self, input_messages: list[dict[str, Any]], tools: list[dict[str, Any]]
     ) -> Any:
         """Create research task with retry logic (OpenAI)"""
-        response = self.client.responses.create(
+        response = await run_blocking(
+            self.client.responses.create,
             model=self.config.model,
             input=input_messages,
             tools=tools,
@@ -749,7 +753,7 @@ Additionally, if after some searching you find out that you need more informatio
 
         while time.time() - start_time < self.config.timeout:
             try:
-                response = self.client.responses.retrieve(task_id)
+                response = await run_blocking(self.client.responses.retrieve, task_id)
 
                 if response.status == "completed":
                     self.logger.info(f"Research completed: {task_id}")
@@ -781,7 +785,7 @@ Additionally, if after some searching you find out that you need more informatio
         # Timeout reached, attempt cancellation
         self.logger.warning(f"Task {task_id} timed out, attempting cancellation")
         try:
-            self.client.responses.cancel(task_id)
+            await run_blocking(self.client.responses.cancel, task_id)
         except:
             pass
 
@@ -924,7 +928,7 @@ Additionally, if after some searching you find out that you need more informatio
             )
         if self.config.provider in {"openai"}:
             try:
-                response = self.client.responses.retrieve(task_id)
+                response = await run_blocking(self.client.responses.retrieve, task_id)
                 return ResearchTaskStatus(
                     task_id=task_id,
                     status=response.status,
@@ -936,7 +940,7 @@ Additionally, if after some searching you find out that you need more informatio
                 return ResearchTaskStatus.error_status(task_id=task_id, error=str(e))
         elif self.config.provider in {"gemini"}:
             try:
-                interaction = self.gemini_interactions.get(task_id)
+                interaction = await run_blocking(self.gemini_interactions.get, task_id)
                 completed_at = (
                     interaction.updated
                     if interaction.status in GEMINI_TERMINAL_STATUSES
@@ -973,6 +977,10 @@ Additionally, if after some searching you find out that you need more informatio
         """
         return self.clarification_manager.start_clarification(user_query)
 
+    async def start_clarification_async(self, user_query: str) -> dict[str, Any]:
+        """Start clarification without blocking the event loop."""
+        return await self.clarification_manager.start_clarification_async(user_query)
+
     def add_clarification_answers(
         self, session_id: str, answers: list[str]
     ) -> dict[str, Any]:
@@ -999,6 +1007,10 @@ Additionally, if after some searching you find out that you need more informatio
             Enriched query string or None if session not found
         """
         return self.clarification_manager.get_enriched_query(session_id)
+
+    async def get_enriched_query_async(self, session_id: str) -> str | None:
+        """Get an enriched query without blocking the event loop."""
+        return await self.clarification_manager.get_enriched_query_async(session_id)
 
     def _create_instruction_client(self) -> OpenAI:
         """
@@ -1043,3 +1055,7 @@ Additionally, if after some searching you find out that you need more informatio
             self.logger.warning(f"Failed to build research instruction: {e}")
             # Fallback to original query if instruction building fails
             return query
+
+    async def build_research_instruction_async(self, query: str) -> str:
+        """Build research instructions without blocking the event loop."""
+        return await run_blocking(self.build_research_instruction, query)

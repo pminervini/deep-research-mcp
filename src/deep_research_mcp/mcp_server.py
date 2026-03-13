@@ -349,7 +349,7 @@ async def deep_research(
     try:
         # Handle clarification request
         if request_clarification:
-            clarification_result = agent.start_clarification(query)
+            clarification_result = await agent.start_clarification_async(query)
 
             if not clarification_result.get("needs_clarification", False):
                 return f"""# Query Analysis
@@ -515,7 +515,7 @@ async def research_with_context(
             return f"Error with clarification session: {status_result['error']}"
 
         # Get enriched query
-        enriched_query = agent.get_enriched_query(session_id)
+        enriched_query = await agent.get_enriched_query_async(session_id)
 
         if not enriched_query:
             return f"Could not retrieve enriched query for session {session_id}. Please check the session ID."
