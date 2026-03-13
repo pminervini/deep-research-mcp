@@ -21,6 +21,7 @@ from tenacity import (
 )
 
 from deep_research_mcp.async_utils import run_blocking
+from deep_research_mcp.clarification import MISSING_OPENAI_API_KEY_PLACEHOLDER
 from deep_research_mcp.config import ResearchConfig
 from deep_research_mcp.errors import ResearchError, TaskTimeoutError
 from deep_research_mcp.results import (
@@ -38,8 +39,7 @@ class OpenAIResearchBackend(ResearchBackend):
     def __init__(self, config: ResearchConfig, logger):
         super().__init__(config, logger)
         client_kwargs: dict[str, Any] = {}
-        if config.api_key:
-            client_kwargs["api_key"] = config.api_key
+        client_kwargs["api_key"] = config.api_key or MISSING_OPENAI_API_KEY_PLACEHOLDER
         if config.base_url:
             client_kwargs["base_url"] = config.base_url
         self.client = OpenAI(**client_kwargs)

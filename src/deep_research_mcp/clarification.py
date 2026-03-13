@@ -21,6 +21,7 @@ from deep_research_mcp.config import ResearchConfig
 from deep_research_mcp.prompts import PromptManager
 
 logger = logging.getLogger(__name__)
+MISSING_OPENAI_API_KEY_PLACEHOLDER = "missing-openai-api-key"
 
 
 class OpenAIClientKwargs(TypedDict, total=False):
@@ -50,6 +51,9 @@ def build_clarification_client_kwargs(config: ResearchConfig) -> OpenAIClientKwa
 
     if api_key:
         kwargs["api_key"] = api_key
+    else:
+        # Allow non-API flows and tests to construct the client without secrets.
+        kwargs["api_key"] = MISSING_OPENAI_API_KEY_PLACEHOLDER
     if base_url:
         kwargs["base_url"] = base_url
 
