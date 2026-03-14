@@ -245,7 +245,9 @@ class ClarificationManager:
         return [
             {
                 "question": question,
-                "answer": session.answers[index] if index < len(session.answers) else "",
+                "answer": (
+                    session.answers[index] if index < len(session.answers) else ""
+                ),
             }
             for index, question in enumerate(session.questions)
         ]
