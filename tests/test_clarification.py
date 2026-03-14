@@ -177,8 +177,6 @@ def test_clarifier_agent_error_fallback(config):
     """Test ClarifierAgent falls back to original query on error"""
     # Test with invalid config to trigger error - don't actually break API key
     # since the test might still succeed with a different response
-    original_key = os.environ.get("OPENAI_API_KEY")
-
     # Create a config with an invalid API key
     config.api_key = "sk-invalid-key-for-testing"
     agent = ClarifierAgent(config)
