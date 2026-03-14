@@ -15,11 +15,11 @@
 - Try CLI: `uv run python cli/agent-cli.py research "What’s new in quantum computing?" --model gpt-5-mini`.
 - Tests: `uv run pytest -v` or `uv run pytest --cov=deep_research_mcp tests/`.
 - Lint/format/type-check: `uv run black .`, `uv run pylint src/deep_research_mcp tests`, `uv run mypy src/deep_research_mcp`.
+- Before committing or opening a PR, run `uv run black --fast --check .` to match the CI formatting check.
 
 ## Coding Style & Naming Conventions
 - Python 3.11+, 4-space indentation, use type hints in new/changed code.
 - Format with `black` defaults; keep imports and docstrings idiomatic.
-- Keep every import, method/function call, and `assert` statement on a single line.
 - Prefer f-strings over `%s`-style string interpolation, including in logging calls.
 - Naming: snake_case for modules/functions, PascalCase for classes, UPPER_CASE for constants.
 - Keep public tool signatures stable; document changes in `README.md`/`ARCH.md`.

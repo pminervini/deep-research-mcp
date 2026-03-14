@@ -4,7 +4,6 @@ This short guide is for Claude Code (claude.ai/code) when working with this repo
 
 Code Style
 - NO EMOJIS in any Python or Markdown files.
-- Keep every import, method/function call, and `assert` statement on a single line.
 - Prefer f-strings over `%s`-style string interpolation, including in logging calls.
 
 Authoritative Docs
@@ -24,4 +23,5 @@ Exposed Tools
 
 Development
 - Testing, linting, formatting, and type-checking commands are documented in README.md. Use those as the single source of truth.
+- Before committing or opening a PR, run `uv run black --fast --check .` to match the CI formatting check.
 - ABSOLUTELY DO NOT use monkey patching or mock classes in `tests/`.
