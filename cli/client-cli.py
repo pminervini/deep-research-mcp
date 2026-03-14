@@ -63,7 +63,6 @@ import argparse
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any
 
 from mcp import ClientSession, types
 from mcp.client.streamable_http import streamablehttp_client

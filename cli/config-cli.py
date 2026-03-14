@@ -18,7 +18,6 @@ Usage:
 
 import argparse
 import json
-import sys
 from dataclasses import asdict
 from typing import Any
 
@@ -28,8 +27,6 @@ import logging
 
 # Set up logging to show debug messages
 logging.basicConfig(level=logging.DEBUG)
-
-logger = logging.getLogger(__name__)
 
 
 def _mask_secret(value: str | None, keep: int = 4) -> str:
