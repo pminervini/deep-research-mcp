@@ -47,6 +47,9 @@ docs = [
 open-deep-research = [
     "open-deep-research @ git+https://github.com/pminervini/open-deep-research.git",
 ]
+tavily = [
+    "tavily-python>=0.5.0",
+]
 
 [project.scripts]
 deep-research-mcp = "deep_research_mcp.mcp_server:main"
@@ -104,6 +107,7 @@ module = [
     "open_deep_research",
     "open_deep_research.*",
     "smolagents",
+    "tavily",
     "yaml",
 ]
 ignore_missing_imports = true
