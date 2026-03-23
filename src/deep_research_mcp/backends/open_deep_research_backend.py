@@ -50,6 +50,9 @@ class OpenDeepResearchBackend(ResearchBackend):
         if os.getenv("HF_TOKEN"):
             login(os.getenv("HF_TOKEN"))
 
+        if self.config.tavily_api_key and not os.getenv("TAVILY_API_KEY"):
+            os.environ["TAVILY_API_KEY"] = self.config.tavily_api_key
+
         user_agent = (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
             "(KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 Edg/119.0.0.0"
@@ -133,6 +136,15 @@ Additionally, if after some searching you find out that you need more informatio
         )
 
         search_tools: list[Any] = []
+
+        if os.getenv("TAVILY_API_KEY"):
+            try:
+                tavily_tool = self._build_tavily_tool()
+                if tavily_tool is not None:
+                    search_tools.append(tavily_tool)
+            except Exception as exc:
+                self.logger.warning(f"Failed to initialise Tavily search tool: {exc}")
+
         if os.getenv("SERPAPI_API_KEY") or os.getenv("SERPER_API_KEY"):
             try:
                 search_tools.append(
@@ -146,6 +158,49 @@ Additionally, if after some searching you find out that you need more informatio
         search_tools.append(DuckDuckGoSearchTool())
         search_tools.append(WikipediaSearchTool(user_agent="OpenDeepResearch/1.0"))
         return search_tools
+
+    @staticmethod
+    def _build_tavily_tool() -> Any | None:
+        """Create a smolagents-compatible Tavily search tool."""
+        from smolagents import Tool
+        from tavily import TavilyClient
+
+        class TavilySearchTool(Tool):
+            name = "tavily_search"
+            description = (
+                "Search the web using the Tavily API. "
+                "Returns relevant search results with titles, URLs, and content snippets."
+            )
+            inputs = {
+                "query": {
+                    "type": "string",
+                    "description": "The search query to look up on the web.",
+                }
+            }
+            output_type = "string"
+
+            def __init__(self, **kwargs: Any):
+                super().__init__(**kwargs)
+                self.client = TavilyClient()
+
+            def forward(self, query: str) -> str:
+                response = self.client.search(
+                    query=query,
+                    max_results=5,
+                    search_depth="advanced",
+                )
+                results = response.get("results", [])
+                if not results:
+                    return "No results found."
+                parts: list[str] = []
+                for idx, result in enumerate(results, 1):
+                    title = result.get("title", "")
+                    url = result.get("url", "")
+                    content = result.get("content", "")
+                    parts.append(f"{idx}. [{title}]({url})\n{content}")
+                return "\n\n".join(parts)
+
+        return TavilySearchTool()
 
     async def research(
         self,

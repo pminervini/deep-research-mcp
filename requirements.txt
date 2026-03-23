@@ -41,3 +41,6 @@ mkdocs-material>=9.2.0
 
 # Optional Open Deep Research dependency
 # open-deep-research @ git+https://github.com/pminervini/open-deep-research.git
+
+# Optional Tavily search dependency
+# tavily-python>=0.5.0

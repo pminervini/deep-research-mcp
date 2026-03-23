@@ -96,6 +96,7 @@ class ResearchConfig:
     clarification_base_url: str | None = None
     clarification_api_key: str | None = None
     instruction_builder_model: str = "gpt-5-mini"
+    tavily_api_key: str | None = None
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> ResearchConfig:
@@ -232,6 +233,7 @@ class ResearchConfig:
             or cls.instruction_builder_model,
             clarification_base_url=get_setting_first("CLARIFICATION_BASE_URL"),
             clarification_api_key=get_setting_first("CLARIFICATION_API_KEY"),
+            tavily_api_key=get_setting_first("TAVILY_API_KEY"),
         )
 
     def validate(self) -> bool:
