@@ -20,6 +20,10 @@ A Python-based agent that integrates research providers with Claude Code through
   - Open Deep Research dependencies (installed via `uv sync --extra open-deep-research`)
 - Claude Code, or any other assistant supporting MCP integration
 
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/pminervini-deep-research-mcp).
+
 ## Installation
 
 Recommended setup (resolves the latest compatible versions):
