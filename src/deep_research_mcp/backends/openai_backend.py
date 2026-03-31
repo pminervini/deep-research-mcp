@@ -243,6 +243,20 @@ class OpenAIResearchBackend(ResearchBackend):
 
         return citations
 
+    def _build_responses_create_kwargs(
+        self, input_messages: list[dict[str, Any]], tools: list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        """Build keyword arguments for the Responses API create call."""
+        kwargs: dict[str, Any] = {
+            "model": self.config.model,
+            "input": input_messages,
+            "tools": tools,
+            "background": True,
+        }
+        if self.config.enable_reasoning_summaries:
+            kwargs["reasoning"] = {"summary": "auto"}
+        return kwargs
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=4, max=10),
@@ -253,13 +267,10 @@ class OpenAIResearchBackend(ResearchBackend):
         self, input_messages: list[dict[str, Any]], tools: list[dict[str, Any]]
     ):
         """Create a background Responses API research task."""
+        create_kwargs = self._build_responses_create_kwargs(input_messages, tools)
         response = await run_blocking(
             self.client.responses.create,
-            model=self.config.model,
-            input=input_messages,
-            tools=tools,
-            reasoning={"summary": "auto"},
-            background=True,
+            **create_kwargs,
         )
         self.logger.info(f"Research task started: {response.id}")
         return response
