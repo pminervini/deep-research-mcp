@@ -143,9 +143,66 @@ Additionally, if after some searching you find out that you need more informatio
             except Exception:
                 pass
 
+        if os.getenv("TAVILY_API_KEY"):
+            try:
+                from tavily import TavilyClient
+                from smolagents import Tool
+
+                tavily_tool = self._create_tavily_tool(TavilyClient, Tool)
+                search_tools.append(tavily_tool)
+                self.logger.info("Tavily search tool enabled")
+            except ImportError:
+                self.logger.warning(
+                    "TAVILY_API_KEY is set but tavily-python is not installed. "
+                    "Install it with: pip install tavily-python"
+                )
+            except Exception as exc:
+                self.logger.warning(f"Failed to initialise Tavily search tool: {exc}")
+
         search_tools.append(DuckDuckGoSearchTool())
         search_tools.append(WikipediaSearchTool(user_agent="OpenDeepResearch/1.0"))
         return search_tools
+
+    @staticmethod
+    def _create_tavily_tool(TavilyClient, Tool):
+        """Create a smolagents-compatible Tavily search tool."""
+
+        class TavilySearchTool(Tool):
+            name = "tavily_search"
+            description = (
+                "Search the web using Tavily. Returns relevant results with titles, "
+                "URLs, and content snippets. Use this for up-to-date web information."
+            )
+            inputs = {
+                "query": {
+                    "type": "string",
+                    "description": "The search query to look up on the web.",
+                }
+            }
+            output_type = "string"
+
+            def __init__(self, **kwargs):
+                super().__init__(**kwargs)
+                self._client = TavilyClient()
+
+            def forward(self, query: str) -> str:
+                response = self._client.search(
+                    query=query,
+                    max_results=5,
+                    search_depth="advanced",
+                )
+                results = response.get("results", [])
+                if not results:
+                    return "No results found."
+                parts = []
+                for i, r in enumerate(results, 1):
+                    title = r.get("title", "No title")
+                    url = r.get("url", "")
+                    content = r.get("content", "")
+                    parts.append(f"{i}. {title}\n   URL: {url}\n   {content}")
+                return "\n\n".join(parts)
+
+        return TavilySearchTool()
 
     async def research(
         self,
