@@ -609,14 +609,12 @@ def main():
     mcp.settings.port = args.port
 
     # Run the MCP server with selected transport
-    if args.transport in {"http"}:
+    if args.transport == "http":
         logger.info(f"Starting HTTP (streaming) server on {args.host}:{args.port}")
         mcp.run(transport="streamable-http")
-    elif args.transport in {"stdio"}:
+    else:
         logger.info("Starting stdio server")
         mcp.run()
-    else:
-        raise ValueError(f"Invalid transport: {args.transport}")
 
 
 if __name__ == "__main__":
