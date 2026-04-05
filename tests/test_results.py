@@ -28,7 +28,8 @@ def test_research_result_completed_contract():
     assert result.status == "completed"
     assert result.task_id == "task-123"
     assert result.final_report == "Structured report"
-    assert result.to_dict()["citations"][0]["url"] == "https://example.com"
+    assert len(result.citations) == 1
+    assert result.citations[0].url == "https://example.com"
 
 
 def test_research_task_status_helpers():

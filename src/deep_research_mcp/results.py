@@ -18,16 +18,6 @@ class ResearchCitation:
     start_char: int = 0
     end_char: int = 0
 
-    def to_dict(self) -> dict[str, Any]:
-        """Serialize the citation into a dictionary."""
-        return {
-            "index": self.index,
-            "title": self.title,
-            "url": self.url,
-            "start_char": self.start_char,
-            "end_char": self.end_char,
-        }
-
 
 @dataclass(slots=True)
 class ResearchResult:
@@ -107,21 +97,6 @@ class ResearchResult:
         """Return True when the research finished successfully."""
         return self.status == "completed"
 
-    def to_dict(self) -> dict[str, Any]:
-        """Serialize the result into a dictionary."""
-        return {
-            "status": self.status,
-            "task_id": self.task_id,
-            "final_report": self.final_report,
-            "citations": [citation.to_dict() for citation in self.citations],
-            "reasoning_steps": self.reasoning_steps,
-            "search_queries": self.search_queries,
-            "total_steps": self.total_steps,
-            "message": self.message,
-            "error_code": self.error_code,
-            "execution_time": self.execution_time,
-        }
-
 
 @dataclass(slots=True)
 class ResearchTaskStatus:
@@ -143,14 +118,3 @@ class ResearchTaskStatus:
     def error_status(cls, *, task_id: str, error: str) -> "ResearchTaskStatus":
         """Build an error task status response."""
         return cls(task_id=task_id, status="error", error=error)
-
-    def to_dict(self) -> dict[str, Any]:
-        """Serialize the task status into a dictionary."""
-        return {
-            "task_id": self.task_id,
-            "status": self.status,
-            "created_at": self.created_at,
-            "completed_at": self.completed_at,
-            "message": self.message,
-            "error": self.error,
-        }
