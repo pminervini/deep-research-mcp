@@ -248,8 +248,6 @@ class GeminiResearchBackend(ResearchBackend):
                         index=len(citations) + 1,
                         title=citation_info["title"],
                         url=citation_url,
-                        start_char=getattr(annotation, "start_index", 0) or 0,
-                        end_char=getattr(annotation, "end_index", 0) or 0,
                     )
                 )
 

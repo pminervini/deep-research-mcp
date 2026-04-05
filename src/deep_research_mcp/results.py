@@ -15,8 +15,6 @@ class ResearchCitation:
     index: int
     title: str
     url: str
-    start_char: int = 0
-    end_char: int = 0
 
 
 @dataclass(slots=True)

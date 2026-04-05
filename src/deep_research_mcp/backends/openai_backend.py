@@ -216,16 +216,14 @@ class OpenAIResearchBackend(ResearchBackend):
                     if url and url not in seen_urls:
                         seen_urls.add(url)
                         citations.append(
-                            ResearchCitation(
-                                index=len(citations) + 1,
-                                title=getattr(
-                                    annotation, "title", f"Source {len(citations) + 1}"
-                                ),
-                                url=url,
-                                start_char=getattr(annotation, "start_index", 0),
-                                end_char=getattr(annotation, "end_index", 0),
-                            )
+                        ResearchCitation(
+                            index=len(citations) + 1,
+                            title=getattr(
+                                annotation, "title", f"Source {len(citations) + 1}"
+                            ),
+                            url=url,
                         )
+                    )
 
         if not citations and text:
             urls = re.findall(r"https?://[^\s\)\]\}>\"']+", text)
@@ -346,8 +344,6 @@ class OpenAIResearchBackend(ResearchBackend):
                             index=index + 1,
                             title=annotation.title,
                             url=annotation.url,
-                            start_char=annotation.start_index,
-                            end_char=annotation.end_index,
                         )
                     )
                 elif annotation.type == "file_citation":
@@ -356,8 +352,6 @@ class OpenAIResearchBackend(ResearchBackend):
                             index=index + 1,
                             title=f"File: {annotation.filename}",
                             url=f"file://{annotation.file_id}/{annotation.filename}",
-                            start_char=annotation.index,
-                            end_char=annotation.index,
                         )
                     )
                 elif annotation.type == "container_file_citation":
@@ -371,8 +365,6 @@ class OpenAIResearchBackend(ResearchBackend):
                                 f"{annotation.file_id}/"
                                 f"{annotation.filename}"
                             ),
-                            start_char=annotation.start_index,
-                            end_char=annotation.end_index,
                         )
                     )
                 elif annotation.type == "file_path":
@@ -381,8 +373,6 @@ class OpenAIResearchBackend(ResearchBackend):
                             index=index + 1,
                             title=f"File Path: {annotation.file_id}",
                             url=f"file://{annotation.file_id}",
-                            start_char=annotation.index,
-                            end_char=annotation.index,
                         )
                     )
                 else:
