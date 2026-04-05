@@ -174,18 +174,44 @@ Optional env variables for Open Deep Research tools:
 
 1. **Configure MCP Server**
 
-Add the MCP server using Claude Code's command line:
+Choose one of the transports below.
+
+**Option A: stdio (recommended when Claude Code should spawn the server itself)**
+
+If your provider credentials are already stored in `~/.deep_research`, the
+minimal setup is:
 
 ```bash
 claude mcp add deep-research -- uv run --directory /path/to/deep-research-mcp deep-research-mcp
 ```
 
-Replace `/path/to/deep-research-mcp/` with the actual path to your cloned repository.
+If you want Claude Code to pass `OPENAI_API_KEY` through to the spawned MCP
+process explicitly, use:
 
-HTTP transport: If your client supports MCP-over-HTTP, you can run this
-server in HTTP streaming mode (see "As an MCP Server" below) and configure the
-client to connect to `http://127.0.0.1:8080/`. Refer to your client's
-documentation for how to add an HTTP MCP server.
+```bash
+claude mcp add -e OPENAI_API_KEY="$OPENAI_API_KEY" \
+  deep-research -- \
+  uv run --directory /path/to/deep-research-mcp deep-research-mcp
+```
+
+**Option B: HTTP (recommended when you want to run the server separately)**
+
+Start the server in one terminal:
+
+```bash
+OPENAI_API_KEY="$OPENAI_API_KEY" \
+uv run --directory /path/to/deep-research-mcp \
+  deep-research-mcp --transport http --host 127.0.0.1 --port 8080
+```
+
+Then add the HTTP MCP server in Claude Code:
+
+```bash
+claude mcp add --transport http deep-research-http http://127.0.0.1:8080/mcp
+```
+
+Replace `/path/to/deep-research-mcp/` with the actual path to your cloned repository.
+The verified Streamable HTTP endpoint is `http://127.0.0.1:8080/mcp`.
 
 For multi-hour research, raise Claude Code's tool timeout before launching the CLI and rely on incremental status polls:
 
@@ -205,12 +231,19 @@ Kick off work with `deep_research` or `research_with_context`, note the returned
 
 1. **Configure MCP Server**
 
+Choose one of the transports below.
+
+**Option A: stdio (recommended when Codex should spawn the server itself)**
+
 Add the MCP server configuration to your `~/.codex/config.toml` file:
 
 ```toml
 [mcp_servers.deep-research]
 command = "uv"
 args = ["run", "--directory", "/path/to/deep-research-mcp", "deep-research-mcp"]
+# If your provider credentials live in shell env vars rather than ~/.deep_research,
+# pass them through to the MCP subprocess explicitly:
+env_vars = ["OPENAI_API_KEY"]
 startup_timeout_ms = 30000  # 30 seconds for server startup
 request_timeout_ms = 7200000  # 2 hours for long-running research tasks
 # Alternatively, set tool_timeout_sec when using newer Codex clients
@@ -219,6 +252,30 @@ request_timeout_ms = 7200000  # 2 hours for long-running research tasks
 
 Replace `/path/to/deep-research-mcp/` with the actual path to your cloned repository.
 
+If your credentials are already configured in `~/.deep_research`, `env_vars` is
+optional. It is required when you expect the spawned MCP server to inherit
+`OPENAI_API_KEY` from the parent shell.
+
+**Option B: HTTP (recommended when you want to run the server separately)**
+
+Start the server in one terminal:
+
+```bash
+OPENAI_API_KEY="$OPENAI_API_KEY" \
+uv run --directory /path/to/deep-research-mcp \
+  deep-research-mcp --transport http --host 127.0.0.1 --port 8080
+```
+
+Then add this to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.deep-research-http]
+url = "http://127.0.0.1:8080/mcp"
+tool_timeout_sec = 14400.0
+```
+
+The verified Streamable HTTP endpoint is `http://127.0.0.1:8080/mcp`.
+
 **Important timeout configuration:**
 - `startup_timeout_ms`: Time allowed for the MCP server to start (default: 30000ms / 30 seconds)
 - `request_timeout_ms`: Maximum time for research queries to complete (recommended: 7200000ms / 2 hours for comprehensive research)
@@ -226,10 +283,6 @@ Replace `/path/to/deep-research-mcp/` with the actual path to your cloned reposi
 - Kick off research once to capture the job ID, then poll `research_status` so each tool call remains short and avoids hitting client timeouts.
 
 Without proper timeout configuration, long-running research queries may fail with "request timed out" errors.
-
-Some environments also support MCP-over-HTTP. If available, run the server in
-HTTP mode and configure the client with the base URL (for example,
-`http://127.0.0.1:8080/`). Consult the specific client's docs for setup steps.
 
 2. **Use in OpenAI Codex**:
    - The research tools will be available automatically when you start Codex
@@ -322,7 +375,12 @@ Notes:
 - HTTP mode uses streaming responses provided by FastMCP. The tools in this
   server return their full results when a research task completes; streaming is
   still beneficial for compatible clients and for future incremental outputs.
-- To use HTTP mode, point your MCP-over-HTTP client at the host/port you chose.
+- The verified Streamable HTTP endpoint is `/mcp`, so the default local URL is
+  `http://127.0.0.1:8080/mcp`.
+- If you start the server outside the client and rely on environment variables
+  for credentials, export them before launching the server process. If you use
+  `stdio` and let the client spawn the server, make sure the client passes the
+  required env vars through.
 
 ### Example Queries
 
