@@ -31,6 +31,9 @@ uv sync --upgrade
 # Development tooling (pytest, black, pylint, mypy, pre-commit)
 uv sync --upgrade --extra dev
 
+# Enable the pre-commit hook so black runs automatically before each commit
+uv run pre-commit install
+
 # Optional docs tooling
 uv sync --upgrade --extra docs
 

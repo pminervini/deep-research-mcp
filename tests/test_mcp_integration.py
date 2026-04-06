@@ -80,7 +80,9 @@ async def test_deep_research_invalid_api_key_graceful_error():
             include_analysis=False,
         )
         assert isinstance(result, str)
-        assert result.startswith("Unexpected error:") or result.startswith("Research error:")
+        assert result.startswith("Unexpected error:") or result.startswith(
+            "Research error:"
+        )
     finally:
         if old_provider is None:
             os.environ.pop("PROVIDER", None)
