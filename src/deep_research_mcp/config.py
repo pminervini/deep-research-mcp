@@ -91,6 +91,7 @@ class ResearchConfig:
     poll_interval: float = 30.0
     log_level: str = "INFO"
     enable_clarification: bool = False
+    enable_reasoning_summaries: bool = False
     triage_model: str = "gpt-5-mini"
     clarifier_model: str = "gpt-5-mini"
     clarification_base_url: str | None = None
@@ -232,6 +233,9 @@ class ResearchConfig:
             or cls.instruction_builder_model,
             clarification_base_url=get_setting_first("CLARIFICATION_BASE_URL"),
             clarification_api_key=get_setting_first("CLARIFICATION_API_KEY"),
+            enable_reasoning_summaries=get_bool_setting(
+                "ENABLE_REASONING_SUMMARIES", default=False
+            ),
         )
 
     def validate(self) -> bool:
