@@ -216,14 +216,14 @@ class OpenAIResearchBackend(ResearchBackend):
                     if url and url not in seen_urls:
                         seen_urls.add(url)
                         citations.append(
-                        ResearchCitation(
-                            index=len(citations) + 1,
-                            title=getattr(
-                                annotation, "title", f"Source {len(citations) + 1}"
-                            ),
-                            url=url,
+                            ResearchCitation(
+                                index=len(citations) + 1,
+                                title=getattr(
+                                    annotation, "title", f"Source {len(citations) + 1}"
+                                ),
+                                url=url,
+                            )
                         )
-                    )
 
         if not citations and text:
             urls = re.findall(r"https?://[^\s\)\]\}>\"']+", text)

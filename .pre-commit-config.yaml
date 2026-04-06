@@ -1,0 +1,8 @@
+# Run `uv run pre-commit install` once after cloning to enable.
+# Keep the black version in sync with what CI resolves (see .github/workflows/ci.yml).
+repos:
+  - repo: https://github.com/psf/black
+    rev: 26.3.1
+    hooks:
+      - id: black
+        args: ["--fast"]
