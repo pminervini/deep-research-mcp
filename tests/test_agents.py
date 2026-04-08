@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
     [
         ("openai", "gpt-5-mini", "responses"),
         ("openai", "gpt-5-mini", "chat_completions"),
+        ("gemini", "deep-research-pro-preview-12-2025", "responses"),
     ],
 )
 async def test_mcp_server_with_providers(provider, model, api_style):
@@ -39,21 +40,40 @@ async def run_provider_check(provider, model, api_style="responses"):
         f"=== Starting test for provider={provider}, model={model}, api_style={api_style} ==="
     )
 
-    # Prepare environment for this run
-    old_provider = os.environ.get("PROVIDER")
-    old_research_provider = os.environ.get("RESEARCH_PROVIDER")
-    old_model = os.environ.get("RESEARCH_MODEL")
-    old_enable_clar = os.environ.get("ENABLE_CLARIFICATION")
-    old_api_style = os.environ.get("RESEARCH_API_STYLE")
+    # Per-provider environment overrides. These take precedence over any
+    # values loaded from ~/.deep_research so a single pytest --slow run can
+    # exercise multiple providers without file edits.
+    env_overrides: dict[str, str] = {
+        "PROVIDER": provider,
+        "RESEARCH_PROVIDER": provider,
+        "RESEARCH_MODEL": model,
+        "ENABLE_CLARIFICATION": "false",
+        "RESEARCH_API_STYLE": api_style,
+    }
+
+    if provider == "gemini":
+        gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get(
+            "GOOGLE_API_KEY"
+        )
+        if not gemini_key:
+            pytest.skip(
+                "GEMINI_API_KEY / GOOGLE_API_KEY not set; skipping Gemini provider check"
+            )
+        # Override both so we don't inherit a stale openai api_key / base_url
+        # from ~/.deep_research when running against Gemini.
+        env_overrides["RESEARCH_API_KEY"] = gemini_key
+        env_overrides["RESEARCH_BASE_URL"] = "https://generativelanguage.googleapis.com"
+
+    old_values: dict[str, str | None] = {
+        key: os.environ.get(key) for key in env_overrides
+    }
 
     logger.info(
-        f"Setting environment: PROVIDER={provider}, RESEARCH_MODEL={model}, RESEARCH_API_STYLE={api_style}"
+        f"Setting environment overrides: {sorted(env_overrides.keys())} "
+        f"(provider={provider}, model={model}, api_style={api_style})"
     )
-    os.environ["PROVIDER"] = provider
-    os.environ["RESEARCH_PROVIDER"] = provider
-    os.environ["RESEARCH_MODEL"] = model
-    os.environ["ENABLE_CLARIFICATION"] = "false"
-    os.environ["RESEARCH_API_STYLE"] = api_style
+    for key, value in env_overrides.items():
+        os.environ[key] = value
 
     try:
         # Confirm config resolve reflects our desired provider/model
@@ -106,29 +126,11 @@ async def run_provider_check(provider, model, api_style="responses"):
     finally:
         # Restore environment
         logger.info("Restoring environment variables...")
-        if old_provider is None:
-            os.environ.pop("PROVIDER", None)
-        else:
-            os.environ["PROVIDER"] = old_provider
-        if old_research_provider is None:
-            os.environ.pop("RESEARCH_PROVIDER", None)
-        else:
-            os.environ["RESEARCH_PROVIDER"] = old_research_provider
-
-        if old_model is None:
-            os.environ.pop("RESEARCH_MODEL", None)
-        else:
-            os.environ["RESEARCH_MODEL"] = old_model
-
-        if old_enable_clar is None:
-            os.environ.pop("ENABLE_CLARIFICATION", None)
-        else:
-            os.environ["ENABLE_CLARIFICATION"] = old_enable_clar
-
-        if old_api_style is None:
-            os.environ.pop("RESEARCH_API_STYLE", None)
-        else:
-            os.environ["RESEARCH_API_STYLE"] = old_api_style
+        for key, old in old_values.items():
+            if old is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = old
         logger.info(
             f"=== Finished test for provider={provider} (api_style={api_style}) ==="
         )
