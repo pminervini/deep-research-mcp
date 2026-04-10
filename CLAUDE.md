@@ -25,3 +25,8 @@ Development
 - Testing, linting, formatting, and type-checking commands are documented in README.md. Use those as the single source of truth.
 - Before committing or opening a PR, run `uv run black --fast --check .` to match the CI formatting check.
 - ABSOLUTELY DO NOT use monkey patching or mock classes in `tests/`.
+
+TUI Demo GIF
+- The TUI demo animation is at `docs/images/tui-demo.gif`, generated from `docs/tui-demo.tape`.
+- To update after TUI changes: install VHS (`brew install vhs`), edit the tape file, run `vhs docs/tui-demo.tape`.
+- The tape file controls terminal size, typing, key presses, and timing. See AGENTS.md for full details.

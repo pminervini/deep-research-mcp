@@ -38,3 +38,26 @@
 ## Security & Configuration Tips
 - Do not commit secrets. Configure via `~/.deep_research` (TOML) or env vars (`OPENAI_API_KEY`, `OPENAI_BASE_URL`, `PROVIDER`, `RESEARCH_MODEL`, clarification settings).
 - Gate network-dependent tests behind markers; avoid requiring keys in CI by default.
+
+## Updating the TUI Demo GIF
+The README includes an animated GIF demonstrating the TUI (`docs/images/tui-demo.gif`). To update it after TUI changes:
+
+1. Install VHS (terminal recording tool): `brew install vhs`
+2. Edit the tape file at `docs/tui-demo.tape` to adjust the demo sequence
+3. Run VHS to regenerate the GIF: `vhs docs/tui-demo.tape`
+4. The output is written to `docs/images/tui-demo.gif`
+
+The tape file uses VHS scripting syntax:
+- `Set Width/Height`: terminal dimensions (currently 1400x900)
+- `Type "..."`: simulates typing
+- `Enter`, `Up`, `Down`, `Left`, `Right`: key presses
+- `Sleep Xs`: pause for X seconds/milliseconds
+
+Example workflow in the current tape:
+1. Start TUI with `uv run python cli/deep-research-tui.py`
+2. Navigate to Provider selector and switch to Gemini
+3. Navigate to Query area and enter a research question
+4. Press `r` to start research
+5. Press `q` to quit
+
+After regenerating, commit both the tape file and the new GIF.
