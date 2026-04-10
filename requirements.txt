@@ -16,6 +16,7 @@ tenacity>=8.2.0
 
 # Logging and monitoring
 structlog>=23.1.0
+textual>=8.2.3
 
 # Development dependencies
 pytest>=7.4.0

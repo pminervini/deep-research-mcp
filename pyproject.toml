@@ -21,6 +21,7 @@ dependencies = [
     "pyyaml>=6.0",
     "structlog>=23.1.0",
     "tenacity>=8.2.0",
+    "textual>=8.2.3",
 ]
 
 [project.optional-dependencies]

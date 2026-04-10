@@ -61,6 +61,7 @@ pip install -e .
 - `src/deep_research_mcp/clarification.py`: clarification agents, sessions, and enrichment flow
 - `src/deep_research_mcp/prompts/`: YAML prompt templates used by clarification and instruction building
 - `cli/deep-research-cli.py`: unified CLI for agent mode, MCP client mode, and configuration viewing
+- `cli/deep-research-tui.py`: interactive full-screen terminal UI for clarification, research, status checks, and saving output to disk
 - `tests/`: `pytest` suite covering configuration, MCP integration, prompts, results, and clarification flows
 
 ## Configuration
@@ -408,6 +409,62 @@ client mode** which connects to a running MCP server over HTTP.
 Configuration is loaded from `~/.deep_research` by default. Every
 `ResearchConfig` parameter can be overridden via CLI flags, which take
 precedence over both the TOML file and environment variables.
+
+### Terminal UI
+
+The repository also ships with a full-screen terminal UI at
+`cli/deep-research-tui.py`. It presents the same core functionality as the
+CLI in a dark, keyboard-driven interface for running clarification, deep
+research, task status checks, and saving output to disk.
+
+#### Quick Start
+
+```bash
+# Start in direct agent mode
+uv run python cli/deep-research-tui.py
+
+# Start in MCP client mode
+uv run python cli/deep-research-tui.py --mode mcp \
+  --server-url http://127.0.0.1:8080/mcp
+
+# Start with Gemini selected
+uv run python cli/deep-research-tui.py --provider gemini
+```
+
+#### TUI Workflow
+
+- Use the left control panel to edit provider settings, query text, system prompt, and save path.
+- Press `Enter` to edit the selected field or activate the selected action.
+- Use `Left` / `Right` to toggle booleans and cycle through choice fields.
+- Use `c` to run clarification, `r` to run deep research, `t` to check task status, `s` to save the current output, and `q` to quit.
+- The right panel shows the latest clarification output, research report, or status response.
+
+#### Provider Defaults
+
+In `agent` mode, the TUI applies provider-aware defaults:
+
+- `openai` + `responses`: model `o4-mini-deep-research-2025-06-26`, base URL `https://api.openai.com/v1`
+- `openai` + `chat_completions`: model `gpt-5-mini`, base URL `https://api.openai.com/v1`
+- `gemini`: model `deep-research-pro-preview-12-2025`, base URL `https://generativelanguage.googleapis.com`
+- `open-deep-research`: model `openai/qwen/qwen3-coder-30b`, base URL `http://localhost:1234/v1`
+
+Switching provider or OpenAI API style automatically refreshes the model and
+base URL defaults. You can still override those fields manually afterward.
+
+#### Clarification, Research, and Saving Output
+
+- In `agent` mode, `Run Clarification` calls the clarification flow directly through `DeepResearchAgent`.
+- In `mcp` mode, `Run Clarification` calls the MCP `deep_research` tool with `request_clarification=true`.
+- If clarification questions are returned, the TUI adds answer fields dynamically and uses those answers on the next research run.
+- `Run Deep Research` executes either the direct agent flow or the MCP client flow, depending on the selected mode.
+- `Save Output` writes the current contents of the output panel to the configured path, creating parent directories if needed.
+
+#### Notes
+
+- In `mcp` mode, set `MCP Server URL` to a running Streamable HTTP endpoint such as `http://127.0.0.1:8080/mcp`.
+- The TUI reuses the same config-loading behavior as `cli/deep-research-cli.py`, so `~/.deep_research` and any startup overrides still apply.
+- Direct-agent JSON rendering is available through the `JSON Output` toggle; MCP mode saves the textual tool response exactly as returned by the server.
+- The current layout is designed for terminals at least 100 columns wide and 28 rows tall.
 
 #### Quick Start
 
