@@ -423,7 +423,7 @@ The TUI features a split-panel layout:
 - **Left panel**: Configuration controls for mode selection (Agent/MCP), provider settings, model configuration, query input, and system prompt
 - **Right panel**: Output display showing research results, clarification questions, or status information
 
-The animation above shows selecting the Gemini provider (which auto-fills the model and base URL), entering a research query, and starting a deep research task.
+The animation above demonstrates the TUI workflow: selecting the Chat Completions API style, entering a research query about nuclear fusion, running the research, viewing results in the output panel, and saving the output to file.
 
 #### Quick Start
 

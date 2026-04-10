@@ -15,47 +15,51 @@ Type "cd /Users/pminervi/workspace/deep-research-mcp && uv run python cli/deep-r
 Enter
 Sleep 3s
 
-# Navigate to Provider (press down a few times)
+# Navigate to API Style (skip Mode, Save Path, Task ID, Provider)
 Down
-Sleep 500ms
+Sleep 250ms
 Down
-Sleep 500ms
+Sleep 250ms
 Down
-Sleep 500ms
+Sleep 250ms
+Down
+Sleep 250ms
 
-# Select Gemini provider using Right arrow
+# Now on API Style - change to Chat Completions for faster demo
 Right
 Sleep 500ms
 
-# Move down to see model updated
+# Model auto-updates to gpt-4o-mini, navigate to Query
 Down
-Sleep 500ms
+Sleep 250ms
 Down
-Sleep 500ms
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
 
-# Navigate to Query area
-Down
-Sleep 500ms
-Down
-Sleep 500ms
-Down
-Sleep 500ms
-Down
-Sleep 500ms
-Down
-Sleep 500ms
-
-# Type a research query
-Type "What are the most promising approaches to nuclear fusion energy in 2026?"
+# Now in Query TextArea - type a research query
+Type "What are the top 3 nuclear fusion breakthroughs in 2025?"
 Sleep 1s
 
 # Press 'r' to run research
 Type "r"
-Sleep 2s
 
-# Wait for research to start (showing the loading state)
+# Wait for research to complete (chat completions is fast ~10s)
+Sleep 15s
+
+# Show the results - scroll output if needed
 Sleep 5s
 
-# Quit the app
+# Save the output - press 's'
+Type "s"
+Sleep 2s
+
+# Quit
 Type "q"
 Sleep 1s
