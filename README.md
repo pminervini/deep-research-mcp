@@ -60,6 +60,7 @@ pip install -e .
 - `src/deep_research_mcp/mcp_server.py`: FastMCP server and tool entrypoints
 - `src/deep_research_mcp/clarification.py`: clarification agents, sessions, and enrichment flow
 - `src/deep_research_mcp/prompts/`: YAML prompt templates used by clarification and instruction building
+- `cli/deep-research-cli.py`: unified CLI for agent mode, MCP client mode, and configuration viewing
 - `tests/`: `pytest` suite covering configuration, MCP integration, prompts, results, and clarification flows
 
 ## Configuration
@@ -153,6 +154,18 @@ api_style = "chat_completions"
 model = "llama3.1"                     # Any model available in your Ollama instance
 base_url = "http://localhost:11434/v1" # Ollama's OpenAI-compatible endpoint
 api_key = ""                           # Not required for local Ollama
+timeout = 600
+```
+
+llama-server (local llama.cpp server) provider example:
+
+```toml
+[research]
+provider = "openai"
+api_style = "chat_completions"
+model = "qwen2.5-0.5b"                 # Must match the --alias passed to llama-server
+base_url = "http://127.0.0.1:8081/v1"  # llama-server OpenAI-compatible endpoint
+api_key = "test"                       # Must match the --api-key passed to llama-server
 timeout = 600
 ```
 
@@ -384,6 +397,313 @@ Notes:
   for credentials, export them before launching the server process. If you use
   `stdio` and let the client spawn the server, make sure the client passes the
   required env vars through.
+
+### Command-Line Interface
+
+The unified CLI at `cli/deep-research-cli.py` provides direct access to all
+research functionality from the terminal. It supports two modes of operation:
+**agent mode** (default) which runs `DeepResearchAgent` directly, and **MCP
+client mode** which connects to a running MCP server over HTTP.
+
+Configuration is loaded from `~/.deep_research` by default. Every
+`ResearchConfig` parameter can be overridden via CLI flags, which take
+precedence over both the TOML file and environment variables.
+
+#### Quick Start
+
+```bash
+# Basic research query
+uv run python cli/deep-research-cli.py research "What are the latest advances in quantum computing?"
+
+# View resolved configuration
+uv run python cli/deep-research-cli.py config --pretty
+
+# Show all available options
+uv run python cli/deep-research-cli.py --help
+```
+
+#### Commands
+
+**`research QUERY`** -- perform deep research on a query.
+
+```bash
+# Simple research (agent mode)
+uv run python cli/deep-research-cli.py research "Economic impact of AI adoption"
+
+# Override provider and model for a single run
+uv run python cli/deep-research-cli.py --provider gemini research "Climate change policies"
+
+# Use a custom system prompt from a file
+uv run python cli/deep-research-cli.py research "Healthcare trends" --system-prompt-file prompts/health.txt
+
+# Or pass the system prompt inline
+uv run python cli/deep-research-cli.py research "Healthcare trends" --system-prompt "Focus on peer-reviewed sources only"
+
+# Output as JSON (includes metadata, citations, execution time)
+uv run python cli/deep-research-cli.py research "AI safety" --json
+
+# Save the report to a file
+uv run python cli/deep-research-cli.py research "Renewable energy" --output-file report.md
+
+# Disable code interpreter / data analysis tools
+uv run python cli/deep-research-cli.py research "Simple topic" --no-analysis
+
+# Notify a webhook when research completes
+uv run python cli/deep-research-cli.py research "Long query" --callback-url https://example.com/webhook
+```
+
+#### Tested local OpenAI-compatible backends
+
+The unified CLI works with local servers that expose an OpenAI-compatible
+Chat Completions API. The commands below were tested against local Ollama and
+local `llama-server` (from `llama.cpp`).
+
+##### Ollama
+
+Basic `research` flow:
+
+```bash
+uv run python cli/deep-research-cli.py \
+  --provider openai \
+  --api-style chat_completions \
+  --base-url http://localhost:11434/v1 \
+  --api-key test \
+  --model qwen3.5:0.8b \
+  --timeout 180 \
+  research "Reply with exactly: ok"
+```
+
+Observed output:
+
+```text
+HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+============================================================
+RESEARCH REPORT
+============================================================
+Task ID: chatcmpl-215
+Total steps: 1
+Execution time: 14.33s
+
+ok
+```
+
+Interactive clarification with Ollama needs the clarification models pinned to
+the same local endpoint. In testing, `qwen3.5:4b` worked for clarification,
+while `qwen3.5:0.8b` was too small to reliably satisfy the structured triage
+step.
+
+```bash
+uv run python cli/deep-research-cli.py \
+  --provider openai \
+  --api-style chat_completions \
+  --base-url http://localhost:11434/v1 \
+  --api-key test \
+  --model qwen3.5:0.8b \
+  --clarification-base-url http://localhost:11434/v1 \
+  --clarification-api-key test \
+  --triage-model qwen3.5:4b \
+  --clarifier-model qwen3.5:4b \
+  --instruction-builder-model qwen3.5:4b \
+  --timeout 180 \
+  research "best laptop" --clarify
+```
+
+Observed interaction:
+
+```text
+Starting clarification process...
+
+Please answer the following clarifying questions:
+
+1. What is your budget range?
+Your answer (or press Enter to skip): Under $1500
+
+2. What will you primarily use the laptop for (gaming, work, students, creative tasks)?
+Your answer (or press Enter to skip): Programming and general work
+
+3. Do you have a preferred operating system (macOS, Windows,)?
+Your answer (or press Enter to skip): macOS preferred, Windows acceptable
+
+...
+
+Enriched query: What are the best laptops under $1500 for professional programming work, preferably macOS with 16GB RAM, 512GB SSD, 13-15 inch display, and good battery life?
+```
+
+##### llama-server
+
+Start a local OpenAI-compatible server and let it download a small GGUF model
+from Hugging Face automatically:
+
+```bash
+llama-server \
+  --host 127.0.0.1 \
+  --port 8081 \
+  --api-key test \
+  --ctx-size 4096 \
+  --alias qwen2.5-0.5b \
+  -hf Qwen/Qwen2.5-0.5B-Instruct-GGUF:Q4_K_M
+```
+
+Then point the CLI at the server:
+
+```bash
+uv run python cli/deep-research-cli.py \
+  --provider openai \
+  --api-style chat_completions \
+  --base-url http://127.0.0.1:8081/v1 \
+  --api-key test \
+  --model qwen2.5-0.5b \
+  --timeout 120 \
+  research "Reply with exactly: ok"
+```
+
+Observed output:
+
+```text
+HTTP Request: POST http://127.0.0.1:8081/v1/chat/completions "HTTP/1.1 200 OK"
+============================================================
+RESEARCH REPORT
+============================================================
+Task ID: chatcmpl-uzqSNDzRgYchZRxn1Kq2MNYyc2w6hpc6
+Total steps: 1
+Execution time: 0.15s
+
+Ok
+```
+
+`--clarify` is model-sensitive on `llama-server`. Small tested models
+(`qwen2.5-0.5b` and `qwen2.5-3b`) completed the basic `research` command but
+did not reliably ask follow-up questions. Example output with
+`qwen2.5-3b`:
+
+```text
+Starting clarification process...
+Triage assessment: The query is focused on finding the best laptop, which is a common and specific research topic.
+Assessment: The query 'best laptop' is clear and specific enough for direct research.
+Proceeding with original query
+```
+
+**`research QUERY --clarify`** -- interactive clarification before research.
+
+The `--clarify` flag runs an interactive clarification flow: the agent
+analyzes your query, asks follow-up questions to improve specificity, and
+then performs research using an enriched query. This works in both agent mode
+and MCP client mode.
+
+In agent mode, `--clarify` automatically enables the clarification pipeline
+regardless of the `enable_clarification` setting in your config file.
+
+```bash
+# Interactive clarification (agent mode)
+uv run python cli/deep-research-cli.py research "Quantum computing applications" --clarify
+
+# Interactive clarification (MCP client mode)
+uv run python cli/deep-research-cli.py research "Quantum computing" --clarify \
+  --server-url http://localhost:8080/mcp
+```
+
+Example session:
+
+```
+Starting clarification process...
+
+Please answer the following clarifying questions:
+
+1. Are you interested in near-term applications or long-term theoretical possibilities?
+Your answer (or press Enter to skip): Near-term commercial applications
+
+2. Which industries are you most interested in?
+Your answer (or press Enter to skip): Finance and pharmaceuticals
+
+3. Should the report focus on specific hardware platforms?
+Your answer (or press Enter to skip):
+
+Enriched query: Quantum computing applications in finance and pharmaceuticals...
+Starting research with query: '...'
+```
+
+**`research QUERY --server-url URL`** -- use MCP client mode.
+
+Instead of running the agent directly, connect to a running Deep Research MCP
+server over Streamable HTTP.
+
+```bash
+# First, start the MCP server in another terminal:
+uv run deep-research-mcp --transport http --host 127.0.0.1 --port 8080
+
+# Then run queries against it:
+uv run python cli/deep-research-cli.py research "AI trends" \
+  --server-url http://127.0.0.1:8080/mcp
+```
+
+**`status TASK_ID`** -- check the status of a running research task.
+
+```bash
+# Agent mode
+uv run python cli/deep-research-cli.py status abc123-def456-ghi789
+
+# MCP client mode
+uv run python cli/deep-research-cli.py status abc123-def456-ghi789 \
+  --server-url http://127.0.0.1:8080/mcp
+```
+
+**`config`** -- display the resolved configuration.
+
+Shows the final configuration after merging the TOML file, environment
+variables, and any CLI overrides.
+
+```bash
+# JSON output (default), with secrets masked
+uv run python cli/deep-research-cli.py config
+
+# Human-readable output
+uv run python cli/deep-research-cli.py config --pretty
+
+# Show full API keys
+uv run python cli/deep-research-cli.py config --pretty --show-secrets
+
+# See the effect of CLI overrides
+uv run python cli/deep-research-cli.py --provider gemini --timeout 600 config --pretty
+
+# Skip config validation
+uv run python cli/deep-research-cli.py config --no-validate
+```
+
+#### Configuration Overrides
+
+All global flags are placed **before** the subcommand and override the
+corresponding `ResearchConfig` field:
+
+| Flag | Description |
+|------|-------------|
+| `--config PATH` | Path to TOML config file (default: `~/.deep_research`) |
+| `--provider {openai,gemini,open-deep-research}` | Research provider |
+| `--model MODEL` | Model or agent ID |
+| `--api-key KEY` | Provider API key |
+| `--base-url URL` | Provider API base URL |
+| `--api-style {responses,chat_completions}` | OpenAI API style |
+| `--timeout SECONDS` | Max research timeout |
+| `--poll-interval SECONDS` | Task poll interval |
+| `--log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}` | Logging level |
+| `--enable-clarification` | Enable the clarification pipeline |
+| `--enable-reasoning-summaries` | Enable reasoning summaries |
+| `--triage-model MODEL` | Model for query triage |
+| `--clarifier-model MODEL` | Model for query enrichment |
+| `--clarification-base-url URL` | Base URL for clarification models |
+| `--clarification-api-key KEY` | API key for clarification models |
+| `--instruction-builder-model MODEL` | Model for instruction building |
+
+Configuration precedence (highest to lowest): CLI flags > environment
+variables > TOML config file (`~/.deep_research`) > built-in defaults.
+
+#### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success |
+| 1 | Research or configuration error |
+| 2 | MCP tool error |
+| 3 | Unexpected error |
 
 ### Example Queries
 
