@@ -15,51 +15,57 @@ Type "cd /Users/pminervi/workspace/deep-research-mcp && uv run python cli/deep-r
 Enter
 Sleep 3s
 
-# Navigate to API Style (skip Mode, Save Path, Task ID, Provider)
+# Navigate to API Style (Mode -> Save Path -> Task ID -> Provider -> API Style)
 Down
-Sleep 250ms
+Sleep 200ms
 Down
-Sleep 250ms
+Sleep 200ms
 Down
-Sleep 250ms
+Sleep 200ms
 Down
-Sleep 250ms
+Sleep 200ms
 
-# Now on API Style - change to Chat Completions for faster demo
+# Change to Chat Completions for faster results
 Right
-Sleep 500ms
+Sleep 400ms
 
-# Model auto-updates to gpt-4o-mini, navigate to Query
+# Navigate to Query area (API Style -> Model -> Base URL -> Include Analysis -> JSON Output -> Query)
 Down
-Sleep 250ms
+Sleep 200ms
 Down
-Sleep 250ms
+Sleep 200ms
 Down
-Sleep 250ms
+Sleep 200ms
 Down
-Sleep 250ms
+Sleep 200ms
 Down
-Sleep 250ms
+Sleep 200ms
 Down
-Sleep 250ms
+Sleep 200ms
 
-# Now in Query TextArea - type a research query
+# Type the research query
 Type "What are the top 3 nuclear fusion breakthroughs in 2025?"
 Sleep 1s
 
-# Press 'r' to run research
-Type "r"
+# Tab to Research button (Query -> System Prompt -> Clarify -> Research)
+Tab
+Sleep 200ms
+Tab
+Sleep 200ms
+Tab
+Sleep 200ms
 
-# Wait for research to complete (chat completions is fast ~10s)
-Sleep 15s
+# Press Enter to run research
+Enter
+Sleep 3s
 
-# Show the results - scroll output if needed
+# Wait for research to complete (chat completions takes ~10s)
+Sleep 17s
+
+# Show results for a moment
 Sleep 5s
 
-# Save the output - press 's'
-Type "s"
-Sleep 2s
-
-# Quit
+# The app shows results - end recording here
+# (pressing q while focused on a button should work)
 Type "q"
 Sleep 1s
