@@ -2,47 +2,54 @@
 # -*- coding: utf-8 -*-
 
 """
-Full-screen Textual TUI for Deep Research.
-"""
+Interactive full-screen terminal UI for Deep Research.
 
-# pylint: disable=too-many-lines,wrong-import-position
+A dark, keyboard-driven interface for running clarification, deep research,
+task status checks, and saving output to disk.
+
+USAGE:
+    # Start in direct agent mode
+    uv run python cli/deep-research-tui.py
+
+    # Start in MCP client mode
+    uv run python cli/deep-research-tui.py --mode mcp --server-url http://127.0.0.1:8080/mcp
+
+    # Start with Gemini selected
+    uv run python cli/deep-research-tui.py --provider gemini
+"""
 
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
-import logging
-import os
 import re
 import sys
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+src_path = Path(__file__).parent.parent / "src"
+sys.path.insert(0, str(src_path))
+
 from textual import on, work
 from textual.app import App, ComposeResult
+from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual.reactive import reactive
+from textual.theme import Theme
 from textual.widgets import (
     Button,
-    Collapsible,
     Footer,
     Header,
     Input,
     Label,
+    Rule,
     Select,
     Static,
     Switch,
     TextArea,
 )
-
-# Add src to path to import the deep_research_mcp package
-src_path = Path(__file__).parent.parent / "src"
-sys.path.insert(0, str(src_path))
-
-import structlog
 
 from deep_research_mcp import (
     DeepResearchAgent,
@@ -50,7 +57,6 @@ from deep_research_mcp import (
     ResearchError,
     ResearchResult,
 )
-from deep_research_mcp.results import ResearchTaskStatus
 
 DEFAULT_SYSTEM_PROMPT = """
 You are a professional researcher preparing a structured, data-driven report.
@@ -69,1303 +75,1142 @@ Be analytical, avoid generalities, and ensure that each section supports
 data-backed reasoning.
 """.strip()
 
-DEFAULT_SAVE_PATH = "reports/deep-research-output.md"
-DEFAULT_MCP_SERVER_URL = "http://127.0.0.1:8080/mcp"
-NO_ANSWER_PLACEHOLDER = "[No answer provided]"
 
-MODE_OPTIONS: list[tuple[str, str]] = [
-    ("Direct Agent", "agent"),
-    ("MCP Client", "mcp"),
-]
-
-PROVIDER_OPTIONS: list[tuple[str, str]] = [
-    ("OpenAI", "openai"),
-    ("Gemini", "gemini"),
-    ("Open Deep Research", "open-deep-research"),
-]
-
-API_STYLE_OPTIONS: list[tuple[str, str]] = [
-    ("Responses API", "responses"),
-    ("Chat Completions", "chat_completions"),
-]
-
-LOG_LEVEL_OPTIONS: list[tuple[str, str]] = [
-    ("DEBUG", "DEBUG"),
-    ("INFO", "INFO"),
-    ("WARNING", "WARNING"),
-    ("ERROR", "ERROR"),
-    ("CRITICAL", "CRITICAL"),
-]
+CODEX_THEME = Theme(
+    name="codex",
+    primary="#a78bfa",
+    secondary="#818cf8",
+    accent="#c4b5fd",
+    foreground="#e2e8f0",
+    background="#0f0f14",
+    success="#a78bfa",
+    warning="#f59e0b",
+    error="#ef4444",
+    surface="#1a1a24",
+    panel="#252532",
+    dark=True,
+)
 
 
-@dataclass(slots=True)
+@dataclass
+class ProviderDefaults:
+    """Provider-specific default settings."""
+
+    model: str
+    base_url: str
+
+
+def get_provider_defaults(
+    provider: str, api_style: str = "responses"
+) -> ProviderDefaults:
+    """Return provider-specific default model and base URL."""
+    if provider == "openai":
+        if api_style == "chat_completions":
+            return ProviderDefaults(
+                model="gpt-5-mini",
+                base_url="https://api.openai.com/v1",
+            )
+        return ProviderDefaults(
+            model="o4-mini-deep-research-2025-06-26",
+            base_url="https://api.openai.com/v1",
+        )
+    if provider == "gemini":
+        return ProviderDefaults(
+            model="deep-research-pro-preview-12-2025",
+            base_url="https://generativelanguage.googleapis.com",
+        )
+    if provider == "open-deep-research":
+        return ProviderDefaults(
+            model="openai/qwen/qwen3-coder-30b",
+            base_url="http://localhost:1234/v1",
+        )
+    return ProviderDefaults(model="gpt-5-mini", base_url="https://api.openai.com/v1")
+
+
+@dataclass
 class StartupState:
-    """Initial values used to seed the TUI."""
+    """Initial state passed to the TUI at startup."""
 
-    config_path: str | None
-    mode: str
-    server_url: str
-    query: str
-    task_id: str
-    save_path: str
-    system_prompt: str
-    include_analysis: bool
-    json_output: bool
-    config: ResearchConfig
+    config_path: str | None = None
+    mode: str = "agent"
+    server_url: str = "http://127.0.0.1:8080/mcp"
+    query: str = ""
+    task_id: str = ""
+    save_path: str = "output.md"
+    system_prompt: str = DEFAULT_SYSTEM_PROMPT
+    include_analysis: bool = True
+    json_output: bool = False
+    config: ProviderDefaults = field(
+        default_factory=lambda: get_provider_defaults("openai")
+    )
 
 
 class ClarificationAnswersPanel(Container):
-    """Renders answer inputs for the current clarification session."""
+    """Dynamic panel for clarification question answers."""
 
-    questions: reactive[tuple[str, ...]] = reactive(tuple(), recompose=True)
-    answer_defaults: reactive[tuple[str, ...]] = reactive(tuple(), recompose=True)
-
-    def set_questions(
-        self, questions: list[str], answers: list[str] | None = None
-    ) -> None:
-        self.questions = tuple(questions)
-        self.answer_defaults = tuple(answers or [])
-
-    def compose(self) -> ComposeResult:
-        yield Static("Clarification Answers", classes="panel-title")
-        if not self.questions:
-            yield Static(
-                "Run clarification to generate focused follow-up questions.",
-                classes="helper-copy",
-            )
-            return
-
-        for index, question in enumerate(self.questions, start=1):
-            default_answer = (
-                self.answer_defaults[index - 1]
-                if index - 1 < len(self.answer_defaults)
-                else ""
-            )
-            with Container(classes="answer-card"):
-                yield Static(f"{index}. {question}", classes="question-copy")
-                yield Input(
-                    value=default_answer,
-                    placeholder="Type an answer or leave blank",
-                    id=f"answer-{index - 1}",
-                    classes="answer-input",
-                )
-
-
-# ---------------------------------------------------------------------------
-# Shared CLI-style helpers
-# ---------------------------------------------------------------------------
-
-
-def build_cli_env(args: argparse.Namespace) -> dict[str, str]:
-    """Build an env dict with CLI flag overrides injected."""
-
-    mapping: dict[str, str] = {
-        "provider": "RESEARCH_PROVIDER",
-        "model": "RESEARCH_MODEL",
-        "api_key": "RESEARCH_API_KEY",
-        "base_url": "RESEARCH_BASE_URL",
-        "api_style": "RESEARCH_API_STYLE",
-        "timeout": "RESEARCH_TIMEOUT",
-        "poll_interval": "RESEARCH_POLL_INTERVAL",
-        "log_level": "LOGGING_LEVEL",
-        "triage_model": "CLARIFICATION_TRIAGE_MODEL",
-        "clarifier_model": "CLARIFICATION_CLARIFIER_MODEL",
-        "clarification_base_url": "CLARIFICATION_BASE_URL",
-        "clarification_api_key": "CLARIFICATION_API_KEY",
-        "instruction_builder_model": "CLARIFICATION_INSTRUCTION_BUILDER_MODEL",
+    DEFAULT_CSS = """
+    ClarificationAnswersPanel {
+        height: auto;
+        padding: 0 1;
     }
 
-    env = dict(os.environ)
-    for attr_name, env_key in mapping.items():
-        value = getattr(args, attr_name, None)
-        if value is not None:
-            env[env_key] = str(value)
-
-    if getattr(args, "enable_clarification", False):
-        env["ENABLE_CLARIFICATION"] = "true"
-    if getattr(args, "enable_reasoning_summaries", False):
-        env["ENABLE_REASONING_SUMMARIES"] = "true"
-
-    return env
-
-
-def load_config(args: argparse.Namespace) -> ResearchConfig:
-    """Load config from file + env, then layer CLI overrides on top."""
-
-    cli_env = build_cli_env(args)
-    config_path = getattr(args, "config", None)
-    return ResearchConfig.load(config_path=config_path, env=cli_env)
-
-
-def resolve_system_prompt(args: argparse.Namespace) -> str:
-    """Resolve the startup system prompt."""
-
-    if getattr(args, "system_prompt_file", None):
-        path = Path(args.system_prompt_file)
-        return path.read_text(encoding="utf-8").strip()
-    if getattr(args, "system_prompt", None):
-        return args.system_prompt
-    return DEFAULT_SYSTEM_PROMPT
-
-
-def get_provider_defaults(provider: str, api_style: str) -> ResearchConfig:
-    """Return provider-aware defaults for the selected provider."""
-
-    env = {
-        "RESEARCH_PROVIDER": provider,
-        "RESEARCH_API_STYLE": api_style,
-    }
-    return ResearchConfig.from_env(env=env)
-
-
-def normalize_answers(questions: list[str], answers: list[str]) -> list[str]:
-    """Pad missing answers with the standard placeholder."""
-
-    normalized: list[str] = []
-    for index, _question in enumerate(questions):
-        answer = answers[index] if index < len(answers) else ""
-        stripped = answer.strip()
-        normalized.append(stripped if stripped else NO_ANSWER_PLACEHOLDER)
-    return normalized
-
-
-def parse_task_id_from_output(text: str) -> str | None:
-    """Extract a task identifier from report or status output."""
-
-    patterns = [
-        r"\*\*Task ID\*\*:\s*`?([A-Za-z0-9_.:-]+)`?",
-        r"Task ID:\s*`?([A-Za-z0-9_.:-]+)`?",
-        r"Task\s+([A-Za-z0-9_.:-]+)\s+status:",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            return match.group(1)
-    return None
-
-
-def render_agent_clarification_output(query: str, result: dict[str, Any]) -> str:
-    """Render direct-agent clarification results as readable text."""
-
-    if not result.get("needs_clarification", False):
-        assessment = result.get("query_assessment", "Query is sufficient for research")
-        reasoning = result.get("reasoning", "Proceed with research directly")
-        return (
-            "# Query Analysis\n\n"
-            f"**Original Query:** {query}\n\n"
-            f"**Assessment:** {assessment}\n\n"
-            f"**Recommendation:** {reasoning}\n"
-        )
-
-    questions = result.get("questions", [])
-    questions_formatted = "\n".join(
-        f"{index}. {question}" for index, question in enumerate(questions, start=1)
-    )
-    created_at = result.get("created_at")
-    created_line = f"\n**Created At:** {created_at}\n" if created_at else "\n"
-    return (
-        "# Clarifying Questions Needed\n\n"
-        f"**Original Query:** {query}\n\n"
-        f"**Why clarification is helpful:** {result.get('reasoning', 'Additional context will improve research quality')}\n\n"
-        f"**Session ID:** `{result.get('session_id', '')}`\n"
-        f"{created_line}\n"
-        "**Please answer these questions to improve the research:**\n\n"
-        f"{questions_formatted}\n"
-    )
-
-
-def write_output_file(path: str, content: str) -> str:
-    """Persist output text to disk and return the saved path."""
-
-    target = Path(path).expanduser()
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(content, encoding="utf-8")
-    return str(target)
-
-
-def format_report(result: ResearchResult) -> str:
-    """Format a ResearchResult as a human-readable report."""
-
-    parts: list[str] = []
-    parts.append("=" * 60)
-    parts.append("RESEARCH REPORT")
-    parts.append("=" * 60)
-
-    if result.task_id:
-        parts.append(f"Task ID: {result.task_id}")
-    if result.total_steps:
-        parts.append(f"Total steps: {result.total_steps}")
-    if result.search_queries:
-        parts.append(f"Search queries: {len(result.search_queries)}")
-    if result.citations:
-        parts.append(f"Citations: {len(result.citations)}")
-    if isinstance(result.execution_time, (int, float)):
-        parts.append(f"Execution time: {result.execution_time:.2f}s")
-
-    parts.append("")
-    parts.append(result.final_report)
-
-    if result.citations:
-        parts.append("")
-        parts.append("=" * 60)
-        parts.append("CITATIONS")
-        parts.append("=" * 60)
-        for citation in result.citations:
-            parts.append(f"{citation.index}. [{citation.title}]({citation.url})")
-
-    return "\n".join(parts)
-
-
-def format_result_json(result: ResearchResult) -> str:
-    """Format a ResearchResult as JSON."""
-
-    data = asdict(result)
-    return json.dumps(data, indent=2, ensure_ascii=False)
-
-
-def format_task_status(status: ResearchTaskStatus) -> str:
-    """Format a task status response."""
-
-    parts = [f"Task ID: {status.task_id}", f"Status: {status.status}"]
-    if status.created_at is not None:
-        parts.append(f"Created: {status.created_at}")
-    if status.completed_at is not None:
-        parts.append(f"Completed: {status.completed_at}")
-    if status.message:
-        parts.append(f"Message: {status.message}")
-    if status.error:
-        parts.append(f"Error: {status.error}")
-    return "\n".join(parts)
-
-
-# ---------------------------------------------------------------------------
-# MCP helpers
-# ---------------------------------------------------------------------------
-
-
-@asynccontextmanager
-async def _mcp_connect(url: str) -> AsyncIterator:
-    """Connect to an MCP server over Streamable HTTP."""
-
-    from mcp import ClientSession
-    from mcp.client.streamable_http import streamablehttp_client
-
-    async with streamablehttp_client(url) as (read_stream, write_stream, _):
-        async with ClientSession(read_stream, write_stream) as session:
-            await session.initialize()
-            yield session
-
-
-async def _mcp_progress_callback(
-    progress: float, total: float | None, message: str | None
-) -> None:
-    del progress, total, message
-
-
-def _render_mcp_result(result: Any) -> str:
-    """Extract text from an MCP CallToolResult."""
-
-    from mcp import types
-
-    if result.structuredContent is not None:
-        structured_content = result.structuredContent
-        if isinstance(structured_content, dict) and "result" in structured_content:
-            value = structured_content.get("result")
-            return value if isinstance(value, str) else str(value)
-        return str(structured_content)
-
-    parts: list[str] = []
-    for item in result.content or []:
-        if isinstance(item, types.TextContent):
-            parts.append(item.text)
-        else:
-            parts.append(str(item))
-    return "\n".join(parts)
-
-
-async def mcp_research(
-    url: str,
-    query: str,
-    system_instructions: str,
-    include_analysis: bool,
-    request_clarification: bool,
-) -> tuple[int, str]:
-    """Call the deep_research MCP tool."""
-
-    async with _mcp_connect(url) as session:
-        result = await session.call_tool(
-            "deep_research",
-            {
-                "query": query,
-                "system_instructions": system_instructions,
-                "include_analysis": include_analysis,
-                "request_clarification": request_clarification,
-                "callback_url": "",
-            },
-            progress_callback=_mcp_progress_callback,
-        )
-        return (2 if result.isError else 0, _render_mcp_result(result))
-
-
-async def mcp_research_with_context(
-    url: str,
-    session_id: str,
-    answers: list[str],
-    system_instructions: str,
-    include_analysis: bool,
-) -> tuple[int, str]:
-    """Call the research_with_context MCP tool."""
-
-    async with _mcp_connect(url) as session:
-        result = await session.call_tool(
-            "research_with_context",
-            {
-                "session_id": session_id,
-                "answers": answers,
-                "system_instructions": system_instructions,
-                "include_analysis": include_analysis,
-                "callback_url": "",
-            },
-            progress_callback=_mcp_progress_callback,
-        )
-        return (2 if result.isError else 0, _render_mcp_result(result))
-
-
-async def mcp_status(url: str, task_id: str) -> tuple[int, str]:
-    """Call the research_status MCP tool."""
-
-    async with _mcp_connect(url) as session:
-        result = await session.call_tool(
-            "research_status",
-            {"task_id": task_id},
-            progress_callback=_mcp_progress_callback,
-        )
-        return (2 if result.isError else 0, _render_mcp_result(result))
-
-
-def parse_mcp_clarification(text: str) -> tuple[str | None, list[str]]:
-    """Parse session ID and numbered clarification questions."""
-
-    session_match = re.search(r"Session ID:\s*`([^`]+)`", text)
-    session_id = session_match.group(1) if session_match else None
-    questions = re.findall(r"^\d+\.\s+(.+)$", text, re.MULTILINE)
-    return session_id, questions
-
-
-# ---------------------------------------------------------------------------
-# App
-# ---------------------------------------------------------------------------
-
-
-class DeepResearchTUI(App[None]):
-    """Interactive terminal UI for deep research workflows."""
-
-    TITLE = "Deep Research TUI"
-    SUB_TITLE = "Neon operations deck for clarification and autonomous research"
-
-    CSS = """
-    Screen {
-        background: #05070d;
-        color: #dffcff;
-    }
-
-    Header {
-        background: #090f1b;
-        color: #00f5ff;
-        border-bottom: solid #17324b;
-    }
-
-    Footer {
-        background: #090f1b;
-        color: #89ff00;
-        border-top: solid #17324b;
-    }
-
-    #layout {
-        layout: horizontal;
-        height: 1fr;
-    }
-
-    #control-dock {
-        width: 44;
-        min-width: 38;
-        max-width: 52;
-        padding: 1;
-        border-right: solid #17324b;
-        background: #070b12;
-    }
-
-    #output-dock {
-        padding: 1 2;
-        background: #04070d;
-    }
-
-    .panel {
-        border: round #153a58;
-        background: #08111d;
-        padding: 0 1 1 1;
-        margin-bottom: 1;
-    }
-
-    .panel-title {
-        color: #ff4fa3;
-        text-style: bold;
-        padding: 0 0 1 0;
-    }
-
-    .helper-copy {
-        color: #89ff00;
-        text-style: italic;
-    }
-
-    .question-copy {
-        color: #dffcff;
-        padding-bottom: 1;
-    }
-
-    .field-label {
-        color: #89ff00;
-        padding-top: 1;
-    }
-
-    Input,
-    Select,
-    TextArea {
-        background: #050b14;
-        color: #dffcff;
-        border: tall #17324b;
-    }
-
-    Input:focus,
-    Select:focus,
-    TextArea:focus {
-        border: tall #00f5ff;
-    }
-
-    Switch {
-        padding: 0 0 1 0;
-    }
-
-    Switch:focus {
-        background: #0b1624;
-        tint: #00f5ff 25%;
-    }
-
-    Button {
-        width: 1fr;
+    ClarificationAnswersPanel .question-label {
         margin-top: 1;
-        border: tall #17324b;
-        background: #0d1523;
-        color: #dffcff;
+        color: $accent;
     }
 
-    Button.primary {
-        background: #ff2d95;
-        color: #05070d;
-        text-style: bold;
-    }
-
-    Button.secondary {
-        background: #00d4ff;
-        color: #05070d;
-        text-style: bold;
-    }
-
-    Button:hover {
-        tint: #00f5ff 15%;
-    }
-
-    #brand {
-        color: #00f5ff;
-        text-style: bold;
-        padding-bottom: 1;
-    }
-
-    #app-status {
-        color: #89ff00;
-        padding-bottom: 1;
-    }
-
-    #output-title {
-        color: #ff4fa3;
-        text-style: bold;
-        padding-bottom: 1;
-    }
-
-    #output-meta {
-        color: #89ff00;
-        padding-bottom: 1;
-    }
-
-    #output-text {
-        height: 1fr;
-        border: round #00f5ff;
-        background: #03060c;
-        color: #dffcff;
-    }
-
-    #query,
-    #system-prompt,
-    #output-text {
-        min-height: 8;
-    }
-
-    #system-prompt {
-        min-height: 10;
-    }
-
-    .answer-card {
-        border: tall #122a40;
-        background: #07101b;
-        padding: 1;
-        margin-top: 1;
-    }
-
-    .answer-input {
-        margin-top: 1;
-    }
-
-    Collapsible {
+    ClarificationAnswersPanel Input {
         margin-bottom: 1;
     }
     """
 
-    BINDINGS = [
-        ("c", "run_clarification", "Clarify"),
-        ("r", "run_research", "Research"),
-        ("t", "check_status", "Status"),
-        ("s", "save_output", "Save"),
-        ("q", "quit", "Quit"),
-    ]
+    questions = reactive(list, recompose=True)
+    answers = reactive(list, recompose=True)
 
-    busy = reactive(False)
-    current_status = reactive("Idle // ready for new instructions")
-
-    def __init__(self, startup: StartupState):
-        super().__init__()
-        self.startup = startup
-        self.latest_output = ""
-        self.latest_output_title = "Signal Buffer"
-        self.latest_task_id = startup.task_id.strip()
-        self.pending_clarification_session_id: str | None = None
-        self.pending_clarification_query: str | None = None
-        self.pending_clarification_questions: list[str] = []
-        self._agent: DeepResearchAgent | None = None
-        self._agent_signature: str | None = None
-        self._hydrating = True
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._questions: list[str] = []
+        self._answers: list[str] = []
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=True, icon="<>")
-        with Horizontal(id="layout"):
-            with VerticalScroll(id="control-dock"):
-                yield Static("DEEP RESEARCH // NIGHT DECK", id="brand")
-                yield Static(self.current_status, id="app-status")
+        if not self._questions:
+            yield Label("No clarification questions yet.", classes="question-label")
+            return
+        for i, question in enumerate(self._questions):
+            yield Label(f"{i + 1}. {question}", classes="question-label")
+            answer_value = self._answers[i] if i < len(self._answers) else ""
+            yield Input(
+                value=answer_value,
+                placeholder="Your answer...",
+                id=f"clarification-answer-{i}",
+            )
 
-                with Container(classes="panel"):
-                    yield Static("Session", classes="panel-title")
-                    yield Label("Mode", classes="field-label")
-                    yield Select(MODE_OPTIONS, id="mode", allow_blank=False)
+    def set_questions(
+        self, questions: list[str], answers: list[str] | None = None
+    ) -> None:
+        """Set questions and optionally prefill answers, then recompose."""
+        self._questions = list(questions)
+        self._answers = list(answers) if answers else []
+        self.questions = self._questions
+        self.answers = self._answers
 
-                    yield Label("Save Path", classes="field-label")
+    def get_answers(self) -> list[str]:
+        """Collect current answer values from input widgets."""
+        answers: list[str] = []
+        for i in range(len(self._questions)):
+            try:
+                inp = self.query_one(f"#clarification-answer-{i}", Input)
+                answers.append(inp.value.strip() or "[No answer provided]")
+            except Exception:
+                answers.append("[No answer provided]")
+        return answers
+
+    def clear(self) -> None:
+        """Clear all questions and answers."""
+        self._questions = []
+        self._answers = []
+        self.questions = []
+        self.answers = []
+
+
+class OutputPanel(Static):
+    """Panel for displaying research output."""
+
+    DEFAULT_CSS = """
+    OutputPanel {
+        height: 100%;
+        border: round $panel;
+        padding: 1 2;
+        background: $surface;
+        overflow-y: auto;
+    }
+
+    OutputPanel .output-content {
+        width: 100%;
+    }
+    """
+
+    output_text = reactive("")
+
+    def compose(self) -> ComposeResult:
+        yield Static(self.output_text, classes="output-content", id="output-content")
+
+    def watch_output_text(self, value: str) -> None:
+        try:
+            self.query_one("#output-content", Static).update(value)
+        except Exception:
+            pass
+
+    def set_output(self, text: str) -> None:
+        self.output_text = text
+
+    def append_output(self, text: str) -> None:
+        self.output_text = self.output_text + text
+
+
+class DeepResearchTUI(App):
+    """Interactive TUI for Deep Research."""
+
+    TITLE = "Deep Research"
+    SUB_TITLE = "Interactive Research Terminal"
+
+    CSS = """
+    Screen {
+        background: $background;
+    }
+
+    Header {
+        background: $surface;
+        color: $primary;
+    }
+
+    Footer {
+        background: $surface;
+    }
+
+    #main-container {
+        layout: horizontal;
+        height: 100%;
+    }
+
+    #left-panel {
+        width: 45;
+        min-width: 40;
+        height: 100%;
+        border: round $panel;
+        background: $surface;
+        padding: 1;
+    }
+
+    #right-panel {
+        width: 1fr;
+        height: 100%;
+        padding: 0 1;
+    }
+
+    .section-title {
+        text-style: bold;
+        color: $primary;
+        margin-bottom: 1;
+    }
+
+    .field-label {
+        color: $secondary;
+        margin-top: 1;
+    }
+
+    #agent-settings, #mcp-settings {
+        height: auto;
+        padding: 0;
+    }
+
+    #agent-settings.hidden, #mcp-settings.hidden {
+        display: none;
+    }
+
+    Select {
+        width: 100%;
+        margin-bottom: 1;
+    }
+
+    Input {
+        width: 100%;
+        margin-bottom: 1;
+    }
+
+    Switch {
+        margin-bottom: 1;
+    }
+
+    .switch-row {
+        height: auto;
+        margin-bottom: 1;
+    }
+
+    .switch-row Label {
+        width: 1fr;
+        padding-top: 1;
+    }
+
+    .switch-row Switch {
+        width: auto;
+    }
+
+    TextArea {
+        height: 6;
+        margin-bottom: 1;
+        border: round $panel;
+    }
+
+    #query-area {
+        height: 4;
+    }
+
+    #system-prompt-area {
+        height: 6;
+    }
+
+    #button-row {
+        height: auto;
+        margin-top: 1;
+        align: center middle;
+    }
+
+    #button-row Button {
+        margin: 0 1;
+    }
+
+    Button {
+        background: $panel;
+        color: $foreground;
+        border: round $accent;
+    }
+
+    Button:hover {
+        background: $accent;
+        color: $background;
+    }
+
+    Button:focus {
+        border: round $primary;
+    }
+
+    Button.-primary {
+        background: $primary;
+        color: $background;
+    }
+
+    Button.-primary:hover {
+        background: $accent;
+    }
+
+    #output-scroll {
+        height: 100%;
+        border: round $panel;
+        background: $surface;
+    }
+
+    #output-area {
+        padding: 1 2;
+        width: 100%;
+    }
+
+    Rule {
+        margin: 1 0;
+        color: $panel;
+    }
+
+    #clarification-section {
+        height: auto;
+        margin-top: 1;
+        border: round $panel;
+        padding: 1;
+        background: $surface;
+    }
+
+    #clarification-section.hidden {
+        display: none;
+    }
+
+    #status-bar {
+        dock: bottom;
+        height: 1;
+        background: $surface;
+        color: $secondary;
+        padding: 0 1;
+    }
+    """
+
+    BINDINGS = [
+        Binding("q", "quit", "Quit", show=True),
+        Binding("c", "run_clarification", "Clarify", show=True),
+        Binding("r", "run_research", "Research", show=True),
+        Binding("t", "check_status", "Status", show=True),
+        Binding("s", "save_output", "Save", show=True),
+    ]
+
+    mode = reactive("agent")
+    provider = reactive("openai")
+    api_style = reactive("responses")
+    current_session_id: str | None = None
+    clarification_questions: list[str] = []
+
+    _focusable_ids: list[str] = [
+        "#mode",
+        "#save-path",
+        "#task-id",
+        "#server-url",
+        "#provider",
+        "#api-style",
+        "#model",
+        "#base-url",
+        "#include-analysis",
+        "#json-output",
+        "#query-area",
+        "#system-prompt-area",
+        "#btn-clarify",
+        "#btn-research",
+        "#btn-status",
+        "#btn-save",
+    ]
+
+    def __init__(self, startup_state: StartupState | None = None) -> None:
+        super().__init__()
+        self._startup_state = startup_state or StartupState()
+        self._output_text = ""
+        self._status_message = "Ready"
+
+    def on_mount(self) -> None:
+        self.register_theme(CODEX_THEME)
+        self.theme = "codex"
+
+        state = self._startup_state
+        self.mode = state.mode
+        self.provider = "openai"
+
+        self.query_one("#mode", Select).value = state.mode
+        self.query_one("#save-path", Input).value = state.save_path
+        self.query_one("#task-id", Input).value = state.task_id
+        self.query_one("#server-url", Input).value = state.server_url
+        self.query_one("#provider", Select).value = "openai"
+        self.query_one("#api-style", Select).value = (
+            state.config.model.startswith("gpt") and "chat_completions" or "responses"
+        )
+        self.query_one("#model", Input).value = state.config.model
+        self.query_one("#base-url", Input).value = state.config.base_url
+        self.query_one("#include-analysis", Switch).value = state.include_analysis
+        self.query_one("#json-output", Switch).value = state.json_output
+        self.query_one("#query-area", TextArea).text = state.query
+        self.query_one("#system-prompt-area", TextArea).text = state.system_prompt
+
+        self._update_mode_visibility()
+        self.query_one("#mode", Select).focus()
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+
+        with Horizontal(id="main-container"):
+            with Vertical(id="left-panel"):
+                yield Label("Configuration", classes="section-title")
+
+                yield Label("Mode", classes="field-label")
+                yield Select(
+                    [("Agent (Direct)", "agent"), ("MCP Client", "mcp")],
+                    value="agent",
+                    id="mode",
+                    allow_blank=False,
+                )
+
+                yield Label("Save Path", classes="field-label")
+                yield Input(placeholder="output.md", id="save-path")
+
+                yield Label("Task ID (for status)", classes="field-label")
+                yield Input(placeholder="task-id-here", id="task-id")
+
+                with Container(id="mcp-settings"):
+                    yield Label("MCP Server URL", classes="field-label")
                     yield Input(
-                        value=self.startup.save_path,
-                        placeholder=DEFAULT_SAVE_PATH,
-                        id="save-path",
+                        placeholder="http://127.0.0.1:8080/mcp",
+                        id="server-url",
                     )
 
-                    yield Label("Task ID", classes="field-label")
-                    yield Input(
-                        value=self.startup.task_id,
-                        placeholder="Paste a task id or let the TUI detect one",
-                        id="task-id",
-                    )
-
-                with Container(classes="panel", id="agent-settings"):
-                    yield Static("Agent Runtime", classes="panel-title")
+                with Container(id="agent-settings"):
                     yield Label("Provider", classes="field-label")
-                    yield Select(PROVIDER_OPTIONS, id="provider", allow_blank=False)
-
-                    yield Label("OpenAI API Style", classes="field-label")
                     yield Select(
-                        API_STYLE_OPTIONS,
+                        [
+                            ("OpenAI", "openai"),
+                            ("Gemini", "gemini"),
+                            ("Open Deep Research", "open-deep-research"),
+                        ],
+                        value="openai",
+                        id="provider",
+                        allow_blank=False,
+                    )
+
+                    yield Label("API Style", classes="field-label")
+                    yield Select(
+                        [
+                            ("Responses", "responses"),
+                            ("Chat Completions", "chat_completions"),
+                        ],
+                        value="responses",
                         id="api-style",
                         allow_blank=False,
                     )
 
                     yield Label("Model", classes="field-label")
-                    yield Input(
-                        value=self.startup.config.model or "",
-                        placeholder="Provider default model",
-                        id="model",
-                    )
+                    yield Input(placeholder="model-id", id="model")
 
-                    yield Label("Provider Base URL", classes="field-label")
-                    yield Input(
-                        value=self.startup.config.base_url or "",
-                        placeholder="Provider endpoint",
-                        id="base-url",
-                    )
+                    yield Label("Base URL", classes="field-label")
+                    yield Input(placeholder="https://api.openai.com/v1", id="base-url")
 
-                    yield Label("Provider API Key", classes="field-label")
-                    yield Input(
-                        value=self.startup.config.api_key or "",
-                        placeholder="Loaded from config or env",
-                        password=True,
-                        id="api-key",
-                    )
+                    with Horizontal(classes="switch-row"):
+                        yield Label("Include Analysis")
+                        yield Switch(value=True, id="include-analysis")
 
-                with Container(classes="panel", id="mcp-settings"):
-                    yield Static("MCP Connection", classes="panel-title")
-                    yield Label("MCP Server URL", classes="field-label")
-                    yield Input(
-                        value=self.startup.server_url,
-                        placeholder=DEFAULT_MCP_SERVER_URL,
-                        id="server-url",
-                    )
-                    yield Static(
-                        "Connect to a running streamable HTTP MCP server.",
-                        classes="helper-copy",
-                    )
+                    with Horizontal(classes="switch-row"):
+                        yield Label("JSON Output")
+                        yield Switch(value=False, id="json-output")
 
-                with Container(classes="panel"):
-                    yield Static("Research Query", classes="panel-title")
-                    yield Label("Query", classes="field-label")
-                    yield TextArea(
-                        self.startup.query,
-                        id="query",
-                        soft_wrap=True,
-                        placeholder="What do you want to investigate?",
-                    )
+                yield Rule()
 
-                    yield Label("System Prompt", classes="field-label")
-                    yield TextArea(
-                        self.startup.system_prompt,
-                        id="system-prompt",
-                        soft_wrap=True,
-                        placeholder="Optional system guidance",
-                    )
+                yield Label("Query", classes="field-label")
+                yield TextArea(id="query-area")
 
-                with Container(classes="panel"):
-                    yield Static("Execution Flags", classes="panel-title")
-                    yield Label("Include Analysis Tools", classes="field-label")
-                    yield Switch(self.startup.include_analysis, id="include-analysis")
+                yield Label("System Prompt", classes="field-label")
+                yield TextArea(id="system-prompt-area")
 
-                    yield Label("Enable Clarification Pipeline", classes="field-label")
-                    yield Switch(
-                        self.startup.config.enable_clarification,
-                        id="enable-clarification",
-                    )
-
-                    yield Label("JSON Output", classes="field-label")
-                    yield Switch(self.startup.json_output, id="json-output")
-
-                with Collapsible(
-                    title="Advanced Controls",
-                    collapsed=True,
-                    classes="panel",
-                    id="advanced-controls",
-                ):
-                    yield Label("Timeout (seconds)", classes="field-label")
-                    yield Input(
-                        value=str(self.startup.config.timeout),
-                        placeholder="1800",
-                        id="timeout",
-                    )
-
-                    yield Label("Poll Interval (seconds)", classes="field-label")
-                    yield Input(
-                        value=str(self.startup.config.poll_interval),
-                        placeholder="30",
-                        id="poll-interval",
-                    )
-
-                    yield Label("Log Level", classes="field-label")
-                    yield Select(
-                        LOG_LEVEL_OPTIONS,
-                        id="log-level",
-                        allow_blank=False,
-                    )
-
-                    yield Label("Triage Model", classes="field-label")
-                    yield Input(
-                        value=self.startup.config.triage_model,
-                        placeholder="gpt-5-mini",
-                        id="triage-model",
-                    )
-
-                    yield Label("Clarifier Model", classes="field-label")
-                    yield Input(
-                        value=self.startup.config.clarifier_model,
-                        placeholder="gpt-5-mini",
-                        id="clarifier-model",
-                    )
-
-                    yield Label("Instruction Builder Model", classes="field-label")
-                    yield Input(
-                        value=self.startup.config.instruction_builder_model,
-                        placeholder="gpt-5-mini",
-                        id="instruction-builder-model",
-                    )
-
-                    yield Label("Clarification Base URL", classes="field-label")
-                    yield Input(
-                        value=self.startup.config.clarification_base_url or "",
-                        placeholder="Optional clarification endpoint",
-                        id="clarification-base-url",
-                    )
-
-                    yield Label("Clarification API Key", classes="field-label")
-                    yield Input(
-                        value=self.startup.config.clarification_api_key or "",
-                        placeholder="Optional clarification key",
-                        password=True,
-                        id="clarification-api-key",
-                    )
-
-                with Container(classes="panel"):
+                with Container(id="clarification-section", classes="hidden"):
+                    yield Label("Clarification Answers", classes="section-title")
                     yield ClarificationAnswersPanel(id="clarification-answers")
 
-                with Container(classes="panel"):
-                    yield Static("Actions", classes="panel-title")
-                    with Horizontal():
-                        yield Button(
-                            "Clarify",
-                            id="run-clarification",
-                            classes="secondary",
-                        )
-                        yield Button("Research", id="run-research", classes="primary")
-                    with Horizontal():
-                        yield Button("Status", id="run-status")
-                        yield Button("Save Output", id="save-output")
+                with Horizontal(id="button-row"):
+                    yield Button("Clarify", id="btn-clarify", variant="default")
+                    yield Button("Research", id="btn-research", variant="primary")
+                    yield Button("Status", id="btn-status", variant="default")
+                    yield Button("Save", id="btn-save", variant="default")
 
-            with Vertical(id="output-dock"):
-                yield Static(self.latest_output_title, id="output-title")
-                yield Static("", id="output-meta")
-                yield TextArea(
-                    "",
-                    id="output-text",
-                    read_only=True,
-                    soft_wrap=True,
-                    show_line_numbers=False,
-                    placeholder="Clarification notes, reports, and task status will appear here.",
-                )
+            with Vertical(id="right-panel"):
+                yield Label("Output", classes="section-title")
+                with VerticalScroll(id="output-scroll"):
+                    yield Static("", id="output-area")
 
+        yield Static("Ready", id="status-bar")
         yield Footer()
 
-    def on_mount(self) -> None:
-        self.query_one("#mode", Select).value = self.startup.mode
-        self.query_one("#provider", Select).value = self.startup.config.provider
-        self.query_one("#api-style", Select).value = self.startup.config.api_style
-        self.query_one("#log-level", Select).value = (
-            self.startup.config.log_level.upper()
-        )
-        self._refresh_provider_defaults_ui()
-        self._refresh_mode_visibility()
-        self._refresh_output_meta()
-        self._refresh_action_state()
-        self.query_one("#query", TextArea).focus()
-        self._hydrating = False
-
-    def watch_busy(self, busy: bool) -> None:
-        self.current_status = (
-            "Link hot // remote research in progress"
-            if busy
-            else "Idle // ready for new instructions"
-        )
-        self.query_one("#app-status", Static).update(self.current_status)
-        self._refresh_action_state()
-
-    def _refresh_action_state(self) -> None:
-        disabled = self.busy
-        for widget_id in (
-            "run-clarification",
-            "run-research",
-            "run-status",
-            "save-output",
-        ):
-            self.query_one(f"#{widget_id}", Button).disabled = disabled
-
-    def _refresh_output_meta(self) -> None:
-        mode = self._selected_mode()
-        task_id = self.latest_task_id or "none"
-        session = self.pending_clarification_session_id or "none"
-        if mode == "agent":
-            source = self.query_one("#provider", Select).value
-        else:
-            source = (
-                self.query_one("#server-url", Input).value.strip() or "unconfigured"
-            )
-        metadata = f"mode={mode}  source={source}  task={task_id}  session={session}"
-        self.query_one("#output-meta", Static).update(metadata)
-
-    def _set_output(self, title: str, text: str) -> None:
-        self.latest_output_title = title
-        self.latest_output = text
-        self.query_one("#output-title", Static).update(title)
-        self.query_one("#output-text", TextArea).load_text(text)
-        detected_task_id = parse_task_id_from_output(text)
-        if detected_task_id:
-            self.latest_task_id = detected_task_id
-            self.query_one("#task-id", Input).value = detected_task_id
-        self._refresh_output_meta()
-
-    def _clear_clarification_state(self, keep_output: bool = True) -> None:
-        del keep_output
-        self.pending_clarification_session_id = None
-        self.pending_clarification_query = None
-        self.pending_clarification_questions = []
-        self.query_one(
-            "#clarification-answers", ClarificationAnswersPanel
-        ).set_questions([])
-        self._refresh_output_meta()
-
-    def _set_clarification_state(
-        self, query: str, session_id: str | None, questions: list[str]
-    ) -> None:
-        self.pending_clarification_session_id = session_id
-        self.pending_clarification_query = query
-        self.pending_clarification_questions = list(questions)
-        self.query_one(
-            "#clarification-answers", ClarificationAnswersPanel
-        ).set_questions(questions)
-        self._refresh_output_meta()
-
-    def _selected_mode(self) -> str:
-        return str(self.query_one("#mode", Select).value)
-
-    def _refresh_mode_visibility(self) -> None:
-        mode = self._selected_mode()
-        self.query_one("#agent-settings", Container).display = mode == "agent"
-        self.query_one("#mcp-settings", Container).display = mode == "mcp"
+    def _update_mode_visibility(self) -> None:
+        """Show/hide agent vs MCP settings based on mode."""
+        agent_settings = self.query_one("#agent-settings", Container)
+        mcp_settings = self.query_one("#mcp-settings", Container)
         json_switch = self.query_one("#json-output", Switch)
-        json_switch.disabled = mode == "mcp"
-        self._refresh_output_meta()
 
-    def _refresh_provider_defaults_ui(self) -> None:
-        provider = str(self.query_one("#provider", Select).value)
-        api_style_widget = self.query_one("#api-style", Select)
-        current_api_style = str(api_style_widget.value)
-        is_openai = provider == "openai"
+        if self.mode == "mcp":
+            agent_settings.display = False
+            mcp_settings.display = True
+            json_switch.disabled = True
+        else:
+            agent_settings.display = True
+            mcp_settings.display = False
+            json_switch.disabled = False
 
-        api_style_widget.disabled = not is_openai
-        if not is_openai:
-            api_style_widget.value = "responses"
-            current_api_style = "responses"
-
-        defaults = get_provider_defaults(provider, current_api_style)
+    def _update_provider_defaults(self) -> None:
+        """Update model and base URL based on provider and api_style."""
+        defaults = get_provider_defaults(self.provider, self.api_style)
         self.query_one("#model", Input).value = defaults.model
-        self.query_one("#base-url", Input).value = defaults.base_url or ""
+        self.query_one("#base-url", Input).value = defaults.base_url
 
-    def _collect_answers(self) -> list[str]:
-        answer_inputs = self.query_one(
-            "#clarification-answers", ClarificationAnswersPanel
-        ).query(Input)
-        return normalize_answers(
-            self.pending_clarification_questions,
-            [answer_input.value for answer_input in answer_inputs],
-        )
+        api_style_select = self.query_one("#api-style", Select)
+        if self.provider == "openai":
+            api_style_select.disabled = False
+        else:
+            api_style_select.disabled = True
 
-    def _runtime_env(self) -> dict[str, str]:
-        provider = str(self.query_one("#provider", Select).value)
-        api_style = str(self.query_one("#api-style", Select).value)
+    def _set_status(self, message: str) -> None:
+        """Update the status bar message."""
+        self._status_message = message
+        self.query_one("#status-bar", Static).update(message)
 
-        env = dict(os.environ)
-        env["RESEARCH_PROVIDER"] = provider
-        env["RESEARCH_MODEL"] = self.query_one("#model", Input).value
-        env["RESEARCH_API_KEY"] = self.query_one("#api-key", Input).value
-        env["RESEARCH_BASE_URL"] = self.query_one("#base-url", Input).value
-        env["RESEARCH_API_STYLE"] = api_style
-        env["RESEARCH_TIMEOUT"] = self.query_one("#timeout", Input).value
-        env["RESEARCH_POLL_INTERVAL"] = self.query_one("#poll-interval", Input).value
-        env["LOGGING_LEVEL"] = str(self.query_one("#log-level", Select).value)
-        env["CLARIFICATION_TRIAGE_MODEL"] = self.query_one("#triage-model", Input).value
-        env["CLARIFICATION_CLARIFIER_MODEL"] = self.query_one(
-            "#clarifier-model", Input
-        ).value
-        env["CLARIFICATION_INSTRUCTION_BUILDER_MODEL"] = self.query_one(
-            "#instruction-builder-model", Input
-        ).value
-        env["CLARIFICATION_BASE_URL"] = self.query_one(
-            "#clarification-base-url", Input
-        ).value
-        env["CLARIFICATION_API_KEY"] = self.query_one(
-            "#clarification-api-key", Input
-        ).value
-        env["ENABLE_CLARIFICATION"] = str(
-            self.query_one("#enable-clarification", Switch).value
-        ).lower()
-        env["ENABLE_REASONING_SUMMARIES"] = "false"
-        return env
+    def _set_output(self, text: str) -> None:
+        """Set the output panel text."""
+        self._output_text = text
+        self.query_one("#output-area", Static).update(text)
 
-    def _build_runtime_config(
-        self, *, force_enable_clarification: bool = False
-    ) -> ResearchConfig:
-        config = ResearchConfig.load(
-            config_path=self.startup.config_path,
-            env=self._runtime_env(),
-        )
-        if force_enable_clarification:
-            config.enable_clarification = True
-        config.validate()
-        return config
+    def _append_output(self, text: str) -> None:
+        """Append text to the output panel."""
+        self._output_text += text
+        self.query_one("#output-area", Static).update(self._output_text)
 
-    def _config_signature(self, config: ResearchConfig) -> str:
-        return json.dumps(asdict(config), sort_keys=True)
+    def _show_clarification_section(self, questions: list[str]) -> None:
+        """Show the clarification section with questions."""
+        self.clarification_questions = questions
+        section = self.query_one("#clarification-section", Container)
+        section.remove_class("hidden")
+        panel = self.query_one("#clarification-answers", ClarificationAnswersPanel)
+        panel.set_questions(questions)
 
-    def _ensure_agent(self, config: ResearchConfig) -> DeepResearchAgent:
-        signature = self._config_signature(config)
-        if self._agent is None or self._agent_signature != signature:
-            if (
-                self._agent_signature is not None
-                and self.pending_clarification_session_id
-            ):
-                self._clear_clarification_state()
-                self.notify(
-                    "Configuration changed; pending clarification session was cleared.",
-                    severity="warning",
-                )
-            self._agent = DeepResearchAgent(config)
-            self._agent_signature = signature
-        return self._agent
+    def _hide_clarification_section(self) -> None:
+        """Hide the clarification section."""
+        section = self.query_one("#clarification-section", Container)
+        section.add_class("hidden")
+        panel = self.query_one("#clarification-answers", ClarificationAnswersPanel)
+        panel.clear()
+        self.clarification_questions = []
+        self.current_session_id = None
 
-    def _query_text(self) -> str:
-        return self.query_one("#query", TextArea).text.strip()
+    def on_key(self, event) -> None:
+        """Handle arrow key navigation for form controls."""
+        focused = self.focused
 
-    def _system_prompt_text(self) -> str:
-        system_prompt = self.query_one("#system-prompt", TextArea).text.strip()
-        return system_prompt or DEFAULT_SYSTEM_PROMPT
-
-    def _include_analysis(self) -> bool:
-        return self.query_one("#include-analysis", Switch).value
-
-    def _server_url(self) -> str:
-        return self.query_one("#server-url", Input).value.strip()
-
-    def _task_id(self) -> str:
-        task_id = self.query_one("#task-id", Input).value.strip()
-        return task_id or self.latest_task_id
-
-    def action_run_clarification(self) -> None:
-        if self.busy:
-            self.notify("An operation is already running.", severity="warning")
-            return
-        self._run_clarification_worker()
-
-    def action_run_research(self) -> None:
-        if self.busy:
-            self.notify("An operation is already running.", severity="warning")
-            return
-        self._run_research_worker()
-
-    def action_check_status(self) -> None:
-        if self.busy:
-            self.notify("An operation is already running.", severity="warning")
-            return
-        self._run_status_worker()
-
-    def action_save_output(self) -> None:
-        if not self.latest_output.strip():
-            self.notify("There is no output to save yet.", severity="warning")
+        if isinstance(focused, TextArea):
             return
 
-        save_path = (
-            self.query_one("#save-path", Input).value.strip() or DEFAULT_SAVE_PATH
-        )
-        saved_path = write_output_file(save_path, self.latest_output)
-        self.notify(f"Saved output to {saved_path}", severity="information")
+        if event.key in ("up", "down"):
+            self._navigate_focus(event.key)
+            event.prevent_default()
+            event.stop()
+        elif event.key in ("left", "right"):
+            if isinstance(focused, Select):
+                self._cycle_select(focused, event.key)
+                event.prevent_default()
+                event.stop()
+            elif isinstance(focused, Switch):
+                focused.value = event.key == "right"
+                event.prevent_default()
+                event.stop()
 
-    @on(Button.Pressed, "#run-clarification")
-    def on_run_clarification_pressed(self, _event: Button.Pressed) -> None:
-        self.action_run_clarification()
+    def _navigate_focus(self, direction: str) -> None:
+        """Move focus up or down through form controls."""
+        focused = self.focused
+        if focused is None:
+            return
 
-    @on(Button.Pressed, "#run-research")
-    def on_run_research_pressed(self, _event: Button.Pressed) -> None:
-        self.action_run_research()
+        visible_ids: list[str] = []
+        for widget_id in self._focusable_ids:
+            try:
+                widget = self.query_one(widget_id)
+                if widget.display and not widget.disabled:
+                    visible_ids.append(widget_id)
+            except Exception:
+                pass
 
-    @on(Button.Pressed, "#run-status")
-    def on_run_status_pressed(self, _event: Button.Pressed) -> None:
-        self.action_check_status()
+        current_id = None
+        for widget_id in visible_ids:
+            try:
+                if self.query_one(widget_id) is focused:
+                    current_id = widget_id
+                    break
+            except Exception:
+                pass
 
-    @on(Button.Pressed, "#save-output")
-    def on_save_output_pressed(self, _event: Button.Pressed) -> None:
-        self.action_save_output()
+        if current_id is None:
+            return
+
+        try:
+            idx = visible_ids.index(current_id)
+        except ValueError:
+            return
+
+        if direction == "down":
+            new_idx = (idx + 1) % len(visible_ids)
+        else:
+            new_idx = (idx - 1) % len(visible_ids)
+
+        try:
+            self.query_one(visible_ids[new_idx]).focus()
+        except Exception:
+            pass
+
+    def _cycle_select(self, select: Select, direction: str) -> None:
+        """Cycle through select options with left/right keys."""
+        options = list(select._options)
+        if not options:
+            return
+
+        current_value = select.value
+        current_idx = -1
+        for i, (_, value) in enumerate(options):
+            if value == current_value:
+                current_idx = i
+                break
+
+        if current_idx == -1:
+            current_idx = 0
+
+        if direction == "right":
+            new_idx = (current_idx + 1) % len(options)
+        else:
+            new_idx = (current_idx - 1) % len(options)
+
+        select.value = options[new_idx][1]
 
     @on(Select.Changed, "#mode")
-    def on_mode_changed(self, _event: Select.Changed) -> None:
-        if self._hydrating:
-            return
-        self._refresh_mode_visibility()
-        self._clear_clarification_state()
+    def handle_mode_change(self, event: Select.Changed) -> None:
+        if event.value is not None:
+            self.mode = str(event.value)
+            self._update_mode_visibility()
 
     @on(Select.Changed, "#provider")
-    def on_provider_changed(self, _event: Select.Changed) -> None:
-        if self._hydrating:
-            return
-        self._refresh_provider_defaults_ui()
+    def handle_provider_change(self, event: Select.Changed) -> None:
+        if event.value is not None:
+            self.provider = str(event.value)
+            self._update_provider_defaults()
 
     @on(Select.Changed, "#api-style")
-    def on_api_style_changed(self, _event: Select.Changed) -> None:
-        if self._hydrating:
-            return
-        self._refresh_provider_defaults_ui()
+    def handle_api_style_change(self, event: Select.Changed) -> None:
+        if event.value is not None:
+            self.api_style = str(event.value)
+            if self.provider == "openai":
+                self._update_provider_defaults()
 
-    @on(Input.Changed, "#server-url")
-    def on_server_url_changed(self, _event: Input.Changed) -> None:
-        self._refresh_output_meta()
+    @on(Button.Pressed, "#btn-clarify")
+    def handle_clarify_button(self) -> None:
+        self.action_run_clarification()
 
-    @work(group="operations", exclusive=True, exit_on_error=False)
-    async def _run_clarification_worker(self) -> None:
-        query = self._query_text()
+    @on(Button.Pressed, "#btn-research")
+    def handle_research_button(self) -> None:
+        self.action_run_research()
+
+    @on(Button.Pressed, "#btn-status")
+    def handle_status_button(self) -> None:
+        self.action_check_status()
+
+    @on(Button.Pressed, "#btn-save")
+    def handle_save_button(self) -> None:
+        self.action_save_output()
+
+    def _build_config(self) -> ResearchConfig:
+        """Build a ResearchConfig from current UI state."""
+        return ResearchConfig(
+            provider=self.query_one("#provider", Select).value or "openai",
+            api_style=self.query_one("#api-style", Select).value or "responses",
+            model=self.query_one("#model", Input).value,
+            base_url=self.query_one("#base-url", Input).value or None,
+            enable_clarification=True,
+        )
+
+    def _get_query(self) -> str:
+        return self.query_one("#query-area", TextArea).text.strip()
+
+    def _get_system_prompt(self) -> str:
+        return (
+            self.query_one("#system-prompt-area", TextArea).text.strip()
+            or DEFAULT_SYSTEM_PROMPT
+        )
+
+    def _get_include_analysis(self) -> bool:
+        return self.query_one("#include-analysis", Switch).value
+
+    def _get_json_output(self) -> bool:
+        return self.query_one("#json-output", Switch).value
+
+    def action_run_clarification(self) -> None:
+        """Run the clarification flow."""
+        query = self._get_query()
         if not query:
-            self.notify("Enter a research query first.", severity="warning")
+            self._set_status("Error: No query provided")
+            self.notify("Please enter a query first", severity="error")
             return
 
-        self.busy = True
+        if self.mode == "mcp":
+            self._run_mcp_clarification(query)
+        else:
+            self._run_agent_clarification(query)
+
+    @work(exclusive=True)
+    async def _run_agent_clarification(self, query: str) -> None:
+        """Run clarification via direct agent."""
+        self._set_status("Running clarification...")
+        self._set_output("Starting clarification process...\n")
+
         try:
-            self._set_output(
-                "Clarification // running", "Negotiating a clarification session..."
-            )
-            mode = self._selected_mode()
-            if mode == "agent":
-                config = self._build_runtime_config(force_enable_clarification=True)
-                agent = self._ensure_agent(config)
-                result = await agent.start_clarification_async(query)
-                rendered = render_agent_clarification_output(query, result)
-                self._set_output("Clarification // agent", rendered)
-                if result.get("needs_clarification", False):
-                    self._set_clarification_state(
-                        query,
-                        result.get("session_id"),
-                        list(result.get("questions", [])),
-                    )
-                    self.notify(
-                        "Clarification questions loaded into the control panel.",
-                        severity="information",
-                    )
-                else:
-                    self._clear_clarification_state()
-                    self.notify(
-                        "No clarification needed. The query is ready for research.",
-                        severity="information",
-                    )
+            config = self._build_config()
+            agent = DeepResearchAgent(config)
+
+            result = agent.start_clarification(query)
+
+            if not result.get("needs_clarification", False):
+                reasoning = result.get("reasoning", "Query is sufficient")
+                self._append_output(f"\nAssessment: {reasoning}\n")
+                self._append_output("\nNo clarification needed. Ready for research.\n")
+                self._set_status("Clarification complete - no questions needed")
+                self.notify("No clarification needed", severity="information")
                 return
 
-            server_url = self._server_url()
-            if not server_url:
-                self.notify("Set an MCP server URL first.", severity="warning")
-                return
+            questions = result.get("questions", [])
+            session_id = result.get("session_id")
+            self.current_session_id = session_id
 
-            rc, text = await mcp_research(
-                url=server_url,
-                query=query,
-                system_instructions=self._system_prompt_text(),
-                include_analysis=self._include_analysis(),
-                request_clarification=True,
+            reasoning = result.get("reasoning", "")
+            self._append_output(f"\nReasoning: {reasoning}\n")
+            self._append_output(f"\nSession ID: {session_id}\n")
+            self._append_output("\nClarifying Questions:\n")
+            for i, q in enumerate(questions, 1):
+                self._append_output(f"  {i}. {q}\n")
+
+            self._show_clarification_section(questions)
+            self._set_status("Clarification questions ready - provide answers")
+            self.notify(
+                f"{len(questions)} clarification questions generated",
+                severity="information",
             )
-            self._set_output("Clarification // mcp", text)
 
-            session_id, questions = parse_mcp_clarification(text)
-            if session_id and questions:
-                self._set_clarification_state(query, session_id, questions)
-                self.notify(
-                    "Clarification questions received from the MCP server.",
-                    severity="information",
-                )
-            else:
-                self._clear_clarification_state()
-                severity = "error" if rc else "information"
-                message = (
-                    "Clarification request failed."
-                    if rc
-                    else "The MCP server reported that no clarification is needed."
-                )
-                self.notify(message, severity=severity)
-        except ResearchError as error:
-            self._set_output("Clarification // error", f"Research error: {error}")
-            self.notify(str(error), severity="error")
-        except Exception as error:  # pylint: disable=broad-exception-caught
-            self._set_output("Clarification // error", f"Unexpected error: {error}")
-            self.notify(str(error), severity="error")
-        finally:
-            self.busy = False
+        except Exception as e:
+            self._append_output(f"\nError: {e}\n")
+            self._set_status(f"Clarification error: {e}")
+            self.notify(f"Clarification failed: {e}", severity="error")
 
-    @work(group="operations", exclusive=True, exit_on_error=False)
-    async def _run_research_worker(self) -> None:
-        query = self._query_text()
-        if not query:
-            self.notify("Enter a research query first.", severity="warning")
-            return
+    @work(exclusive=True)
+    async def _run_mcp_clarification(self, query: str) -> None:
+        """Run clarification via MCP client."""
+        self._set_status("Connecting to MCP server...")
+        self._set_output("Starting MCP clarification...\n")
 
-        self.busy = True
+        server_url = self.query_one("#server-url", Input).value
+        system_prompt = self._get_system_prompt()
+        include_analysis = self._get_include_analysis()
+
         try:
-            self._set_output("Research // running", "Booting the research worker...")
-            mode = self._selected_mode()
-            include_analysis = self._include_analysis()
-            system_prompt = self._system_prompt_text()
+            from mcp import ClientSession
+            from mcp.client.streamable_http import streamablehttp_client
 
-            if (
-                self.pending_clarification_session_id
-                and self.pending_clarification_query
-                and self.pending_clarification_query != query
+            async with streamablehttp_client(server_url) as (
+                read_stream,
+                write_stream,
+                _,
             ):
-                self._clear_clarification_state()
-                self.notify(
-                    "The query changed, so the previous clarification session was discarded.",
-                    severity="warning",
-                )
+                async with ClientSession(read_stream, write_stream) as session:
+                    await session.initialize()
 
-            if mode == "agent":
-                use_pending_clarification = (
-                    self.pending_clarification_session_id is not None
-                )
-                config = self._build_runtime_config(
-                    force_enable_clarification=use_pending_clarification
-                )
-                agent = self._ensure_agent(config)
-                working_query = query
-
-                if use_pending_clarification and self.pending_clarification_questions:
-                    answers = self._collect_answers()
-                    session_status = agent.add_clarification_answers(
-                        self.pending_clarification_session_id or "",
-                        answers,
+                    result = await session.call_tool(
+                        "deep_research",
+                        {
+                            "query": query,
+                            "system_instructions": system_prompt,
+                            "include_analysis": include_analysis,
+                            "request_clarification": True,
+                            "callback_url": "",
+                        },
                     )
-                    if session_status.get("error"):
-                        self._clear_clarification_state()
+
+                    text = self._render_mcp_result(result)
+                    self._append_output(f"\n{text}\n")
+
+                    session_id, questions = self._parse_mcp_clarification(text)
+                    if session_id and questions:
+                        self.current_session_id = session_id
+                        self._show_clarification_section(questions)
+                        self._set_status("Clarification questions ready")
                         self.notify(
-                            "The clarification session expired. Run clarification again.",
-                            severity="warning",
+                            f"{len(questions)} questions received",
+                            severity="information",
                         )
                     else:
-                        enriched_query = await agent.get_enriched_query_async(
-                            self.pending_clarification_session_id or ""
-                        )
-                        if enriched_query:
-                            working_query = enriched_query
+                        self._set_status("Clarification complete")
+                        self.notify("No clarification needed", severity="information")
 
-                result = await agent.research(
-                    query=working_query,
-                    system_prompt=system_prompt,
-                    include_code_interpreter=include_analysis,
-                )
+        except Exception as e:
+            self._append_output(f"\nMCP Error: {e}\n")
+            self._set_status(f"MCP error: {e}")
+            self.notify(f"MCP connection failed: {e}", severity="error")
 
-                if result.status == "completed":
-                    text = (
-                        format_result_json(result)
-                        if self.query_one("#json-output", Switch).value
-                        else format_report(result)
-                    )
-                    self._set_output("Research // completed", text)
-                    if result.task_id:
-                        self.latest_task_id = result.task_id
-                        self.query_one("#task-id", Input).value = result.task_id
-                    self.notify(
-                        "Deep research completed successfully.", severity="information"
-                    )
-                    return
-
-                message = result.message or "Unknown provider failure"
-                if result.error_code:
-                    message = f"{message} (code: {result.error_code})"
-                self._set_output("Research // failed", message)
-                self.notify(message, severity="error")
-                return
-
-            server_url = self._server_url()
-            if not server_url:
-                self.notify("Set an MCP server URL first.", severity="warning")
-                return
-
-            if (
-                self.pending_clarification_session_id
-                and self.pending_clarification_questions
-            ):
-                answers = self._collect_answers()
-                rc, text = await mcp_research_with_context(
-                    url=server_url,
-                    session_id=self.pending_clarification_session_id,
-                    answers=answers,
-                    system_instructions=system_prompt,
-                    include_analysis=include_analysis,
-                )
-            else:
-                rc, text = await mcp_research(
-                    url=server_url,
-                    query=query,
-                    system_instructions=system_prompt,
-                    include_analysis=include_analysis,
-                    request_clarification=False,
-                )
-
-            self._set_output("Research // mcp", text)
-            if rc:
-                self.notify("The MCP research request failed.", severity="error")
-            else:
-                self.notify(
-                    "Deep research completed successfully.", severity="information"
-                )
-        except ResearchError as error:
-            self._set_output("Research // error", f"Research error: {error}")
-            self.notify(str(error), severity="error")
-        except Exception as error:  # pylint: disable=broad-exception-caught
-            self._set_output("Research // error", f"Unexpected error: {error}")
-            self.notify(str(error), severity="error")
-        finally:
-            self.busy = False
-
-    @work(group="operations", exclusive=True, exit_on_error=False)
-    async def _run_status_worker(self) -> None:
-        task_id = self._task_id()
-        if not task_id:
-            self.notify("Enter or detect a task id first.", severity="warning")
+    def action_run_research(self) -> None:
+        """Run the deep research flow."""
+        query = self._get_query()
+        if not query:
+            self._set_status("Error: No query provided")
+            self.notify("Please enter a query first", severity="error")
             return
 
-        self.busy = True
+        if self.mode == "mcp":
+            self._run_mcp_research(query)
+        else:
+            self._run_agent_research(query)
+
+    @work(exclusive=True)
+    async def _run_agent_research(self, query: str) -> None:
+        """Run research via direct agent."""
+        self._set_status("Running deep research...")
+        self._set_output("Starting deep research...\n")
+
         try:
-            self._set_output(
-                "Status // running", f"Checking task status for {task_id}..."
+            config = self._build_config()
+            agent = DeepResearchAgent(config)
+
+            working_query = query
+
+            if self.current_session_id and self.clarification_questions:
+                panel = self.query_one(
+                    "#clarification-answers", ClarificationAnswersPanel
+                )
+                answers = panel.get_answers()
+                agent.add_clarification_answers(self.current_session_id, answers)
+                enriched = agent.get_enriched_query(self.current_session_id)
+                if enriched:
+                    working_query = enriched
+                    self._append_output(f"\nEnriched query: {enriched}\n")
+
+            self._append_output(f"\nResearching: {working_query}\n")
+            self._append_output("\nPlease wait, this may take several minutes...\n")
+
+            system_prompt = self._get_system_prompt()
+            include_analysis = self._get_include_analysis()
+
+            result = await agent.research(
+                query=working_query,
+                system_prompt=system_prompt,
+                include_code_interpreter=include_analysis,
             )
-            mode = self._selected_mode()
-            if mode == "agent":
-                config = self._build_runtime_config()
-                agent = self._ensure_agent(config)
-                status = await agent.get_task_status(task_id)
-                self._set_output("Status // agent", format_task_status(status))
-                self.notify("Task status updated.", severity="information")
-                return
 
-            server_url = self._server_url()
-            if not server_url:
-                self.notify("Set an MCP server URL first.", severity="warning")
-                return
+            if result.status == "completed":
+                if self._get_json_output():
+                    output = self._format_result_json(result)
+                else:
+                    output = self._format_report(result)
+                self._set_output(output)
+                self._set_status("Research completed")
+                self.notify("Research completed successfully", severity="information")
+                self._hide_clarification_section()
+            else:
+                msg = result.message or "Unknown error"
+                self._append_output(f"\nResearch failed: {msg}\n")
+                self._set_status(f"Research failed: {msg}")
+                self.notify(f"Research failed: {msg}", severity="error")
 
-            rc, text = await mcp_status(server_url, task_id)
-            self._set_output("Status // mcp", text)
-            severity = "error" if rc else "information"
-            self.notify("Task status updated.", severity=severity)
-        except ResearchError as error:
-            self._set_output("Status // error", f"Research error: {error}")
-            self.notify(str(error), severity="error")
-        except Exception as error:  # pylint: disable=broad-exception-caught
-            self._set_output("Status // error", f"Unexpected error: {error}")
-            self.notify(str(error), severity="error")
-        finally:
-            self.busy = False
+        except ResearchError as e:
+            self._append_output(f"\nResearch error: {e}\n")
+            self._set_status(f"Research error: {e}")
+            self.notify(f"Research error: {e}", severity="error")
+        except Exception as e:
+            self._append_output(f"\nUnexpected error: {e}\n")
+            self._set_status(f"Error: {e}")
+            self.notify(f"Error: {e}", severity="error")
 
+    @work(exclusive=True)
+    async def _run_mcp_research(self, query: str) -> None:
+        """Run research via MCP client."""
+        self._set_status("Connecting to MCP server...")
+        self._set_output("Starting MCP research...\n")
 
-# ---------------------------------------------------------------------------
-# Argument parsing and entry point
-# ---------------------------------------------------------------------------
+        server_url = self.query_one("#server-url", Input).value
+        system_prompt = self._get_system_prompt()
+        include_analysis = self._get_include_analysis()
+
+        try:
+            from mcp import ClientSession
+            from mcp.client.streamable_http import streamablehttp_client
+
+            async with streamablehttp_client(server_url) as (
+                read_stream,
+                write_stream,
+                _,
+            ):
+                async with ClientSession(read_stream, write_stream) as session:
+                    await session.initialize()
+
+                    if self.current_session_id and self.clarification_questions:
+                        panel = self.query_one(
+                            "#clarification-answers", ClarificationAnswersPanel
+                        )
+                        answers = panel.get_answers()
+
+                        self._append_output(
+                            f"\nUsing session: {self.current_session_id}\n"
+                        )
+                        self._append_output("Sending answers and running research...\n")
+
+                        result = await session.call_tool(
+                            "research_with_context",
+                            {
+                                "session_id": self.current_session_id,
+                                "answers": answers,
+                                "system_instructions": system_prompt,
+                                "include_analysis": include_analysis,
+                                "callback_url": "",
+                            },
+                        )
+                    else:
+                        self._append_output(f"\nResearching: {query}\n")
+                        self._append_output("\nPlease wait...\n")
+
+                        result = await session.call_tool(
+                            "deep_research",
+                            {
+                                "query": query,
+                                "system_instructions": system_prompt,
+                                "include_analysis": include_analysis,
+                                "request_clarification": False,
+                                "callback_url": "",
+                            },
+                        )
+
+                    text = self._render_mcp_result(result)
+                    self._set_output(text)
+
+                    if result.isError:
+                        self._set_status("Research failed")
+                        self.notify("Research failed", severity="error")
+                    else:
+                        self._set_status("Research completed")
+                        self.notify("Research completed", severity="information")
+                        self._hide_clarification_section()
+
+        except Exception as e:
+            self._append_output(f"\nMCP Error: {e}\n")
+            self._set_status(f"MCP error: {e}")
+            self.notify(f"MCP error: {e}", severity="error")
+
+    def action_check_status(self) -> None:
+        """Check the status of a research task."""
+        task_id = self.query_one("#task-id", Input).value.strip()
+        if not task_id:
+            self._set_status("Error: No task ID provided")
+            self.notify("Please enter a task ID", severity="error")
+            return
+
+        if self.mode == "mcp":
+            self._check_mcp_status(task_id)
+        else:
+            self._check_agent_status(task_id)
+
+    @work(exclusive=True)
+    async def _check_agent_status(self, task_id: str) -> None:
+        """Check task status via direct agent."""
+        self._set_status("Checking task status...")
+
+        try:
+            config = self._build_config()
+            agent = DeepResearchAgent(config)
+            status = await agent.get_task_status(task_id)
+
+            lines = [
+                f"Task ID: {status.task_id}",
+                f"Status: {status.status}",
+            ]
+            if status.created_at is not None:
+                lines.append(f"Created: {status.created_at}")
+            if status.completed_at is not None:
+                lines.append(f"Completed: {status.completed_at}")
+            if status.message:
+                lines.append(f"Message: {status.message}")
+            if status.error:
+                lines.append(f"Error: {status.error}")
+
+            self._set_output("\n".join(lines))
+            self._set_status(f"Status: {status.status}")
+
+        except Exception as e:
+            self._set_output(f"Status check error: {e}")
+            self._set_status(f"Error: {e}")
+            self.notify(f"Status check failed: {e}", severity="error")
+
+    @work(exclusive=True)
+    async def _check_mcp_status(self, task_id: str) -> None:
+        """Check task status via MCP client."""
+        self._set_status("Connecting to MCP server...")
+
+        server_url = self.query_one("#server-url", Input).value
+
+        try:
+            from mcp import ClientSession
+            from mcp.client.streamable_http import streamablehttp_client
+
+            async with streamablehttp_client(server_url) as (
+                read_stream,
+                write_stream,
+                _,
+            ):
+                async with ClientSession(read_stream, write_stream) as session:
+                    await session.initialize()
+
+                    result = await session.call_tool(
+                        "research_status",
+                        {"task_id": task_id},
+                    )
+
+                    text = self._render_mcp_result(result)
+                    self._set_output(text)
+
+                    if result.isError:
+                        self._set_status("Status check failed")
+                    else:
+                        self._set_status("Status retrieved")
+
+        except Exception as e:
+            self._set_output(f"MCP status error: {e}")
+            self._set_status(f"MCP error: {e}")
+            self.notify(f"MCP error: {e}", severity="error")
+
+    def action_save_output(self) -> None:
+        """Save the current output to file."""
+        save_path = self.query_one("#save-path", Input).value.strip()
+        if not save_path:
+            self._set_status("Error: No save path provided")
+            self.notify("Please enter a save path", severity="error")
+            return
+
+        if not self._output_text:
+            self._set_status("Error: No output to save")
+            self.notify("No output to save", severity="error")
+            return
+
+        try:
+            path = Path(save_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(self._output_text, encoding="utf-8")
+            self._set_status(f"Saved to {save_path}")
+            self.notify(f"Output saved to {save_path}", severity="information")
+        except Exception as e:
+            self._set_status(f"Save error: {e}")
+            self.notify(f"Save failed: {e}", severity="error")
+
+    def _format_report(self, result: ResearchResult) -> str:
+        """Format a ResearchResult as a human-readable report."""
+        parts: list[str] = []
+        parts.append("=" * 60)
+        parts.append("RESEARCH REPORT")
+        parts.append("=" * 60)
+
+        if result.task_id:
+            parts.append(f"Task ID: {result.task_id}")
+        if result.total_steps:
+            parts.append(f"Total steps: {result.total_steps}")
+        if result.search_queries:
+            parts.append(f"Search queries: {len(result.search_queries)}")
+        if result.citations:
+            parts.append(f"Citations: {len(result.citations)}")
+        if isinstance(result.execution_time, (int, float)):
+            parts.append(f"Execution time: {result.execution_time:.2f}s")
+
+        parts.append("")
+        parts.append(result.final_report)
+
+        if result.citations:
+            parts.append("")
+            parts.append("=" * 60)
+            parts.append("CITATIONS")
+            parts.append("=" * 60)
+            for citation in result.citations:
+                parts.append(f"{citation.index}. [{citation.title}]({citation.url})")
+
+        return "\n".join(parts)
+
+    def _format_result_json(self, result: ResearchResult) -> str:
+        """Format a ResearchResult as JSON."""
+        data = asdict(result)
+        return json.dumps(data, indent=2, ensure_ascii=False)
+
+    def _render_mcp_result(self, result: Any) -> str:
+        """Extract text from an MCP CallToolResult."""
+        from mcp import types
+
+        if result.structuredContent is not None:
+            sc = result.structuredContent
+            if isinstance(sc, dict) and "result" in sc:
+                val = sc.get("result")
+                return val if isinstance(val, str) else str(val)
+            return str(sc)
+
+        parts: list[str] = []
+        for item in result.content or []:
+            if isinstance(item, types.TextContent):
+                parts.append(item.text)
+            else:
+                parts.append(str(item))
+        return "\n".join(parts)
+
+    def _parse_mcp_clarification(self, text: str) -> tuple[str | None, list[str]]:
+        """Parse session ID and questions from MCP clarification output."""
+        session_match = re.search(r"Session ID:\s*`([^`]+)`", text)
+        session_id = session_match.group(1) if session_match else None
+        questions = re.findall(r"^\d+\.\s+(.+)$", text, re.MULTILINE)
+        return session_id, questions
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build the startup argument parser."""
-
     parser = argparse.ArgumentParser(
         prog="deep-research-tui",
-        description="Interactive full-screen TUI for deep research workflows.",
+        description="Interactive full-screen terminal UI for Deep Research.",
     )
-
     parser.add_argument(
         "--config",
         default=None,
@@ -1374,158 +1219,59 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--mode",
-        default=None,
         choices=["agent", "mcp"],
-        help="Startup mode (defaults to agent unless --server-url is provided)",
+        default="agent",
+        help="Operating mode (default: agent)",
     )
     parser.add_argument(
         "--server-url",
-        default="",
-        help="MCP server URL for client mode",
+        default="http://127.0.0.1:8080/mcp",
+        help="MCP server URL for mcp mode",
+    )
+    parser.add_argument(
+        "--provider",
+        choices=["openai", "gemini", "open-deep-research"],
+        default="openai",
+        help="Research provider (default: openai)",
+    )
+    parser.add_argument(
+        "--api-style",
+        choices=["responses", "chat_completions"],
+        default="responses",
+        help="OpenAI API style (default: responses)",
     )
     parser.add_argument(
         "--query",
         default="",
-        help="Initial research query to prefill",
+        help="Initial research query",
     )
     parser.add_argument(
-        "--task-id",
-        default="",
-        help="Initial task id to prefill",
+        "--save-path",
+        default="output.md",
+        help="Default save path for output",
     )
-    parser.add_argument(
-        "--output-file",
-        default=DEFAULT_SAVE_PATH,
-        metavar="PATH",
-        help="Default output save path",
-    )
-    parser.add_argument(
-        "--no-analysis",
-        action="store_true",
-        help="Disable code interpreter / analysis tools",
-    )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        dest="json_output",
-        help="Enable JSON output in agent mode",
-    )
-    prompt_group = parser.add_mutually_exclusive_group()
-    prompt_group.add_argument(
-        "--system-prompt",
-        default=None,
-        help="Inline system prompt text",
-    )
-    prompt_group.add_argument(
-        "--system-prompt-file",
-        default=None,
-        metavar="PATH",
-        help="Read the system prompt from a file",
-    )
-
-    parser.add_argument(
-        "--provider",
-        default=None,
-        choices=["openai", "gemini", "open-deep-research"],
-        help="Research provider",
-    )
-    parser.add_argument("--model", default=None, help="Model or agent ID")
-    parser.add_argument("--api-key", default=None, help="Provider API key")
-    parser.add_argument("--base-url", default=None, help="Provider API base URL")
-    parser.add_argument(
-        "--api-style",
-        default=None,
-        choices=["responses", "chat_completions"],
-        help="OpenAI API style",
-    )
-    parser.add_argument(
-        "--timeout",
-        default=None,
-        type=float,
-        help="Max research timeout in seconds",
-    )
-    parser.add_argument(
-        "--poll-interval",
-        default=None,
-        type=float,
-        help="Task poll interval in seconds",
-    )
-    parser.add_argument(
-        "--log-level",
-        default=None,
-        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        help="Logging level",
-    )
-    parser.add_argument(
-        "--enable-clarification",
-        action="store_true",
-        default=False,
-        help="Enable the clarification pipeline on startup",
-    )
-    parser.add_argument(
-        "--enable-reasoning-summaries",
-        action="store_true",
-        default=False,
-        help="Enable reasoning summaries",
-    )
-    parser.add_argument("--triage-model", default=None, help="Model for query triage")
-    parser.add_argument(
-        "--clarifier-model", default=None, help="Model for query enrichment"
-    )
-    parser.add_argument(
-        "--clarification-base-url",
-        default=None,
-        help="Base URL for clarification models",
-    )
-    parser.add_argument(
-        "--clarification-api-key",
-        default=None,
-        help="API key for clarification models",
-    )
-    parser.add_argument(
-        "--instruction-builder-model",
-        default=None,
-        help="Model for instruction building",
-    )
-
     return parser
 
 
-def build_startup_state(args: argparse.Namespace) -> StartupState:
-    """Build the initial app state from CLI args and config."""
-
-    config = load_config(args)
-    config.validate()
-    mode = args.mode or ("mcp" if args.server_url else "agent")
-    return StartupState(
-        config_path=args.config,
-        mode=mode,
-        server_url=args.server_url or DEFAULT_MCP_SERVER_URL,
-        query=args.query,
-        task_id=args.task_id,
-        save_path=args.output_file or DEFAULT_SAVE_PATH,
-        system_prompt=resolve_system_prompt(args),
-        include_analysis=not args.no_analysis,
-        json_output=args.json_output,
-        config=config,
-    )
-
-
 def main() -> None:
-    """Launch the TUI."""
-
     parser = build_parser()
     args = parser.parse_args()
-    startup = build_startup_state(args)
 
-    level_name = (getattr(args, "log_level", None) or startup.config.log_level).upper()
-    log_level = getattr(logging, level_name, logging.INFO)
-    logging.basicConfig(level=log_level, format="%(message)s")
-    structlog.configure(
-        wrapper_class=structlog.make_filtering_bound_logger(log_level),
+    defaults = get_provider_defaults(args.provider, args.api_style)
+
+    startup_state = StartupState(
+        config_path=args.config,
+        mode=args.mode,
+        server_url=args.server_url,
+        query=args.query,
+        save_path=args.save_path,
+        system_prompt=DEFAULT_SYSTEM_PROMPT,
+        include_analysis=True,
+        json_output=False,
+        config=defaults,
     )
 
-    app = DeepResearchTUI(startup)
+    app = DeepResearchTUI(startup_state)
     app.run()
 
 
