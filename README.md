@@ -417,11 +417,13 @@ The repository also ships with a full-screen terminal UI at
 CLI in a dark, keyboard-driven interface for running clarification, deep
 research, task status checks, and saving output to disk.
 
-![Deep Research TUI Screenshot](docs/images/tui-screenshot.svg)
+![Deep Research TUI Demo](docs/images/tui-demo.gif)
 
 The TUI features a split-panel layout:
 - **Left panel**: Configuration controls for mode selection (Agent/MCP), provider settings, model configuration, query input, and system prompt
 - **Right panel**: Output display showing research results, clarification questions, or status information
+
+The animation above shows selecting the Gemini provider (which auto-fills the model and base URL), entering a research query, and starting a deep research task.
 
 #### Quick Start
 
