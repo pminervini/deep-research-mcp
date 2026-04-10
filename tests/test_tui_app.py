@@ -65,6 +65,26 @@ async def test_provider_change_updates_model_and_base_url():
 
 
 @pytest.mark.asyncio
+async def test_initial_focus_and_arrow_navigation_work_for_form_controls():
+    app = TUI.DeepResearchTUI(build_startup_state())
+
+    async with app.run_test(size=(140, 42)) as pilot:
+        assert app.focused is app.query_one("#mode", Select)
+
+        await pilot.press("right")
+        await pilot.pause()
+        assert app.query_one("#mode", Select).value == "mcp"
+
+        await pilot.press("down")
+        await pilot.pause()
+        assert app.focused is app.query_one("#save-path", Input)
+
+        await pilot.press("down")
+        await pilot.pause()
+        assert app.focused is app.query_one("#task-id", Input)
+
+
+@pytest.mark.asyncio
 async def test_switching_to_mcp_hides_agent_controls_and_disables_json_toggle():
     app = TUI.DeepResearchTUI(build_startup_state())
 
@@ -75,6 +95,24 @@ async def test_switching_to_mcp_hides_agent_controls_and_disables_json_toggle():
         assert not app.query_one("#agent-settings", Container).display
         assert app.query_one("#mcp-settings", Container).display
         assert app.query_one("#json-output", Switch).disabled
+
+
+@pytest.mark.asyncio
+async def test_left_and_right_toggle_switch_values():
+    app = TUI.DeepResearchTUI(build_startup_state())
+
+    async with app.run_test(size=(140, 42)) as pilot:
+        include_analysis = app.query_one("#include-analysis", Switch)
+        include_analysis.focus()
+        await pilot.pause()
+
+        await pilot.press("left")
+        await pilot.pause()
+        assert include_analysis.value is False
+
+        await pilot.press("right")
+        await pilot.pause()
+        assert include_analysis.value is True
 
 
 @pytest.mark.asyncio

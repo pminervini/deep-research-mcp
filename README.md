@@ -434,8 +434,12 @@ uv run python cli/deep-research-tui.py --provider gemini
 #### TUI Workflow
 
 - Use the left control panel to edit provider settings, query text, system prompt, and save path.
-- Press `Enter` to edit the selected field or activate the selected action.
-- Use `Left` / `Right` to toggle booleans and cycle through choice fields.
+- The TUI starts focused on the `Mode` selector rather than inside the query editor.
+- Use `Tab` / `Shift+Tab` to move through all controls.
+- Use `Up` / `Down` to move between non-editor controls, including single-line inputs.
+- Use `Left` / `Right` to toggle booleans and cycle through choice fields when a `Switch` or `Select` has focus.
+- Press `Enter` to activate buttons, toggle switches, cycle selects, or move forward from a single-line input.
+- `TextArea` widgets such as `Query` and `System Prompt` keep normal cursor-key editing behavior.
 - Use `c` to run clarification, `r` to run deep research, `t` to check task status, `s` to save the current output, and `q` to quit.
 - The right panel shows the latest clarification output, research report, or status response.
 
