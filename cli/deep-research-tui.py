@@ -35,7 +35,7 @@ sys.path.insert(0, str(src_path))
 from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Horizontal, Vertical, VerticalScroll
+from textual.containers import Container, Grid, Horizontal, Vertical, VerticalScroll
 from textual.reactive import reactive
 from textual.theme import Theme
 from textual.widgets import (
@@ -274,16 +274,19 @@ class DeepResearchTUI(App):
     }
 
     #left-panel {
-        width: 45;
-        min-width: 40;
+        width: 1fr;
+        max-width: 50;
+        min-width: 30;
         height: 100%;
         border: round $panel;
         background: $surface;
         padding: 1;
+        overflow-y: auto;
     }
 
     #right-panel {
-        width: 1fr;
+        width: 2fr;
+        min-width: 20;
         height: 100%;
         padding: 0 1;
     }
@@ -337,27 +340,30 @@ class DeepResearchTUI(App):
     }
 
     TextArea {
-        height: 6;
+        height: 5;
         margin-bottom: 1;
         border: round $panel;
     }
 
     #query-area {
-        height: 4;
+        height: 3;
     }
 
     #system-prompt-area {
-        height: 6;
+        height: 4;
     }
 
-    #button-row {
+    #button-grid {
+        layout: grid;
+        grid-size: 2;
+        grid-gutter: 1;
         height: auto;
         margin-top: 1;
-        align: center middle;
+        width: 100%;
     }
 
-    #button-row Button {
-        margin: 0 1;
+    #button-grid Button {
+        width: 100%;
     }
 
     Button {
@@ -564,7 +570,7 @@ class DeepResearchTUI(App):
                     yield Label("Clarification Answers", classes="section-title")
                     yield ClarificationAnswersPanel(id="clarification-answers")
 
-                with Horizontal(id="button-row"):
+                with Grid(id="button-grid"):
                     yield Button("Clarify", id="btn-clarify", variant="default")
                     yield Button("Research", id="btn-research", variant="primary")
                     yield Button("Status", id="btn-status", variant="default")
