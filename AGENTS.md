@@ -5,14 +5,14 @@
   - `agent.py`: provider-aware research agent (OpenAI, open-deep-research).
   - `mcp_server.py`: MCP server tools (`deep_research`, `research_with_context`, `research_status`).
   - `config.py`, `errors.py`, `clarification.py`, `prompts/` (YAML prompt templates).
-- `cli/`: runnable examples and utilities (e.g., `agent-cli.py`).
+- `cli/`: unified CLI tool (`deep-research-cli.py`) for agent mode, MCP client mode, and config viewing.
 - `tests/`: `pytest` suite (`test_*.py`) with markers configured in `pytest.ini`.
 - `pyproject.toml`, `requirements.txt` (unpinned compatibility install), `README.md`, `ARCH.md`, `LICENSE`.
 
 ## Build, Test, and Development Commands
 - Setup env: `uv sync --upgrade --extra dev` (or compatibility: `python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && pip install -e .`).
 - Run MCP server: `uv run deep-research-mcp`.
-- Try CLI: `uv run python cli/agent-cli.py research "What’s new in quantum computing?" --model gpt-5-mini`.
+- Try CLI: `uv run python cli/deep-research-cli.py research "What’s new in quantum computing?" --model gpt-5-mini`.
 - Tests: `uv run pytest -v` or `uv run pytest --cov=deep_research_mcp tests/`.
 - Lint/format/type-check: `uv run black .`, `uv run pylint src/deep_research_mcp tests`, `uv run mypy src/deep_research_mcp`.
 - Before committing or opening a PR, run `uv run black --fast --check .` to match the CI formatting check.
