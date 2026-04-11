@@ -50,7 +50,7 @@ def test_provider_defaults_for_dr_tulu():
     assert defaults.provider == "dr-tulu"
     assert defaults.api_style == "responses"
     assert defaults.model == "dr-tulu"
-    assert defaults.base_url == "http://10.8.0.42/"
+    assert defaults.base_url == "http://10.8.0.42:18080/"
 
 
 def test_normalize_answers_pads_missing_values():

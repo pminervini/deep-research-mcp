@@ -129,11 +129,61 @@ Dr Tulu provider example:
 [research]
 provider = "dr-tulu"
 model = "dr-tulu"                   # Logical provider model id; currently informational
-base_url = "http://10.8.0.42/"      # Dr Tulu service base URL; the backend calls /chat
+base_url = "http://10.8.0.42:18080/" # Dr Tulu service base URL; the backend calls /chat
 api_key = ""                        # Optional; defaults to RESEARCH_API_KEY / DR_TULU_API_KEY if set
 timeout = 1800
 poll_interval = 30
 ```
+
+Running Dr Tulu locally:
+
+1. Clone and configure [`dr-tulu`](https://github.com/allenai/dr-tulu) separately.
+2. In `dr-tulu/agent/.env`, set at least:
+   - `SERPER_API_KEY`
+   - `JINA_API_KEY`
+   - `S2_API_KEY` (optional but recommended)
+3. Start the DR-Tulu model server:
+
+```bash
+cd /path/to/dr-tulu/agent
+conda run -n vllm bash -lc '
+  CUDA_VISIBLE_DEVICES=0 \
+  vllm serve rl-research/DR-Tulu-8B \
+    --port 30001 \
+    --dtype auto \
+    --max-model-len 16384 \
+    --gpu-memory-utilization 0.60 \
+    --enforce-eager
+'
+```
+
+4. Start the Dr Tulu MCP backend:
+
+```bash
+cd /path/to/dr-tulu/agent
+conda run -n vllm python -m dr_agent.mcp_backend.main --port 8000
+```
+
+5. Start the Dr Tulu app service:
+
+```bash
+cd /path/to/dr-tulu/agent
+conda run -n vllm python workflows/auto_search_sft.py serve \
+  --port 18080 \
+  --config workflows/auto_search_sft.yaml \
+  --config-overrides "search_agent_max_tokens=12000,browse_agent_max_tokens=12000"
+```
+
+6. Point `deep-research-mcp` at that service:
+
+```toml
+[research]
+provider = "dr-tulu"
+base_url = "http://10.8.0.42:18080/"
+timeout = 1800
+```
+
+The `dr-tulu` backend calls `POST {base_url}/chat`, so if you front Dr Tulu behind a different host, port, or reverse proxy, update `base_url` accordingly.
 
 Perplexity (via [Sonar Deep Research](https://docs.perplexity.ai/getting-started/models/models/sonar-deep-research) and Perplexity's [OpenAI-compatible endpoint](https://docs.perplexity.ai/guides/chat-completions-guide)) provider example:
 
@@ -469,7 +519,7 @@ In `agent` mode, the TUI applies provider-aware defaults:
 
 - `openai` + `responses`: model `o4-mini-deep-research-2025-06-26`, base URL `https://api.openai.com/v1`
 - `openai` + `chat_completions`: model `gpt-5-mini`, base URL `https://api.openai.com/v1`
-- `dr-tulu`: model `dr-tulu`, base URL `http://10.8.0.42/`
+- `dr-tulu`: model `dr-tulu`, base URL `http://10.8.0.42:18080/`
 - `gemini`: model `deep-research-pro-preview-12-2025`, base URL `https://generativelanguage.googleapis.com`
 - `open-deep-research`: model `openai/qwen/qwen3-coder-30b`, base URL `http://localhost:1234/v1`
 
@@ -918,7 +968,7 @@ Configuration class for the research agent.
   - Gemini: Deep Research agent id (for example `deep-research-pro-preview-12-2025`)
   - Open Deep Research: LiteLLM model id (e.g., `openai/qwen/qwen3-coder-30b`)
 - `api_key`: API key for the configured endpoint (optional). Defaults to env `OPENAI_API_KEY` for `openai`, `DR_TULU_API_KEY` for `dr-tulu`, `GEMINI_API_KEY` / `GOOGLE_API_KEY` for `gemini`.
-- `base_url`: Provider API base URL (optional). Defaults to `https://api.openai.com/v1` for `openai`, `http://10.8.0.42/` for `dr-tulu`, `https://generativelanguage.googleapis.com` for `gemini`, and `http://localhost:1234/v1` for `open-deep-research`.
+- `base_url`: Provider API base URL (optional). Defaults to `https://api.openai.com/v1` for `openai`, `http://10.8.0.42:18080/` for `dr-tulu`, `https://generativelanguage.googleapis.com` for `gemini`, and `http://localhost:1234/v1` for `open-deep-research`.
 - `timeout`: Maximum time for research in seconds (default: 1800)
 - `poll_interval`: Polling interval in seconds (default: 30)
 - `enable_clarification`: Enable clarifying questions (default: False)

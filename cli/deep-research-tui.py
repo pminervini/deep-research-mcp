@@ -182,7 +182,7 @@ def get_provider_defaults(
             provider="dr-tulu",
             api_style="responses",
             model="dr-tulu",
-            base_url="http://10.8.0.42/",
+            base_url="http://10.8.0.42:18080/",
         )
     if provider == "gemini":
         return ProviderDefaults(
