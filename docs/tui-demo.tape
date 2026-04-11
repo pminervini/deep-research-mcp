@@ -1,7 +1,10 @@
 # VHS Tape for Deep Research TUI Demo
 # https://github.com/charmbracelet/vhs
+#
+# After recording, speed up the waiting portion:
+# ffmpeg -i docs/images/tui-demo-raw.gif -filter_complex "[0:v]setpts=0.3*PTS[v]" -map "[v]" docs/images/tui-demo.gif
 
-Output docs/images/tui-demo.gif
+Output docs/images/tui-demo-raw.gif
 
 Set Shell "zsh"
 Set FontSize 14
@@ -15,57 +18,58 @@ Type "cd /Users/pminervi/workspace/deep-research-mcp && uv run python cli/deep-r
 Enter
 Sleep 3s
 
-# Navigate to API Style (Mode -> Save Path -> Task ID -> Provider -> API Style)
+# Navigate to API Style
 Down
-Sleep 200ms
+Sleep 150ms
 Down
-Sleep 200ms
+Sleep 150ms
 Down
-Sleep 200ms
+Sleep 150ms
 Down
-Sleep 200ms
+Sleep 150ms
 
-# Change to Chat Completions for faster results
+# Change to Chat Completions
 Right
-Sleep 400ms
+Sleep 300ms
 
-# Navigate to Query area (API Style -> Model -> Base URL -> Include Analysis -> JSON Output -> Query)
+# Navigate to Query area
 Down
-Sleep 200ms
+Sleep 150ms
 Down
-Sleep 200ms
+Sleep 150ms
 Down
-Sleep 200ms
+Sleep 150ms
 Down
-Sleep 200ms
+Sleep 150ms
 Down
-Sleep 200ms
+Sleep 150ms
 Down
-Sleep 200ms
+Sleep 150ms
 
 # Type the research query
 Type "What are the top 3 nuclear fusion breakthroughs in 2025?"
-Sleep 1s
+Sleep 500ms
 
-# Tab to Research button (Query -> System Prompt -> Clarify -> Research)
+# Tab to Research button
 Tab
-Sleep 200ms
+Sleep 150ms
 Tab
-Sleep 200ms
+Sleep 150ms
 Tab
-Sleep 200ms
+Sleep 150ms
 
 # Press Enter to run research
 Enter
-Sleep 3s
 
-# Wait for research to complete (chat completions takes ~10s)
-Sleep 17s
+# Brief pause showing "Starting research"
+Sleep 2s
 
-# Show results for a moment
-Sleep 5s
+# Wait for results (API takes ~25s, we'll speed this up with ffmpeg)
+Sleep 28s
 
-# The app shows results - end recording here
-# (pressing q while focused on a button should work)
+# Show results
+Sleep 4s
+
+# Quit
 Type "q"
-Sleep 1s
+Sleep 500ms
