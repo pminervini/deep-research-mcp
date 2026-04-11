@@ -3,6 +3,8 @@
 #
 # Requires: brew install vhs; GEMINI_API_KEY or GOOGLE_API_KEY for Gemini.
 # Regenerate: vhs docs/tui-demo.tape
+# After a full run, shorten the long "Please wait" span in the GIF (README-sized):
+#   ./docs/trim-tui-demo-gif.sh
 
 Output docs/images/tui-demo.gif
 

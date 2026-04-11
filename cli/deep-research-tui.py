@@ -44,6 +44,7 @@ from textual.widgets import (
     Header,
     Input,
     Label,
+    Markdown,
     Rule,
     Select,
     Static,
@@ -463,10 +464,33 @@ class DeepResearchTUI(App):
         background: $accent;
     }
 
+    #output-header {
+        layout: horizontal;
+        height: auto;
+        margin-bottom: 1;
+        align: left middle;
+    }
+
+    #output-header .section-title {
+        width: 1fr;
+        margin: 0;
+    }
+
+    #output-header Button {
+        min-width: 12;
+        margin-left: 1;
+    }
+
     #output-scroll {
         height: 100%;
         border: round $panel;
         background: $surface;
+    }
+
+    #output-markdown {
+        padding: 1 2;
+        width: 100%;
+        height: auto;
     }
 
     #output-area {
@@ -537,6 +561,7 @@ class DeepResearchTUI(App):
         super().__init__()
         self._startup_state = startup_state or StartupState()
         self._output_text = ""
+        self._output_view: str = "markdown"
         self._status_message = "Ready"
 
     def on_mount(self) -> None:
@@ -563,6 +588,7 @@ class DeepResearchTUI(App):
         self.query_one("#system-prompt-area", TextArea).text = state.system_prompt
 
         self._update_mode_visibility()
+        self._apply_output_view()
         self.query_one("#mode", Select).focus()
 
     def compose(self) -> ComposeResult:
@@ -650,8 +676,16 @@ class DeepResearchTUI(App):
                     yield Button("Save", id="btn-save", variant="default")
 
             with Vertical(id="right-panel"):
-                yield Label("Output", classes="section-title")
+                with Horizontal(id="output-header"):
+                    yield Label("Output", classes="section-title")
+                    yield Button(
+                        "Markdown",
+                        id="btn-output-md",
+                        variant="primary",
+                    )
+                    yield Button("Raw", id="btn-output-raw", variant="default")
                 with VerticalScroll(id="output-scroll"):
+                    yield Markdown("", id="output-markdown", open_links=True)
                     yield Static("", id="output-area")
 
         yield Static("Ready", id="status-bar")
@@ -692,12 +726,45 @@ class DeepResearchTUI(App):
     def _set_output(self, text: str) -> None:
         """Set the output panel text."""
         self._output_text = text
-        self.query_one("#output-area", Static).update(text)
+        self._refresh_output_body()
 
     def _append_output(self, text: str) -> None:
         """Append text to the output panel."""
         self._output_text += text
-        self.query_one("#output-area", Static).update(self._output_text)
+        self._refresh_output_body()
+
+    def _refresh_output_body(self) -> None:
+        """Push stored output to both Markdown and plain views."""
+        body = self._output_text
+        self.query_one("#output-markdown", Markdown).update(body)
+        self.query_one("#output-area", Static).update(body)
+
+    def _apply_output_view(self) -> None:
+        """Show either rendered Markdown or raw text; update toggle buttons."""
+        md = self.query_one("#output-markdown", Markdown)
+        raw = self.query_one("#output-area", Static)
+        btn_md = self.query_one("#btn-output-md", Button)
+        btn_raw = self.query_one("#btn-output-raw", Button)
+        if self._output_view == "markdown":
+            md.display = True
+            raw.display = False
+            btn_md.variant = "primary"
+            btn_raw.variant = "default"
+        else:
+            md.display = False
+            raw.display = True
+            btn_md.variant = "default"
+            btn_raw.variant = "primary"
+
+    @on(Button.Pressed, "#btn-output-md")
+    def handle_output_markdown(self) -> None:
+        self._output_view = "markdown"
+        self._apply_output_view()
+
+    @on(Button.Pressed, "#btn-output-raw")
+    def handle_output_raw(self) -> None:
+        self._output_view = "raw"
+        self._apply_output_view()
 
     def _show_clarification_section(self, questions: list[str]) -> None:
         """Show the clarification section with questions."""
