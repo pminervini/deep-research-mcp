@@ -10,6 +10,7 @@ from deep_research_mcp.config import ResearchConfig
 from deep_research_mcp.errors import ConfigurationError
 
 from .base import ResearchBackend
+from .dr_tulu_backend import DrTuluResearchBackend
 from .gemini_backend import GeminiResearchBackend
 from .open_deep_research_backend import OpenDeepResearchBackend
 from .openai_backend import OpenAIResearchBackend
@@ -21,6 +22,8 @@ def build_research_backend(
     """Construct the provider-specific backend for the current configuration."""
     if config.provider in {"openai"}:
         return OpenAIResearchBackend(config, logger)
+    if config.provider in {"dr-tulu"}:
+        return DrTuluResearchBackend(config, logger)
     if config.provider in {"gemini"}:
         return GeminiResearchBackend(config, logger)
     if config.provider in {"open-deep-research"}:
@@ -31,6 +34,7 @@ def build_research_backend(
 __all__ = [
     "ResearchBackend",
     "OpenAIResearchBackend",
+    "DrTuluResearchBackend",
     "GeminiResearchBackend",
     "OpenDeepResearchBackend",
     "build_research_backend",

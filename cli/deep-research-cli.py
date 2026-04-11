@@ -591,7 +591,7 @@ def build_parser() -> argparse.ArgumentParser:
     cfg.add_argument(
         "--provider",
         default=None,
-        choices=["openai", "gemini", "open-deep-research"],
+        choices=["openai", "dr-tulu", "gemini", "open-deep-research"],
         help="Research provider",
     )
     cfg.add_argument("--model", default=None, help="Model or agent ID")

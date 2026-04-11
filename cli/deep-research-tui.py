@@ -177,6 +177,13 @@ def get_provider_defaults(
             model="o4-mini-deep-research-2025-06-26",
             base_url="https://api.openai.com/v1",
         )
+    if provider == "dr-tulu":
+        return ProviderDefaults(
+            provider="dr-tulu",
+            api_style="responses",
+            model="dr-tulu",
+            base_url="http://10.8.0.42/",
+        )
     if provider == "gemini":
         return ProviderDefaults(
             provider=provider,
@@ -624,6 +631,7 @@ class DeepResearchTUI(App):
                     yield Select(
                         [
                             ("OpenAI", "openai"),
+                            ("Dr Tulu", "dr-tulu"),
                             ("Gemini", "gemini"),
                             ("Open Deep Research", "open-deep-research"),
                         ],
@@ -1376,7 +1384,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--provider",
-        choices=["openai", "gemini", "open-deep-research"],
+        choices=["openai", "dr-tulu", "gemini", "open-deep-research"],
         default="openai",
         help="Research provider (default: openai)",
     )

@@ -76,11 +76,11 @@ Common settings:
 
 ```toml
 [research]                                  # Core Deep Research functionality
-provider = "openai"                         # Available options: "openai", "gemini", "open-deep-research" -- defaults to "openai"
+provider = "openai"                         # Available options: "openai", "dr-tulu", "gemini", "open-deep-research" -- defaults to "openai"
 api_style = "responses"                     # Only applies to provider="openai"; use "chat_completions" for Perplexity, Groq, Ollama, etc.
-model = "o4-mini-deep-research-2025-06-26"  # OpenAI: model identifier; Gemini: agent id; ODR: LiteLLM model identifier, e.g., openai/qwen/qwen3-coder-30b
+model = "o4-mini-deep-research-2025-06-26"  # OpenAI: model identifier; Dr Tulu: logical provider id; Gemini: agent id; ODR: LiteLLM model identifier
 api_key = "your-api-key"                    # API key, optional
-base_url = "https://api.openai.com/v1"      # OpenAI: OpenAI-compatible endpoint; Gemini: https://generativelanguage.googleapis.com; ODR: LiteLLM-compatible endpoint
+base_url = "https://api.openai.com/v1"      # OpenAI: OpenAI-compatible endpoint; Dr Tulu: service base URL; Gemini: https://generativelanguage.googleapis.com; ODR: LiteLLM-compatible endpoint
 
 # Task behavior
 timeout = 1800
@@ -119,6 +119,18 @@ provider = "gemini"
 model = "deep-research-pro-preview-12-2025"     # Gemini Deep Research agent id
 api_key = "AIza..."                             # Defaults to GEMINI_API_KEY or GOOGLE_API_KEY
 base_url = "https://generativelanguage.googleapis.com"
+timeout = 1800
+poll_interval = 30
+```
+
+Dr Tulu provider example:
+
+```toml
+[research]
+provider = "dr-tulu"
+model = "dr-tulu"                   # Logical provider model id; currently informational
+base_url = "http://10.8.0.42/"      # Dr Tulu service base URL; the backend calls /chat
+api_key = ""                        # Optional; defaults to RESEARCH_API_KEY / DR_TULU_API_KEY if set
 timeout = 1800
 poll_interval = 30
 ```
@@ -457,6 +469,7 @@ In `agent` mode, the TUI applies provider-aware defaults:
 
 - `openai` + `responses`: model `o4-mini-deep-research-2025-06-26`, base URL `https://api.openai.com/v1`
 - `openai` + `chat_completions`: model `gpt-5-mini`, base URL `https://api.openai.com/v1`
+- `dr-tulu`: model `dr-tulu`, base URL `http://10.8.0.42/`
 - `gemini`: model `deep-research-pro-preview-12-2025`, base URL `https://generativelanguage.googleapis.com`
 - `open-deep-research`: model `openai/qwen/qwen3-coder-30b`, base URL `http://localhost:1234/v1`
 
@@ -746,7 +759,7 @@ corresponding `ResearchConfig` field:
 | Flag | Description |
 |------|-------------|
 | `--config PATH` | Path to TOML config file (default: `~/.deep_research`) |
-| `--provider {openai,gemini,open-deep-research}` | Research provider |
+| `--provider {openai,dr-tulu,gemini,open-deep-research}` | Research provider |
 | `--model MODEL` | Model or agent ID |
 | `--api-key KEY` | Provider API key |
 | `--base-url URL` | Provider API base URL |
@@ -826,7 +839,7 @@ clarification_api_key = "sk-your-clarification-api-key-here"   # Optional custom
 clarification_base_url = "https://custom-api.example.com/v1"   # Optional custom endpoint for clarification models
 ```
 
-Clarification and instruction-building remain OpenAI-compatible chat flows. If your main research provider is `gemini` or `open-deep-research`, set `clarification_api_key` / `clarification_base_url` explicitly, or provide `OPENAI_API_KEY` / `OPENAI_BASE_URL` in the environment for those helper models.
+Clarification and instruction-building remain OpenAI-compatible chat flows. If your main research provider is `dr-tulu`, `gemini`, or `open-deep-research`, set `clarification_api_key` / `clarification_base_url` explicitly, or provide `OPENAI_API_KEY` / `OPENAI_BASE_URL` in the environment for those helper models.
 
 ### Usage Flow
 
@@ -897,14 +910,15 @@ Configuration class for the research agent.
 
 #### Parameters
 
-- `provider`: Research provider (`openai`, `gemini`, or `open-deep-research`; default: `openai`)
-- `api_style`: API style for the `openai` provider (`responses` or `chat_completions`; default: `responses`). Ignored for `gemini` and `open-deep-research`.
+- `provider`: Research provider (`openai`, `dr-tulu`, `gemini`, or `open-deep-research`; default: `openai`)
+- `api_style`: API style for the `openai` provider (`responses` or `chat_completions`; default: `responses`). Ignored for `dr-tulu`, `gemini`, and `open-deep-research`.
 - `model`: Model identifier
   - OpenAI: Responses model (e.g., `gpt-5-mini`)
+  - Dr Tulu: logical provider id (default: `dr-tulu`)
   - Gemini: Deep Research agent id (for example `deep-research-pro-preview-12-2025`)
   - Open Deep Research: LiteLLM model id (e.g., `openai/qwen/qwen3-coder-30b`)
-- `api_key`: API key for the configured endpoint (optional). Defaults to env `OPENAI_API_KEY` for `openai`, `GEMINI_API_KEY` / `GOOGLE_API_KEY` for `gemini`.
-- `base_url`: Provider API base URL (optional). Defaults to `https://api.openai.com/v1` for `openai`, `https://generativelanguage.googleapis.com` for `gemini`, and `http://localhost:1234/v1` for `open-deep-research`.
+- `api_key`: API key for the configured endpoint (optional). Defaults to env `OPENAI_API_KEY` for `openai`, `DR_TULU_API_KEY` for `dr-tulu`, `GEMINI_API_KEY` / `GOOGLE_API_KEY` for `gemini`.
+- `base_url`: Provider API base URL (optional). Defaults to `https://api.openai.com/v1` for `openai`, `http://10.8.0.42/` for `dr-tulu`, `https://generativelanguage.googleapis.com` for `gemini`, and `http://localhost:1234/v1` for `open-deep-research`.
 - `timeout`: Maximum time for research in seconds (default: 1800)
 - `poll_interval`: Polling interval in seconds (default: 30)
 - `enable_clarification`: Enable clarifying questions (default: False)
