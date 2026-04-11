@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Shorten the "Please wait..." section in docs/images/tui-demo.gif after a full VHS
-# recording. Keeps: intro, ~4s of loading UI, then the completed report and shell demo.
+# Shorten the long Gemini wait in docs/images/tui-demo.gif after a full VHS recording.
 #
-# Requires: ffmpeg (palette filters). Tune times with ffmpeg scene detection if the
-# tape layout changes:
-#   ffmpeg -i docs/images/tui-demo.gif -vf "select='gt(scene,0.015)',showinfo" -f null - 2>&1
+# Uses two segments only (no duplicate "please wait" clip):
+#   1) First few seconds: shell, TUI launch, query, press r, brief spinner
+#   2) Jump to completed report (scene-detected time from full capture)
+#
+# Requires: ffmpeg. Re-tune times after UI or tape changes:
+#   ffmpeg -i docs/images/tui-demo.gif -vf "select='gt(scene,0.012)',showinfo" -f null - 2>&1
 #
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -17,18 +19,14 @@ if awk -v d="$dur" 'BEGIN{exit !(d < 90)}'; then
   exit 0
 fi
 
-# Seconds (playback time in the source GIF). Re-tune after UI or tape changes:
-#   ffmpeg -i docs/images/tui-demo.gif -vf "select='gt(scene,0.015)',showinfo" -f null - 2>&1
-intro_end=9
-load_start=9
-load_end=13
+# Seconds in the *full* VHS GIF (before this script). Re-tune after UI or tape changes.
+intro_end=6
 result_start=177
 
 ffmpeg -y -i "$src" -filter_complex "\
 [0:v]trim=end=${intro_end},setpts=PTS-STARTPTS[v1];\
-[0:v]trim=start=${load_start}:end=${load_end},setpts=PTS-STARTPTS[v2];\
-[0:v]trim=start=${result_start},setpts=PTS-STARTPTS[v3];\
-[v1][v2][v3]concat=n=3:v=1[v];\
+[0:v]trim=start=${result_start},setpts=PTS-STARTPTS[v2];\
+[v1][v2]concat=n=2:v=1[v];\
 [v]split[vt][vp];\
 [vp]palettegen=reserve_transparent=1:stats_mode=diff[p];\
 [vt][p]paletteuse=dither=bayer:bayer_scale=5[out]" \
