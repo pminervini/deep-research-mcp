@@ -96,6 +96,8 @@ CODEX_THEME = Theme(
 class ProviderDefaults:
     """Provider-specific default settings."""
 
+    provider: str
+    api_style: str
     model: str
     base_url: str
 
@@ -107,24 +109,44 @@ def get_provider_defaults(
     if provider == "openai":
         if api_style == "chat_completions":
             return ProviderDefaults(
+                provider="openai",
+                api_style="chat_completions",
                 model="gpt-5-mini",
                 base_url="https://api.openai.com/v1",
             )
         return ProviderDefaults(
+            provider="openai",
+            api_style="responses",
             model="o4-mini-deep-research-2025-06-26",
             base_url="https://api.openai.com/v1",
         )
+    if provider == "dr-tulu":
+        return ProviderDefaults(
+            provider="dr-tulu",
+            api_style="responses",
+            model="dr-tulu",
+            base_url="http://10.8.0.42/",
+        )
     if provider == "gemini":
         return ProviderDefaults(
+            provider="gemini",
+            api_style="responses",
             model="deep-research-pro-preview-12-2025",
             base_url="https://generativelanguage.googleapis.com",
         )
     if provider == "open-deep-research":
         return ProviderDefaults(
+            provider="open-deep-research",
+            api_style="responses",
             model="openai/qwen/qwen3-coder-30b",
             base_url="http://localhost:1234/v1",
         )
-    return ProviderDefaults(model="gpt-5-mini", base_url="https://api.openai.com/v1")
+    return ProviderDefaults(
+        provider="openai",
+        api_style="responses",
+        model="gpt-5-mini",
+        base_url="https://api.openai.com/v1",
+    )
 
 
 @dataclass
@@ -525,6 +547,7 @@ class DeepResearchTUI(App):
                     yield Select(
                         [
                             ("OpenAI", "openai"),
+                            ("Dr Tulu", "dr-tulu"),
                             ("Gemini", "gemini"),
                             ("Open Deep Research", "open-deep-research"),
                         ],
@@ -1236,7 +1259,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--provider",
-        choices=["openai", "gemini", "open-deep-research"],
+        choices=["openai", "dr-tulu", "gemini", "open-deep-research"],
         default="openai",
         help="Research provider (default: openai)",
     )

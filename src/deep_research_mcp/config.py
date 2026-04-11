@@ -163,7 +163,14 @@ class ResearchConfig:
         }:
             api_style = cls.api_style
 
-        if provider in {"open-deep-research"}:
+        if provider in {"dr-tulu"}:
+            default_model = "dr-tulu"
+            default_base_url = "http://10.8.0.42/"
+            api_key = get_setting_first("RESEARCH_API_KEY", "DR_TULU_API_KEY")
+            base_url = get_setting_first(
+                "RESEARCH_BASE_URL", "DR_TULU_BASE_URL", default=default_base_url
+            )
+        elif provider in {"open-deep-research"}:
             default_model = "openai/qwen/qwen3-coder-30b"
             default_base_url = "http://localhost:1234/v1"
             api_key = get_setting_first("RESEARCH_API_KEY", "OPENAI_API_KEY")
