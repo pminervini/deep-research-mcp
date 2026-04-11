@@ -10,7 +10,11 @@ import os
 import pytest
 
 from deep_research_mcp.agent import DeepResearchAgent
-from deep_research_mcp.backends import GeminiResearchBackend, OpenAIResearchBackend
+from deep_research_mcp.backends import (
+    DrTuluResearchBackend,
+    GeminiResearchBackend,
+    OpenAIResearchBackend,
+)
 from deep_research_mcp.config import ResearchConfig
 from deep_research_mcp.results import ResearchResult, ResearchTaskStatus
 
@@ -93,6 +97,40 @@ def test_gemini_agent_initialization():
             os.environ["RESEARCH_API_KEY"] = old_api_key
         else:
             os.environ.pop("RESEARCH_API_KEY", None)
+
+
+def test_dr_tulu_agent_initialization():
+    """Test Dr Tulu agent initialization without making network calls."""
+    old_provider = os.environ.get("RESEARCH_PROVIDER")
+    old_model = os.environ.get("RESEARCH_MODEL")
+    old_base_url = os.environ.get("RESEARCH_BASE_URL")
+
+    os.environ["RESEARCH_PROVIDER"] = "dr-tulu"
+    os.environ["RESEARCH_MODEL"] = "dr-tulu"
+    os.environ["RESEARCH_BASE_URL"] = "http://10.8.0.42/"
+
+    try:
+        config = ResearchConfig.from_env()
+        agent = DeepResearchAgent(config)
+        assert agent.config.provider == "dr-tulu"
+        assert isinstance(agent.backend, DrTuluResearchBackend)
+        assert agent.config.base_url == "http://10.8.0.42/"
+        assert agent.instruction_client is None
+    finally:
+        if old_provider:
+            os.environ["RESEARCH_PROVIDER"] = old_provider
+        else:
+            os.environ.pop("RESEARCH_PROVIDER", None)
+
+        if old_model:
+            os.environ["RESEARCH_MODEL"] = old_model
+        else:
+            os.environ.pop("RESEARCH_MODEL", None)
+
+        if old_base_url:
+            os.environ["RESEARCH_BASE_URL"] = old_base_url
+        else:
+            os.environ.pop("RESEARCH_BASE_URL", None)
 
 
 @pytest.mark.asyncio
