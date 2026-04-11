@@ -1,7 +1,12 @@
 # VHS Tape for Deep Research TUI Demo
 # https://github.com/charmbracelet/vhs
+#
+# Requires: brew install vhs; GEMINI_API_KEY or GOOGLE_API_KEY for Gemini.
+# Regenerate: vhs docs/tui-demo.tape
+# After a full run, shorten the long wait (jump to results after ~6s intro):
+#   ./docs/trim-tui-demo-gif.sh
 
-Output docs/images/tui-demo-raw.gif
+Output docs/images/tui-demo.gif
 
 Set Shell "zsh"
 Set FontSize 14
@@ -10,60 +15,30 @@ Set Height 900
 Set Padding 20
 Set Theme "Catppuccin Mocha"
 
-# Start the TUI
-Type "cd /Users/pminervi/workspace/deep-research-mcp && uv run python cli/deep-research-tui.py"
+# Gemini via CLI; Save Path preset for the save demo at the end
+Type "cd /Users/pasquale/workspace/deep-research-mcp && uv run python cli/deep-research-tui.py --provider gemini --save-path docs/tui-demo-output.md --query 'What are three established facts about the planet Mars?'"
 Enter
 Sleep 3s
 
-# Navigate to API Style
-Down
-Sleep 150ms
-Down
-Sleep 150ms
-Down
-Sleep 150ms
-Down
-Sleep 150ms
-
-# Change to Chat Completions
-Right
-Sleep 300ms
-
-# Navigate to Query area
-Down
-Sleep 150ms
-Down
-Sleep 150ms
-Down
-Sleep 150ms
-Down
-Sleep 150ms
-Down
-Sleep 150ms
-Down
-Sleep 150ms
-
-# Type the research query
-Type "What are the top 3 nuclear fusion breakthroughs in 2025?"
+# Start deep research
+Type "r"
 Sleep 500ms
 
-# Tab to Research button
-Tab
-Sleep 150ms
-Tab
-Sleep 150ms
-Tab
-Sleep 150ms
+# Wait for Gemini deep research (typical run is a few minutes; allow headroom)
+Sleep 360s
 
-# Press Enter to run research
-Enter
+# Hold the completed report on screen
+Sleep 8s
 
-# Wait long enough for results (API takes ~27s, add buffer)
-Sleep 45s
+# Save output to the path in Save Path (footer: Save)
+Type "s"
+Sleep 3s
 
-# Show results
-Sleep 5s
-
-# Quit
+# Quit TUI
 Type "q"
-Sleep 500ms
+Sleep 2s
+
+# Show the file written to disk
+Type "wc -c docs/tui-demo-output.md && head -n 35 docs/tui-demo-output.md"
+Enter
+Sleep 6s

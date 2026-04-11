@@ -29,6 +29,7 @@
 - Test files: `tests/test_*.py`; keep focused and deterministic. Place shared fixtures in `conftest.py` if introduced.
 - Tests that hit OpenAI APIs require `OPENAI_API_KEY`; such tests are skip-aware—prefer marking and clear env checks.
 - ABSOLUTELY DO NOT use monkey patching or mock classes in `tests/`.
+- If tests in `tests/` target obsolete behavior from an older code version, update the tests to match the intended current behavior instead of patching the code to preserve outdated behavior.
 
 ## Commit & Pull Request Guidelines
 - Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `chore:` (see git history).

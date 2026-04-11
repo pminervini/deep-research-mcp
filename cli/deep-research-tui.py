@@ -44,6 +44,7 @@ from textual.widgets import (
     Header,
     Input,
     Label,
+    Markdown,
     Rule,
     Select,
     Static,
@@ -57,6 +58,62 @@ from deep_research_mcp import (
     ResearchError,
     ResearchResult,
 )
+
+NO_ANSWER_PLACEHOLDER = "[No answer provided]"
+
+
+def normalize_answers(questions: list[str], answers: list[str]) -> list[str]:
+    """Pad or substitute answers so len(result) == len(questions)."""
+    out: list[str] = []
+    for i, _ in enumerate(questions):
+        if i < len(answers):
+            text = answers[i].strip()
+            out.append(text if text else NO_ANSWER_PLACEHOLDER)
+        else:
+            out.append(NO_ANSWER_PLACEHOLDER)
+    return out
+
+
+def parse_task_id_from_output(text: str) -> str | None:
+    """Extract a task id from formatted research output or status text."""
+    if not text:
+        return None
+    m = re.search(r"\*\*Task ID\*\*:\s*`?([^`\s\n]+)`?", text)
+    if m:
+        return m.group(1)
+    m = re.search(r"Task\s+([^\s]+)\s+status:", text)
+    if m:
+        return m.group(1)
+    return None
+
+
+def render_agent_clarification_output(query: str, result: dict[str, Any]) -> str:
+    """Format clarification API result for the output panel."""
+    lines: list[str] = [f"Query: {query}", ""]
+    if result.get("reasoning"):
+        lines.append(f"Reasoning: {result['reasoning']}")
+    sid = result.get("session_id")
+    if sid:
+        lines.append(f"Session ID: {sid}")
+    created = result.get("created_at")
+    if created:
+        lines.append(f"Created: {created}")
+    questions = result.get("questions") or []
+    if questions:
+        lines.append("")
+        lines.append("Clarifying Questions:")
+        for i, q in enumerate(questions, 1):
+            lines.append(f"  {i}. {q}")
+    return "\n".join(lines)
+
+
+def write_output_file(path: str, content: str) -> str:
+    """Write UTF-8 text to path, creating parent directories as needed."""
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(content, encoding="utf-8")
+    return str(p)
+
 
 DEFAULT_SYSTEM_PROMPT = """
 You are a professional researcher preparing a structured, data-driven report.
@@ -109,13 +166,13 @@ def get_provider_defaults(
     if provider == "openai":
         if api_style == "chat_completions":
             return ProviderDefaults(
-                provider="openai",
-                api_style="chat_completions",
+                provider=provider,
+                api_style=api_style,
                 model="gpt-5-mini",
                 base_url="https://api.openai.com/v1",
             )
         return ProviderDefaults(
-            provider="openai",
+            provider=provider,
             api_style="responses",
             model="o4-mini-deep-research-2025-06-26",
             base_url="https://api.openai.com/v1",
@@ -129,14 +186,14 @@ def get_provider_defaults(
         )
     if provider == "gemini":
         return ProviderDefaults(
-            provider="gemini",
+            provider=provider,
             api_style="responses",
             model="deep-research-pro-preview-12-2025",
             base_url="https://generativelanguage.googleapis.com",
         )
     if provider == "open-deep-research":
         return ProviderDefaults(
-            provider="open-deep-research",
+            provider=provider,
             api_style="responses",
             model="openai/qwen/qwen3-coder-30b",
             base_url="http://localhost:1234/v1",
@@ -159,11 +216,13 @@ class StartupState:
     query: str = ""
     task_id: str = ""
     save_path: str = "output.md"
+    provider: str = "openai"
+    api_style: str = "responses"
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
     include_analysis: bool = True
     json_output: bool = False
     config: ProviderDefaults = field(
-        default_factory=lambda: get_provider_defaults("openai")
+        default_factory=lambda: get_provider_defaults("openai", "responses")
     )
 
 
@@ -218,14 +277,14 @@ class ClarificationAnswersPanel(Container):
 
     def get_answers(self) -> list[str]:
         """Collect current answer values from input widgets."""
-        answers: list[str] = []
+        raw: list[str] = []
         for i in range(len(self._questions)):
             try:
                 inp = self.query_one(f"#clarification-answer-{i}", Input)
-                answers.append(inp.value.strip() or "[No answer provided]")
+                raw.append(inp.value)
             except Exception:
-                answers.append("[No answer provided]")
-        return answers
+                raw.append("")
+        return normalize_answers(self._questions, raw)
 
     def clear(self) -> None:
         """Clear all questions and answers."""
@@ -412,10 +471,33 @@ class DeepResearchTUI(App):
         background: $accent;
     }
 
+    #output-header {
+        layout: horizontal;
+        height: auto;
+        margin-bottom: 1;
+        align: left middle;
+    }
+
+    #output-header .section-title {
+        width: 1fr;
+        margin: 0;
+    }
+
+    #output-header Button {
+        min-width: 12;
+        margin-left: 1;
+    }
+
     #output-scroll {
         height: 100%;
         border: round $panel;
         background: $surface;
+    }
+
+    #output-markdown {
+        padding: 1 2;
+        width: 100%;
+        height: auto;
     }
 
     #output-area {
@@ -486,6 +568,7 @@ class DeepResearchTUI(App):
         super().__init__()
         self._startup_state = startup_state or StartupState()
         self._output_text = ""
+        self._output_view: str = "markdown"
         self._status_message = "Ready"
 
     def on_mount(self) -> None:
@@ -494,24 +577,25 @@ class DeepResearchTUI(App):
 
         state = self._startup_state
         self.mode = state.mode
-        self.provider = "openai"
+        self.provider = state.provider
+        self.api_style = state.api_style
 
         self.query_one("#mode", Select).value = state.mode
         self.query_one("#save-path", Input).value = state.save_path
         self.query_one("#task-id", Input).value = state.task_id
         self.query_one("#server-url", Input).value = state.server_url
-        self.query_one("#provider", Select).value = "openai"
-        self.query_one("#api-style", Select).value = (
-            state.config.model.startswith("gpt") and "chat_completions" or "responses"
-        )
+        self.query_one("#provider", Select).value = state.provider
+        self.query_one("#api-style", Select).value = state.api_style
         self.query_one("#model", Input).value = state.config.model
         self.query_one("#base-url", Input).value = state.config.base_url
+        self.query_one("#api-style", Select).disabled = state.provider != "openai"
         self.query_one("#include-analysis", Switch).value = state.include_analysis
         self.query_one("#json-output", Switch).value = state.json_output
         self.query_one("#query-area", TextArea).text = state.query
         self.query_one("#system-prompt-area", TextArea).text = state.system_prompt
 
         self._update_mode_visibility()
+        self._apply_output_view()
         self.query_one("#mode", Select).focus()
 
     def compose(self) -> ComposeResult:
@@ -600,8 +684,16 @@ class DeepResearchTUI(App):
                     yield Button("Save", id="btn-save", variant="default")
 
             with Vertical(id="right-panel"):
-                yield Label("Output", classes="section-title")
+                with Horizontal(id="output-header"):
+                    yield Label("Output", classes="section-title")
+                    yield Button(
+                        "Markdown",
+                        id="btn-output-md",
+                        variant="primary",
+                    )
+                    yield Button("Raw", id="btn-output-raw", variant="default")
                 with VerticalScroll(id="output-scroll"):
+                    yield Markdown("", id="output-markdown", open_links=True)
                     yield Static("", id="output-area")
 
         yield Static("Ready", id="status-bar")
@@ -642,12 +734,45 @@ class DeepResearchTUI(App):
     def _set_output(self, text: str) -> None:
         """Set the output panel text."""
         self._output_text = text
-        self.query_one("#output-area", Static).update(text)
+        self._refresh_output_body()
 
     def _append_output(self, text: str) -> None:
         """Append text to the output panel."""
         self._output_text += text
-        self.query_one("#output-area", Static).update(self._output_text)
+        self._refresh_output_body()
+
+    def _refresh_output_body(self) -> None:
+        """Push stored output to both Markdown and plain views."""
+        body = self._output_text
+        self.query_one("#output-markdown", Markdown).update(body)
+        self.query_one("#output-area", Static).update(body)
+
+    def _apply_output_view(self) -> None:
+        """Show either rendered Markdown or raw text; update toggle buttons."""
+        md = self.query_one("#output-markdown", Markdown)
+        raw = self.query_one("#output-area", Static)
+        btn_md = self.query_one("#btn-output-md", Button)
+        btn_raw = self.query_one("#btn-output-raw", Button)
+        if self._output_view == "markdown":
+            md.display = True
+            raw.display = False
+            btn_md.variant = "primary"
+            btn_raw.variant = "default"
+        else:
+            md.display = False
+            raw.display = True
+            btn_md.variant = "default"
+            btn_raw.variant = "primary"
+
+    @on(Button.Pressed, "#btn-output-md")
+    def handle_output_markdown(self) -> None:
+        self._output_view = "markdown"
+        self._apply_output_view()
+
+    @on(Button.Pressed, "#btn-output-raw")
+    def handle_output_raw(self) -> None:
+        self._output_view = "raw"
+        self._apply_output_view()
 
     def _show_clarification_section(self, questions: list[str]) -> None:
         """Show the clarification section with questions."""
@@ -1294,6 +1419,8 @@ def main() -> None:
         server_url=args.server_url,
         query=args.query,
         save_path=args.save_path,
+        provider=args.provider,
+        api_style=args.api_style,
         system_prompt=DEFAULT_SYSTEM_PROMPT,
         include_analysis=True,
         json_output=False,

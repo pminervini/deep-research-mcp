@@ -12,7 +12,7 @@ import sys
 
 import pytest
 from textual.containers import Container
-from textual.widgets import Input, Select, Switch
+from textual.widgets import Input, Markdown, Select, Static, Switch
 
 
 def load_tui_module():
@@ -128,3 +128,28 @@ async def test_clarification_panel_recomposes_answer_inputs():
         assert len(answer_inputs) == 2
         assert answer_inputs[0].value == "Global"
         assert answer_inputs[1].value == ""
+
+
+@pytest.mark.asyncio
+async def test_output_panel_toggles_markdown_and_raw_views():
+    app = TUI.DeepResearchTUI(build_startup_state())
+
+    async with app.run_test(size=(140, 42)) as pilot:
+        app._set_output("# Title\n\n- one\n- two")
+        await pilot.pause()
+
+        md = app.query_one("#output-markdown", Markdown)
+        raw = app.query_one("#output-area", Static)
+        assert md.display is True
+        assert raw.display is False
+
+        await pilot.click("#btn-output-raw")
+        await pilot.pause()
+        assert md.display is False
+        assert raw.display is True
+        assert app._output_text == "# Title\n\n- one\n- two"
+
+        await pilot.click("#btn-output-md")
+        await pilot.pause()
+        assert md.display is True
+        assert raw.display is False
