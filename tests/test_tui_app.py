@@ -135,6 +135,8 @@ async def test_output_panel_toggles_markdown_and_raw_views():
     app = TUI.DeepResearchTUI(build_startup_state())
 
     async with app.run_test(size=(140, 42)) as pilot:
+        # Exercise the internal output toggle state directly in a focused UI test.
+        # pylint: disable=protected-access
         app._set_output("# Title\n\n- one\n- two")
         await pilot.pause()
 
