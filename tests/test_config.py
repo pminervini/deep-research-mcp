@@ -358,6 +358,38 @@ def test_gemini_provider_defaults():
             os.environ.pop("RESEARCH_BASE_URL", None)
 
 
+def test_dr_tulu_provider_defaults():
+    """Test Dr Tulu provider default model and endpoint resolution."""
+    old_provider = os.environ.get("RESEARCH_PROVIDER")
+    old_model = os.environ.get("RESEARCH_MODEL")
+    old_base_url = os.environ.get("RESEARCH_BASE_URL")
+
+    os.environ["RESEARCH_PROVIDER"] = "dr-tulu"
+    os.environ.pop("RESEARCH_MODEL", None)
+    os.environ.pop("RESEARCH_BASE_URL", None)
+
+    try:
+        config = ResearchConfig.from_env()
+        assert config.provider == "dr-tulu"
+        assert config.model == "dr-tulu"
+        assert config.base_url == "http://10.8.0.42/"
+    finally:
+        if old_provider:
+            os.environ["RESEARCH_PROVIDER"] = old_provider
+        else:
+            os.environ.pop("RESEARCH_PROVIDER", None)
+
+        if old_model:
+            os.environ["RESEARCH_MODEL"] = old_model
+        else:
+            os.environ.pop("RESEARCH_MODEL", None)
+
+        if old_base_url:
+            os.environ["RESEARCH_BASE_URL"] = old_base_url
+        else:
+            os.environ.pop("RESEARCH_BASE_URL", None)
+
+
 def test_gemini_api_key_aliases():
     """Test Gemini provider API key aliases."""
     old_provider = os.environ.get("RESEARCH_PROVIDER")

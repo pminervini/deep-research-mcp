@@ -44,6 +44,15 @@ def test_provider_defaults_for_openai_chat_completions():
     assert defaults.base_url == "https://api.openai.com/v1"
 
 
+def test_provider_defaults_for_dr_tulu():
+    defaults = TUI.get_provider_defaults("dr-tulu", "responses")
+
+    assert defaults.provider == "dr-tulu"
+    assert defaults.api_style == "responses"
+    assert defaults.model == "dr-tulu"
+    assert defaults.base_url == "http://10.8.0.42/"
+
+
 def test_normalize_answers_pads_missing_values():
     normalized = TUI.normalize_answers(
         ["Question 1?", "Question 2?", "Question 3?"],
