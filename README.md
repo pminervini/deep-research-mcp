@@ -135,6 +135,56 @@ timeout = 1800
 poll_interval = 30
 ```
 
+Running Dr Tulu locally:
+
+1. Clone and configure [`dr-tulu`](https://github.com/allenai/dr-tulu) separately.
+2. In `dr-tulu/agent/.env`, set at least:
+   - `SERPER_API_KEY`
+   - `JINA_API_KEY`
+   - `S2_API_KEY` (optional but recommended)
+3. Start the DR-Tulu model server:
+
+```bash
+cd /path/to/dr-tulu/agent
+conda run -n vllm bash -lc '
+  CUDA_VISIBLE_DEVICES=0 \
+  vllm serve rl-research/DR-Tulu-8B \
+    --port 30001 \
+    --dtype auto \
+    --max-model-len 16384 \
+    --gpu-memory-utilization 0.60 \
+    --enforce-eager
+'
+```
+
+4. Start the Dr Tulu MCP backend:
+
+```bash
+cd /path/to/dr-tulu/agent
+conda run -n vllm python -m dr_agent.mcp_backend.main --port 8000
+```
+
+5. Start the Dr Tulu app service:
+
+```bash
+cd /path/to/dr-tulu/agent
+conda run -n vllm python workflows/auto_search_sft.py serve \
+  --port 18080 \
+  --config workflows/auto_search_sft.yaml \
+  --config-overrides "search_agent_max_tokens=12000,browse_agent_max_tokens=12000"
+```
+
+6. Point `deep-research-mcp` at that service:
+
+```toml
+[research]
+provider = "dr-tulu"
+base_url = "http://10.8.0.42:18080/"
+timeout = 1800
+```
+
+The `dr-tulu` backend calls `POST {base_url}/chat`, so if you front Dr Tulu behind a different host, port, or reverse proxy, update `base_url` accordingly.
+
 Perplexity (via [Sonar Deep Research](https://docs.perplexity.ai/getting-started/models/models/sonar-deep-research) and Perplexity's [OpenAI-compatible endpoint](https://docs.perplexity.ai/guides/chat-completions-guide)) provider example:
 
 ```toml
