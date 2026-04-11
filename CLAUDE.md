@@ -25,6 +25,7 @@ Development
 - Testing, linting, formatting, and type-checking commands are documented in README.md. Use those as the single source of truth.
 - Before committing or opening a PR, run `uv run black --fast --check .` to match the CI formatting check.
 - ABSOLUTELY DO NOT use monkey patching or mock classes in `tests/`.
+- If tests in `tests/` reflect obsolete behavior from an older code version, update the tests to match the intended current behavior instead of patching the code to preserve outdated behavior.
 
 TUI Demo GIF
 - The TUI demo animation is at `docs/images/tui-demo.gif`, generated from `docs/tui-demo.tape`.
