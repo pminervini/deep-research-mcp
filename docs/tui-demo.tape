@@ -1,8 +1,5 @@
 # VHS Tape for Deep Research TUI Demo
 # https://github.com/charmbracelet/vhs
-#
-# After recording, speed up the waiting portion:
-# ffmpeg -i docs/images/tui-demo-raw.gif -filter_complex "[0:v]setpts=0.3*PTS[v]" -map "[v]" docs/images/tui-demo.gif
 
 Output docs/images/tui-demo-raw.gif
 
@@ -61,14 +58,11 @@ Sleep 150ms
 # Press Enter to run research
 Enter
 
-# Brief pause showing "Starting research"
-Sleep 2s
-
-# Wait for results (API takes ~25s, we'll speed this up with ffmpeg)
-Sleep 28s
+# Wait long enough for results (API takes ~27s, add buffer)
+Sleep 45s
 
 # Show results
-Sleep 4s
+Sleep 5s
 
 # Quit
 Type "q"
