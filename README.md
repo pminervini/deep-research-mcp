@@ -129,7 +129,7 @@ Dr Tulu provider example:
 [research]
 provider = "dr-tulu"
 model = "dr-tulu"                   # Logical provider model id; currently informational
-base_url = "http://10.8.0.42/"      # Dr Tulu service base URL; the backend calls /chat
+base_url = "http://10.8.0.42:18080/" # Dr Tulu service base URL; the backend calls /chat
 api_key = ""                        # Optional; defaults to RESEARCH_API_KEY / DR_TULU_API_KEY if set
 timeout = 1800
 poll_interval = 30
@@ -469,7 +469,7 @@ In `agent` mode, the TUI applies provider-aware defaults:
 
 - `openai` + `responses`: model `o4-mini-deep-research-2025-06-26`, base URL `https://api.openai.com/v1`
 - `openai` + `chat_completions`: model `gpt-5-mini`, base URL `https://api.openai.com/v1`
-- `dr-tulu`: model `dr-tulu`, base URL `http://10.8.0.42/`
+- `dr-tulu`: model `dr-tulu`, base URL `http://10.8.0.42:18080/`
 - `gemini`: model `deep-research-pro-preview-12-2025`, base URL `https://generativelanguage.googleapis.com`
 - `open-deep-research`: model `openai/qwen/qwen3-coder-30b`, base URL `http://localhost:1234/v1`
 
@@ -918,7 +918,7 @@ Configuration class for the research agent.
   - Gemini: Deep Research agent id (for example `deep-research-pro-preview-12-2025`)
   - Open Deep Research: LiteLLM model id (e.g., `openai/qwen/qwen3-coder-30b`)
 - `api_key`: API key for the configured endpoint (optional). Defaults to env `OPENAI_API_KEY` for `openai`, `DR_TULU_API_KEY` for `dr-tulu`, `GEMINI_API_KEY` / `GOOGLE_API_KEY` for `gemini`.
-- `base_url`: Provider API base URL (optional). Defaults to `https://api.openai.com/v1` for `openai`, `http://10.8.0.42/` for `dr-tulu`, `https://generativelanguage.googleapis.com` for `gemini`, and `http://localhost:1234/v1` for `open-deep-research`.
+- `base_url`: Provider API base URL (optional). Defaults to `https://api.openai.com/v1` for `openai`, `http://10.8.0.42:18080/` for `dr-tulu`, `https://generativelanguage.googleapis.com` for `gemini`, and `http://localhost:1234/v1` for `open-deep-research`.
 - `timeout`: Maximum time for research in seconds (default: 1800)
 - `poll_interval`: Polling interval in seconds (default: 30)
 - `enable_clarification`: Enable clarifying questions (default: False)
