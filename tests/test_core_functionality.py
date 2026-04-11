@@ -107,14 +107,14 @@ def test_dr_tulu_agent_initialization():
 
     os.environ["RESEARCH_PROVIDER"] = "dr-tulu"
     os.environ["RESEARCH_MODEL"] = "dr-tulu"
-    os.environ["RESEARCH_BASE_URL"] = "http://10.8.0.42/"
+    os.environ["RESEARCH_BASE_URL"] = "http://10.8.0.42:18080/"
 
     try:
         config = ResearchConfig.from_env()
         agent = DeepResearchAgent(config)
         assert agent.config.provider == "dr-tulu"
         assert isinstance(agent.backend, DrTuluResearchBackend)
-        assert agent.config.base_url == "http://10.8.0.42/"
+        assert agent.config.base_url == "http://10.8.0.42:18080/"
         assert agent.instruction_client is None
     finally:
         if old_provider:
