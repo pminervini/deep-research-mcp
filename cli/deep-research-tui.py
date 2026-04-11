@@ -58,6 +58,62 @@ from deep_research_mcp import (
     ResearchResult,
 )
 
+NO_ANSWER_PLACEHOLDER = "[No answer provided]"
+
+
+def normalize_answers(questions: list[str], answers: list[str]) -> list[str]:
+    """Pad or substitute answers so len(result) == len(questions)."""
+    out: list[str] = []
+    for i, _ in enumerate(questions):
+        if i < len(answers):
+            text = answers[i].strip()
+            out.append(text if text else NO_ANSWER_PLACEHOLDER)
+        else:
+            out.append(NO_ANSWER_PLACEHOLDER)
+    return out
+
+
+def parse_task_id_from_output(text: str) -> str | None:
+    """Extract a task id from formatted research output or status text."""
+    if not text:
+        return None
+    m = re.search(r"\*\*Task ID\*\*:\s*`?([^`\s\n]+)`?", text)
+    if m:
+        return m.group(1)
+    m = re.search(r"Task\s+([^\s]+)\s+status:", text)
+    if m:
+        return m.group(1)
+    return None
+
+
+def render_agent_clarification_output(query: str, result: dict[str, Any]) -> str:
+    """Format clarification API result for the output panel."""
+    lines: list[str] = [f"Query: {query}", ""]
+    if result.get("reasoning"):
+        lines.append(f"Reasoning: {result['reasoning']}")
+    sid = result.get("session_id")
+    if sid:
+        lines.append(f"Session ID: {sid}")
+    created = result.get("created_at")
+    if created:
+        lines.append(f"Created: {created}")
+    questions = result.get("questions") or []
+    if questions:
+        lines.append("")
+        lines.append("Clarifying Questions:")
+        for i, q in enumerate(questions, 1):
+            lines.append(f"  {i}. {q}")
+    return "\n".join(lines)
+
+
+def write_output_file(path: str, content: str) -> str:
+    """Write UTF-8 text to path, creating parent directories as needed."""
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(content, encoding="utf-8")
+    return str(p)
+
+
 DEFAULT_SYSTEM_PROMPT = """
 You are a professional researcher preparing a structured, data-driven report.
 Your task is to analyze the research question the user poses.
@@ -96,6 +152,8 @@ CODEX_THEME = Theme(
 class ProviderDefaults:
     """Provider-specific default settings."""
 
+    provider: str
+    api_style: str
     model: str
     base_url: str
 
@@ -107,24 +165,37 @@ def get_provider_defaults(
     if provider == "openai":
         if api_style == "chat_completions":
             return ProviderDefaults(
+                provider=provider,
+                api_style=api_style,
                 model="gpt-5-mini",
                 base_url="https://api.openai.com/v1",
             )
         return ProviderDefaults(
+            provider=provider,
+            api_style="responses",
             model="o4-mini-deep-research-2025-06-26",
             base_url="https://api.openai.com/v1",
         )
     if provider == "gemini":
         return ProviderDefaults(
+            provider=provider,
+            api_style="responses",
             model="deep-research-pro-preview-12-2025",
             base_url="https://generativelanguage.googleapis.com",
         )
     if provider == "open-deep-research":
         return ProviderDefaults(
+            provider=provider,
+            api_style="responses",
             model="openai/qwen/qwen3-coder-30b",
             base_url="http://localhost:1234/v1",
         )
-    return ProviderDefaults(model="gpt-5-mini", base_url="https://api.openai.com/v1")
+    return ProviderDefaults(
+        provider="openai",
+        api_style="responses",
+        model="gpt-5-mini",
+        base_url="https://api.openai.com/v1",
+    )
 
 
 @dataclass
@@ -137,11 +208,13 @@ class StartupState:
     query: str = ""
     task_id: str = ""
     save_path: str = "output.md"
+    provider: str = "openai"
+    api_style: str = "responses"
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
     include_analysis: bool = True
     json_output: bool = False
     config: ProviderDefaults = field(
-        default_factory=lambda: get_provider_defaults("openai")
+        default_factory=lambda: get_provider_defaults("openai", "responses")
     )
 
 
@@ -196,14 +269,14 @@ class ClarificationAnswersPanel(Container):
 
     def get_answers(self) -> list[str]:
         """Collect current answer values from input widgets."""
-        answers: list[str] = []
+        raw: list[str] = []
         for i in range(len(self._questions)):
             try:
                 inp = self.query_one(f"#clarification-answer-{i}", Input)
-                answers.append(inp.value.strip() or "[No answer provided]")
+                raw.append(inp.value)
             except Exception:
-                answers.append("[No answer provided]")
-        return answers
+                raw.append("")
+        return normalize_answers(self._questions, raw)
 
     def clear(self) -> None:
         """Clear all questions and answers."""
@@ -472,18 +545,18 @@ class DeepResearchTUI(App):
 
         state = self._startup_state
         self.mode = state.mode
-        self.provider = "openai"
+        self.provider = state.provider
+        self.api_style = state.api_style
 
         self.query_one("#mode", Select).value = state.mode
         self.query_one("#save-path", Input).value = state.save_path
         self.query_one("#task-id", Input).value = state.task_id
         self.query_one("#server-url", Input).value = state.server_url
-        self.query_one("#provider", Select).value = "openai"
-        self.query_one("#api-style", Select).value = (
-            state.config.model.startswith("gpt") and "chat_completions" or "responses"
-        )
+        self.query_one("#provider", Select).value = state.provider
+        self.query_one("#api-style", Select).value = state.api_style
         self.query_one("#model", Input).value = state.config.model
         self.query_one("#base-url", Input).value = state.config.base_url
+        self.query_one("#api-style", Select).disabled = state.provider != "openai"
         self.query_one("#include-analysis", Switch).value = state.include_analysis
         self.query_one("#json-output", Switch).value = state.json_output
         self.query_one("#query-area", TextArea).text = state.query
@@ -1271,6 +1344,8 @@ def main() -> None:
         server_url=args.server_url,
         query=args.query,
         save_path=args.save_path,
+        provider=args.provider,
+        api_style=args.api_style,
         system_prompt=DEFAULT_SYSTEM_PROMPT,
         include_analysis=True,
         json_output=False,
