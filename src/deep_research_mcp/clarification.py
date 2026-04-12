@@ -158,7 +158,7 @@ class ClarifierAgent:
                 )
 
         enrichment_prompt = self.prompt_manager.get_enrichment_prompt(
-            user_query=user_query, enriched_context=chr(10).join(enriched_context)
+            user_query=user_query, enriched_context="\n".join(enriched_context)
         )
 
         try:

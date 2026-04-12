@@ -199,33 +199,29 @@ Additionally, if after some searching you find out that you need more informatio
         citations: list[ResearchCitation] = []
         search_queries: list[str] = []
 
-        if hasattr(self.manager_agent, "memory") and hasattr(
-            self.manager_agent.memory, "steps"
-        ):
-            for step in self.manager_agent.memory.steps:
-                if hasattr(step, "tool_calls"):
-                    for tool_call in step.tool_calls:
-                        if "search" in tool_call.get("name", "").lower():
-                            search_queries.append(
-                                tool_call.get("arguments", {}).get("query", "")
+        memory = getattr(self.manager_agent, "memory", None)
+        if memory is None or not hasattr(memory, "steps"):
+            return citations, search_queries, 0
+
+        for step in memory.steps:
+            if hasattr(step, "tool_calls"):
+                for tool_call in step.tool_calls:
+                    if "search" in tool_call.get("name", "").lower():
+                        search_queries.append(
+                            tool_call.get("arguments", {}).get("query", "")
+                        )
+
+            if hasattr(step, "observations") and step.observations:
+                for observation in step.observations:
+                    if isinstance(observation, str) and "http" in observation:
+                        urls = re.findall(r"https?://[^\s\)]+", observation)
+                        for url in urls:
+                            citations.append(
+                                ResearchCitation(
+                                    index=len(citations) + 1,
+                                    title=f"Source {len(citations) + 1}",
+                                    url=url.rstrip(".,;:"),
+                                )
                             )
 
-                if hasattr(step, "observations") and step.observations:
-                    for observation in step.observations:
-                        if isinstance(observation, str) and "http" in observation:
-                            urls = re.findall(r"https?://[^\s\)]+", observation)
-                            for url in urls:
-                                citations.append(
-                                    ResearchCitation(
-                                        index=len(citations) + 1,
-                                        title=f"Source {len(citations) + 1}",
-                                        url=url.rstrip(".,;:"),
-                                    )
-                                )
-
-        total_steps = (
-            len(self.manager_agent.memory.steps)
-            if hasattr(self.manager_agent, "memory")
-            else 0
-        )
-        return citations, search_queries, total_steps
+        return citations, search_queries, len(memory.steps)
