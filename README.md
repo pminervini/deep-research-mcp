@@ -93,7 +93,7 @@ enable = true
 triage_model = "gpt-5-mini"
 clarifier_model = "gpt-5-mini"
 instruction_builder_model = "gpt-5-mini"
-api_key = "sk-your-api-key"             # Optional, overrides api_key
+api_key = "YOUR_OPENAI_API_KEY"         # Optional, overrides api_key
 base_url = "https://api.openai.com/v1"  # Optional, overrides base_url
 
 [logging]
@@ -106,7 +106,7 @@ OpenAI provider example:
 [research]
 provider = "openai"
 model = "o4-mini-deep-research-2025-06-26"  # OpenAI model
-api_key = "sk-..."                          # Defaults to OPENAI_API_KEY
+api_key = "YOUR_OPENAI_API_KEY"             # Defaults to OPENAI_API_KEY
 base_url = "https://api.openai.com/v1"      # OpenAI-compatible endpoint
 timeout = 1800
 poll_interval = 30
@@ -118,7 +118,7 @@ Gemini Deep Research provider example:
 [research]
 provider = "gemini"
 model = "deep-research-pro-preview-12-2025"     # Gemini Deep Research agent id
-api_key = "AIza..."                             # Defaults to GEMINI_API_KEY or GOOGLE_API_KEY
+api_key = "YOUR_GEMINI_API_KEY"                # Defaults to GEMINI_API_KEY or GOOGLE_API_KEY
 base_url = "https://generativelanguage.googleapis.com"
 timeout = 1800
 poll_interval = 30
@@ -130,7 +130,7 @@ Dr Tulu provider example:
 [research]
 provider = "dr-tulu"
 model = "dr-tulu"                   # Logical provider model id; currently informational
-base_url = "http://10.8.0.42:18080/" # Dr Tulu service base URL; the backend calls /chat
+base_url = "http://localhost:8080/"   # Dr Tulu service base URL; the backend calls /chat
 api_key = ""                        # Optional; defaults to RESEARCH_API_KEY / DR_TULU_API_KEY if set
 timeout = 1800
 poll_interval = 30
@@ -170,7 +170,7 @@ conda run -n vllm python -m dr_agent.mcp_backend.main --port 8000
 ```bash
 cd /path/to/dr-tulu/agent
 conda run -n vllm python workflows/auto_search_sft.py serve \
-  --port 18080 \
+  --port 8080 \
   --config workflows/auto_search_sft.yaml \
   --config-overrides "search_agent_max_tokens=12000,browse_agent_max_tokens=12000"
 ```
@@ -180,7 +180,7 @@ conda run -n vllm python workflows/auto_search_sft.py serve \
 ```toml
 [research]
 provider = "dr-tulu"
-base_url = "http://10.8.0.42:18080/"
+base_url = "http://localhost:8080/"
 timeout = 1800
 ```
 
@@ -613,7 +613,7 @@ In `agent` mode, the TUI applies provider-aware defaults:
 
 - `openai` + `responses`: model `o4-mini-deep-research-2025-06-26`, base URL `https://api.openai.com/v1`
 - `openai` + `chat_completions`: model `gpt-5-mini`, base URL `https://api.openai.com/v1`
-- `dr-tulu`: model `dr-tulu`, base URL `http://10.8.0.42:18080/`
+- `dr-tulu`: model `dr-tulu`, base URL `http://localhost:8080/`
 - `gemini`: model `deep-research-pro-preview-12-2025`, base URL `https://generativelanguage.googleapis.com`
 - `open-deep-research`: model `openai/qwen/qwen3-coder-30b`, base URL `http://localhost:1234/v1`
 
@@ -979,7 +979,7 @@ enable_clarification = true
 triage_model = "gpt-5-mini"                                    # Optional, defaults to gpt-5-mini
 clarifier_model = "gpt-5-mini"                                 # Optional, defaults to gpt-5-mini
 instruction_builder_model = "gpt-5-mini"                       # Optional, defaults to gpt-5-mini
-clarification_api_key = "sk-your-clarification-api-key-here"   # Optional custom API key for clarification models
+clarification_api_key = "YOUR_CLARIFICATION_API_KEY"           # Optional custom API key for clarification models
 clarification_base_url = "https://custom-api.example.com/v1"   # Optional custom endpoint for clarification models
 ```
 
@@ -1062,7 +1062,7 @@ Configuration class for the research agent.
   - Gemini: Deep Research agent id (for example `deep-research-pro-preview-12-2025`)
   - Open Deep Research: LiteLLM model id (e.g., `openai/qwen/qwen3-coder-30b`)
 - `api_key`: API key for the configured endpoint (optional). Defaults to env `OPENAI_API_KEY` for `openai`, `DR_TULU_API_KEY` for `dr-tulu`, `GEMINI_API_KEY` / `GOOGLE_API_KEY` for `gemini`.
-- `base_url`: Provider API base URL (optional). Defaults to `https://api.openai.com/v1` for `openai`, `http://10.8.0.42:18080/` for `dr-tulu`, `https://generativelanguage.googleapis.com` for `gemini`, and `http://localhost:1234/v1` for `open-deep-research`.
+- `base_url`: Provider API base URL (optional). Defaults to `https://api.openai.com/v1` for `openai`, `http://localhost:8080/` for `dr-tulu`, `https://generativelanguage.googleapis.com` for `gemini`, and `http://localhost:1234/v1` for `open-deep-research`.
 - `timeout`: Maximum time for research in seconds (default: 1800)
 - `poll_interval`: Polling interval in seconds (default: 30)
 - `enable_clarification`: Enable clarifying questions (default: False)

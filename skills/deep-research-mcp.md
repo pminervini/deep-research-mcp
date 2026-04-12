@@ -193,7 +193,7 @@ poll_interval = 30
 [research]
 provider = "dr-tulu"
 model = "dr-tulu"
-base_url = "http://your-dr-tulu-host:18080"
+base_url = "http://localhost:8080"
 api_key = ""
 timeout = 1800
 poll_interval = 30
@@ -335,7 +335,7 @@ Command:
 uv run python cli/deep-research-cli.py \
   --provider dr-tulu \
   --model dr-tulu \
-  --base-url http://your-dr-tulu-host:18080 \
+  --base-url http://localhost:8080 \
   --timeout 1800 \
   research "What is flow matching in generative AI?" \
   --system-prompt "Answer in exactly 2 bullets and one takeaway sentence. Keep the whole answer under 120 words." \
@@ -820,7 +820,7 @@ Correct direct CLI shape:
 uv run python cli/deep-research-cli.py \
   --provider dr-tulu \
   --model dr-tulu \
-  --base-url http://your-dr-tulu-host:18080 \
+  --base-url http://localhost:8080 \
   research "Your query here"
 ```
 
@@ -832,7 +832,7 @@ from deep_research_mcp import DeepResearchAgent, ResearchConfig
 config = ResearchConfig(
     provider="dr-tulu",
     model="dr-tulu",
-    base_url="http://your-dr-tulu-host:18080",
+    base_url="http://localhost:8080",
 )
 agent = DeepResearchAgent(config)
 ```

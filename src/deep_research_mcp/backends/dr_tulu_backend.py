@@ -33,7 +33,7 @@ class DrTuluResearchBackend(ResearchBackend):
         task_id = str(uuid.uuid4())
         start_time = time.time()
         payload = {"content": self._combine_system_prompt(query, system_prompt)}
-        base_url = (self.config.base_url or "http://10.8.0.42:18080/").rstrip("/")
+        base_url = (self.config.base_url or "http://localhost:8080/").rstrip("/")
         endpoint = f"{base_url}/chat"
 
         try:

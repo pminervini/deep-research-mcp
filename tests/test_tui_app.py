@@ -6,27 +6,11 @@ Headless tests for the Textual deep research TUI.
 
 from __future__ import annotations
 
-import importlib.util
-from pathlib import Path
-import sys
-
 import pytest
 from textual.containers import Container
 from textual.widgets import Input, Markdown, Select, Static, Switch
 
-
-def load_tui_module():
-    module_path = (
-        Path(__file__).resolve().parent.parent / "cli" / "deep-research-tui.py"
-    )
-    spec = importlib.util.spec_from_file_location("deep_research_tui_app", module_path)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
-
+from tests.tui_test_utils import load_tui_module
 
 TUI = load_tui_module()
 
