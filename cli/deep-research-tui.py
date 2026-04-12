@@ -74,47 +74,6 @@ def normalize_answers(questions: list[str], answers: list[str]) -> list[str]:
     return out
 
 
-def parse_task_id_from_output(text: str) -> str | None:
-    """Extract a task id from formatted research output or status text."""
-    if not text:
-        return None
-    m = re.search(r"\*\*Task ID\*\*:\s*`?([^`\s\n]+)`?", text)
-    if m:
-        return m.group(1)
-    m = re.search(r"Task\s+([^\s]+)\s+status:", text)
-    if m:
-        return m.group(1)
-    return None
-
-
-def render_agent_clarification_output(query: str, result: dict[str, Any]) -> str:
-    """Format clarification API result for the output panel."""
-    lines: list[str] = [f"Query: {query}", ""]
-    if result.get("reasoning"):
-        lines.append(f"Reasoning: {result['reasoning']}")
-    sid = result.get("session_id")
-    if sid:
-        lines.append(f"Session ID: {sid}")
-    created = result.get("created_at")
-    if created:
-        lines.append(f"Created: {created}")
-    questions = result.get("questions") or []
-    if questions:
-        lines.append("")
-        lines.append("Clarifying Questions:")
-        for i, q in enumerate(questions, 1):
-            lines.append(f"  {i}. {q}")
-    return "\n".join(lines)
-
-
-def write_output_file(path: str, content: str) -> str:
-    """Write UTF-8 text to path, creating parent directories as needed."""
-    p = Path(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(content, encoding="utf-8")
-    return str(p)
-
-
 DEFAULT_SYSTEM_PROMPT = """
 You are a professional researcher preparing a structured, data-driven report.
 Your task is to analyze the research question the user poses.
@@ -292,41 +251,6 @@ class ClarificationAnswersPanel(Container):
         self._answers = []
         self.questions = []
         self.answers = []
-
-
-class OutputPanel(Static):
-    """Panel for displaying research output."""
-
-    DEFAULT_CSS = """
-    OutputPanel {
-        height: 100%;
-        border: round $panel;
-        padding: 1 2;
-        background: $surface;
-        overflow-y: auto;
-    }
-
-    OutputPanel .output-content {
-        width: 100%;
-    }
-    """
-
-    output_text = reactive("")
-
-    def compose(self) -> ComposeResult:
-        yield Static(self.output_text, classes="output-content", id="output-content")
-
-    def watch_output_text(self, value: str) -> None:
-        try:
-            self.query_one("#output-content", Static).update(value)
-        except Exception:
-            pass
-
-    def set_output(self, text: str) -> None:
-        self.output_text = text
-
-    def append_output(self, text: str) -> None:
-        self.output_text = self.output_text + text
 
 
 class DeepResearchTUI(App):

@@ -194,16 +194,6 @@ def format_result_json(result: ResearchResult) -> str:
     return json.dumps(data, indent=2, ensure_ascii=False)
 
 
-def format_status(task_id: str, status_data: dict[str, Any]) -> str:
-    """Format a task status response."""
-    parts = [f"Task ID: {task_id}"]
-    for key in ("status", "created_at", "completed_at", "message", "error"):
-        value = status_data.get(key)
-        if value is not None:
-            parts.append(f"{key}: {value}")
-    return "\n".join(parts)
-
-
 # ---------------------------------------------------------------------------
 # MCP client helpers
 # ---------------------------------------------------------------------------
