@@ -6,23 +6,7 @@ Tests for the CLI-side deep research TUI helpers.
 
 from __future__ import annotations
 
-import importlib.util
-from pathlib import Path
-import sys
-
-
-def load_tui_module():
-    module_path = (
-        Path(__file__).resolve().parent.parent / "cli" / "deep-research-tui.py"
-    )
-    spec = importlib.util.spec_from_file_location("deep_research_tui", module_path)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
-
+from tests.tui_test_utils import load_tui_module
 
 TUI = load_tui_module()
 
@@ -50,7 +34,7 @@ def test_provider_defaults_for_dr_tulu():
     assert defaults.provider == "dr-tulu"
     assert defaults.api_style == "responses"
     assert defaults.model == "dr-tulu"
-    assert defaults.base_url == "http://10.8.0.42:18080/"
+    assert defaults.base_url == "http://localhost:8080/"
 
 
 def test_normalize_answers_pads_missing_values():

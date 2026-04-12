@@ -165,7 +165,7 @@ class ResearchConfig:
 
         if provider in {"dr-tulu"}:
             default_model = "dr-tulu"
-            default_base_url = "http://10.8.0.42:18080/"
+            default_base_url = "http://localhost:8080/"
             api_key = get_setting_first("RESEARCH_API_KEY", "DR_TULU_API_KEY")
             base_url = get_setting_first(
                 "RESEARCH_BASE_URL", "DR_TULU_BASE_URL", default=default_base_url

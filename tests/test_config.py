@@ -372,7 +372,7 @@ def test_dr_tulu_provider_defaults():
         config = ResearchConfig.from_env()
         assert config.provider == "dr-tulu"
         assert config.model == "dr-tulu"
-        assert config.base_url == "http://10.8.0.42:18080/"
+        assert config.base_url == "http://localhost:8080/"
     finally:
         if old_provider:
             os.environ["RESEARCH_PROVIDER"] = old_provider
