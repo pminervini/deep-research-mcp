@@ -250,6 +250,99 @@ Optional env variables for Open Deep Research tools:
 - `SERPAPI_API_KEY` or `SERPER_API_KEY`: enable Google-style search
 - `HF_TOKEN`: optional, logs into Hugging Face Hub for gated models
 
+### Install The Included Skill In Claude Code Or Codex
+
+This repository also ships a repo-specific skill guide at
+[`skills/deep-research-mcp.md`](skills/deep-research-mcp.md).
+
+Installing that file as a local skill gives Claude Code or Codex a focused
+playbook for this repository's CLI, Python API, providers, and MCP server.
+It does **not** install Python dependencies, start the MCP server, or replace
+the provider configuration in `~/.deep_research`. Treat it as complementary to
+the MCP setup below, not a substitute for it.
+
+#### Claude Code skill install
+
+Claude Code's skills docs use these locations:
+
+- personal skill: `~/.claude/skills/<skill-name>/SKILL.md`
+- project skill: `.claude/skills/<skill-name>/SKILL.md`
+
+Personal install:
+
+```bash
+mkdir -p ~/.claude/skills/deep-research-mcp
+cp /path/to/deep-research-mcp/skills/deep-research-mcp.md \
+  ~/.claude/skills/deep-research-mcp/SKILL.md
+```
+
+If you prefer to keep the installed skill linked to this checkout:
+
+```bash
+mkdir -p ~/.claude/skills/deep-research-mcp
+ln -sf /path/to/deep-research-mcp/skills/deep-research-mcp.md \
+  ~/.claude/skills/deep-research-mcp/SKILL.md
+```
+
+Project-local install from the repository root:
+
+```bash
+mkdir -p .claude/skills/deep-research-mcp
+cp skills/deep-research-mcp.md .claude/skills/deep-research-mcp/SKILL.md
+```
+
+After that, restart Claude Code or open a new session if the skill does not
+appear immediately. The skill can be invoked directly as
+`/deep-research-mcp`, and Claude can also load it automatically when the task
+matches the skill description. For a reusable shared extension, package the
+same skill into a Claude Code plugin instead of copying it by hand.
+
+Official docs:
+
+- Claude Code skills: <https://docs.claude.com/en/docs/claude-code/skills>
+- Claude Code plugins: <https://docs.claude.com/en/docs/claude-code/plugins>
+
+#### Codex skill install
+
+Current Codex docs describe skills as skill folders containing `SKILL.md`,
+stored globally in `$HOME/.agents/skills` or repo-locally in `.agents/skills`.
+
+Personal install:
+
+```bash
+mkdir -p ~/.agents/skills/deep-research-mcp
+cp /path/to/deep-research-mcp/skills/deep-research-mcp.md \
+  ~/.agents/skills/deep-research-mcp/SKILL.md
+```
+
+Or keep the installed skill linked to this checkout:
+
+```bash
+mkdir -p ~/.agents/skills/deep-research-mcp
+ln -sf /path/to/deep-research-mcp/skills/deep-research-mcp.md \
+  ~/.agents/skills/deep-research-mcp/SKILL.md
+```
+
+Project-local install from the repository root:
+
+```bash
+mkdir -p .agents/skills/deep-research-mcp
+cp skills/deep-research-mcp.md .agents/skills/deep-research-mcp/SKILL.md
+```
+
+If your Codex setup still follows older CLI conventions that use
+`~/.codex/skills` or `.codex/skills`, mirror the same directory structure
+there instead.
+
+Codex can invoke the skill implicitly when the task matches its description, or
+explicitly by mentioning `$deep-research-mcp` in the prompt. If the skill does
+not show up immediately, restart Codex.
+
+Official docs:
+
+- Codex skills: <https://developers.openai.com/codex/skills>
+- Codex customization and skill locations: <https://developers.openai.com/codex/concepts/customization#skills>
+
 ### Claude Code Integration
 
 1. **Configure MCP Server**
