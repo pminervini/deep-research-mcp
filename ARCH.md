@@ -34,7 +34,8 @@ graph TD
         P[backends/__init__.py]
         P1[openai_backend.py]
         P2[gemini_backend.py]
-        P3[open_deep_research_backend.py]
+        P3[dr_tulu_backend.py]
+        P4[open_deep_research_backend.py]
     end
 
     subgraph Clarification System
@@ -53,6 +54,7 @@ graph TD
         H[OpenAI Responses API web+code tools]
         H2[OpenAI Chat Completions API]
         H3[Gemini Interactions API Deep Research]
+        H4[DR-Tulu /chat endpoint]
         I[OpenAI Chat API for Clarification]
         L[OpenAI Chat API for Instruction Builder]
         M[Open Deep Research smolagents + text browser]
@@ -69,10 +71,12 @@ graph TD
     P --> P1
     P --> P2
     P --> P3
+    P --> P4
     P1 -- "Makes API calls to" --> H
     P1 -- "Makes API calls to" --> H2
     P2 -- "Makes API calls to" --> H3
-    P3 -- "Orchestrates agents via" --> M
+    P3 -- "Makes API calls to" --> H4
+    P4 -- "Orchestrates agents via" --> M
     
     G --> G1
     G --> G2
@@ -111,12 +115,14 @@ The project is composed of five main layers:
     *   `backends/base.py` defines the backend interface used by `DeepResearchAgent`.
     *   `backends/openai_backend.py` implements the OpenAI Responses API and Chat Completions flows, including citation extraction and background polling.
     *   `backends/gemini_backend.py` implements Gemini Deep Research over the Interactions API, including polling and result normalization.
+    *   `backends/dr_tulu_backend.py` implements the DR-Tulu research agent integration via Allen AI's `/chat` endpoint.
     *   `backends/open_deep_research_backend.py` implements the Open Deep Research integration with smolagents and text-browser tooling.
 
 6.  **External Services**: This layer represents the external systems used:
     * Provider `openai` with `api_style = "responses"` (default): OpenAI Responses API (web search + code interpreter tools), OpenAI Chat API for clarification agents and instruction builder.
     * Provider `openai` with `api_style = "chat_completions"`: OpenAI Chat Completions API -- works with any OpenAI-compatible provider (Perplexity, Groq, Ollama, vLLM, etc.). No built-in tools (web_search_preview, code_interpreter); no background mode or polling.
     * Provider `gemini`: Gemini Deep Research agent over the Interactions API. Background execution and polling are required; built-in Google Search and URL context are provided by Gemini.
+    * Provider `dr-tulu`: Allen AI's DR-Tulu research agent accessed via its `/chat` endpoint. A lightweight integration that delegates research to a separately hosted DR-Tulu service.
     * Provider `open-deep-research`: smolagents stack with a text browser and search tools; optional OpenAI-compatible LLM endpoint via LiteLLM.
 
 ## File-by-File Breakdown
@@ -173,6 +179,14 @@ The project is composed of five main layers:
     -   `_wait_for_completion()`: Polls Gemini interaction status until completion, failure, or timeout.
     -   `_extract_results()`: Parses Gemini interaction outputs into the project's standard report/citation format.
     -   `get_task_status()`: Returns Gemini interaction status metadata.
+
+### `src/deep_research_mcp/backends/dr_tulu_backend.py`
+
+-   **Purpose**: Implements the DR-Tulu research agent integration.
+-   **Key Functionality**:
+    -   `research()`: Sends research queries to the DR-Tulu `/chat` endpoint and returns normalized results.
+    -   `_normalize_citations()`: Converts DR-Tulu searched links into the standard citation format.
+    -   `get_task_status()`: Returns an `unknown` status because DR-Tulu does not support persistent task tracking.
 
 ### `src/deep_research_mcp/backends/open_deep_research_backend.py`
 
@@ -248,7 +262,7 @@ The MCP server exposes three main tools to clients like Claude Code. Each tool a
 
 ### `deep_research()`
 
-**Purpose**: Performs autonomous deep research using the configured provider (OpenAI Responses API, Gemini Deep Research, or Open Deep Research).
+**Purpose**: Performs autonomous deep research using the configured provider (OpenAI Responses API, Gemini Deep Research, DR-Tulu, or Open Deep Research).
 
 **Arguments**:
 - `query` (string, required): Research question or topic to investigate
