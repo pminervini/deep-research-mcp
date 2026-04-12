@@ -8,7 +8,7 @@
 [![OpenAI](https://img.shields.io/badge/OpenAI-compatible-10a37f)](https://platform.openai.com/)
 [![Gemini](https://img.shields.io/badge/Gemini-supported-4285F4)](https://ai.google.dev/)
 
-A Python-based agent that integrates research providers with Claude Code through the Model Context Protocol (MCP). It supports OpenAI (Responses API with web search and code interpreter, or Chat Completions API for broad provider compatibility), Gemini Deep Research via the Interactions API, and the open-source Open Deep Research stack (based on smolagents).
+A Python-based agent that integrates research providers with Claude Code through the Model Context Protocol (MCP). It supports OpenAI (Responses API with web search and code interpreter, or Chat Completions API for broad provider compatibility), Gemini Deep Research via the Interactions API, Allen AI's DR-Tulu research agent, and the open-source Open Deep Research stack (based on smolagents).
 
 ## Prerequisites
 
@@ -17,6 +17,7 @@ A Python-based agent that integrates research providers with Claude Code through
 - One of:
   - OpenAI API access (Responses API models, e.g., `o4-mini-deep-research-2025-06-26`)
   - Gemini API access with the Interactions API / Deep Research agent enabled
+  - DR-Tulu service running locally or remotely (see [DR-Tulu setup](#dr-tulu-provider-example))
   - Open Deep Research dependencies (installed via `uv sync --extra open-deep-research`)
 - Claude Code, or any other assistant supporting MCP integration
 
