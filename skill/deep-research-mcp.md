@@ -1,17 +1,21 @@
----
-name: deep-research
-description: Use this guide when you need to run, integrate, or debug this repository's Deep Research stack through the CLI, the Python API, or the MCP server. It covers direct agent execution, provider/backend selection, OpenAI Responses with o4-mini-deep-research, Gemini Deep Research, DR-Tulu integration requirements, clarification workflows, status polling, and HTTP/stdio MCP usage. Do not use it for the Textual TUI or for unrelated MCP servers.
+name: deep-research-mcp
+description: Use this guide only for the `deep-research-mcp` repository/project when you need to run, integrate, or debug its CLI, Python API, or MCP server. It covers this repo's direct agent execution, provider/backend selection, OpenAI Responses with o4-mini-deep-research, Gemini Deep Research, DR-Tulu integration requirements, clarification workflows, status polling, and HTTP or stdio MCP usage. Do not use it for Deep Research systems in general, for unrelated MCP servers, or for the Textual TUI.
 ---
 
-# Deep Research
+# Deep Research MCP
+
+This document is specifically about the `deep-research-mcp` project/repository, not Deep Research systems in general.
+
+Repository: `https://github.com/pminervini/deep-research-mcp`
 
 This document is written in `SKILL.md` style, but kept in one file as requested. If you package it as a standard Codex skill later, place the same content in a directory-level `SKILL.md`.
 
 ## Use When
 
+- You are working in or against the `deep-research-mcp` repository/project.
 - You need to run `cli/deep-research-cli.py` in direct agent mode.
 - You need to call `DeepResearchAgent` and `ResearchConfig` from Python.
-- You need to expose this project as an MCP server with `deep-research-mcp`.
+- You need to expose the `deep-research-mcp` project as an MCP server with `deep-research-mcp`.
 - You need to connect to the MCP server from another client over HTTP.
 - You need to understand which backend is used for OpenAI, Gemini, DR-Tulu, or Open Deep Research.
 - You need to troubleshoot provider mix-ups caused by values already stored in `~/.deep_research`.
@@ -19,7 +23,7 @@ This document is written in `SKILL.md` style, but kept in one file as requested.
 ## Do Not Use When
 
 - You only need the Textual TUI in `cli/deep-research-tui.py`.
-- You only need a generic overview of MCP and not this repository's tool names and behavior.
+- You need a generic guide to Deep Research agents, generic research workflows, or MCP outside the `deep-research-mcp` codebase.
 - You are looking for model-selection advice outside the providers this repository already implements.
 
 ## Mental Model
@@ -95,7 +99,7 @@ export CLARIFICATION_BASE_URL="https://api.openai.com/v1"
 
 DR-Tulu:
 
-- there is no single required key in this repo
+- there is no single required key defined by `deep-research-mcp` itself
 - you must have a running DR-Tulu service that exposes `POST {base_url}/chat`
 
 ## Provider Matrix
@@ -195,7 +199,7 @@ timeout = 1800
 poll_interval = 30
 ```
 
-`dr-tulu` is different from the others: this repository does not ship the DR-Tulu service itself. The backend only expects something else to be listening at `POST {base_url}/chat`.
+`dr-tulu` is different from the others: the `deep-research-mcp` repository does not ship the DR-Tulu service itself. The backend only expects something else to be listening at `POST {base_url}/chat`.
 
 ## CLI: Direct Agent Mode
 
@@ -278,7 +282,7 @@ Execution time: 216.15s
 
 What this tells you:
 
-- OpenAI Responses mode is genuinely multi-step in this repo.
+- OpenAI Responses mode is genuinely multi-step in `deep-research-mcp`.
 - `total_steps` and `search_queries` are meaningful for this backend.
 - Direct agent mode blocks until the task completes.
 
@@ -745,7 +749,7 @@ Important behavior:
 
 - `research_with_context` stores answers against the server-side clarification session.
 - If you restart the server, in-memory clarification sessions are lost.
-- In this repo, clarification can be followed by instruction building, which means the final backend query may be more detailed than the simple Q/A pairs alone suggest.
+- In `deep-research-mcp`, clarification can be followed by instruction building, which means the final backend query may be more detailed than the simple Q/A pairs alone suggest.
 
 ## Backend-Specific Notes
 
@@ -763,7 +767,7 @@ Use this when you want:
 - background execution
 - search-query accounting
 - best support for `research_status`
-- the repo's intended "deep research" path
+- the `deep-research-mcp` repo's intended "deep research" path
 
 ### OpenAI Chat Completions Backend
 
@@ -835,7 +839,7 @@ agent = DeepResearchAgent(config)
 
 Important limitation:
 
-- This repository does not bootstrap DR-Tulu for you.
+- The `deep-research-mcp` repository does not bootstrap DR-Tulu for you.
 - You need a separately running DR-Tulu service that exposes `/chat`.
 - Without that service, DR-Tulu examples fail immediately with a connection error.
 - The current backend expects `base_url` without the `/chat` suffix, because it appends `/chat` internally.
@@ -944,4 +948,4 @@ If you only remember three things, remember these:
 
 1. Use full provider overrides when your saved TOML file is already specialized.
 2. Use `openai` + `responses` or `gemini` when you need status polling.
-3. Treat DR-Tulu as an external dependency: this repo's DR-Tulu backend is a client, not the service itself.
+3. Treat DR-Tulu as an external dependency: the `deep-research-mcp` repo's DR-Tulu backend is a client, not the service itself.
