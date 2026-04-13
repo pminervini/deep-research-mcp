@@ -2,6 +2,9 @@
 
 This short guide is for Claude Code (claude.ai/code) when working with this repository.
 
+Collaboration
+- Codex may review your output after you finish, so keep changes and summaries clear and easy to verify.
+
 ## Behavioral Guidelines
 
 These guidelines reduce common LLM coding mistakes. They bias toward caution over speed; for trivial tasks, use judgment.
