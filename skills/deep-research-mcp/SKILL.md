@@ -9,8 +9,6 @@ This document is specifically about the `deep-research-mcp` project/repository, 
 
 Repository: `https://github.com/pminervini/deep-research-mcp`
 
-This document is written in `SKILL.md` style, but kept in one file as requested. If you package it as a standard Codex skill later, place the same content in a directory-level `SKILL.md`.
-
 ## Use When
 
 - You are working in or against the `deep-research-mcp` repository/project.
