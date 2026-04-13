@@ -51,9 +51,6 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-`requirements.txt` is intentionally unpinned (uses `>=`) and can be edited directly.
-`uv.lock` is not tracked in this repository.
-
 ## Code Layout
 
 - `src/deep_research_mcp/agent.py`: orchestration layer; owns clarification, instruction building, callbacks, and delegates provider work to backends
@@ -637,14 +634,104 @@ base URL defaults. You can still override those fields manually afterward.
 
 #### Quick Start
 
+**Gemini Deep Research:**
+
 ```bash
-# Basic research query
-uv run python cli/deep-research-cli.py research "What are the latest advances in quantum computing?"
+uv run python cli/deep-research-cli.py \
+  --provider gemini \
+  --model deep-research-pro-preview-12-2025 \
+  --base-url https://generativelanguage.googleapis.com \
+  research "What is the capital of France?"
+```
 
-# View resolved configuration
+Expected output (snippet):
+
+```text
+============================================================
+RESEARCH REPORT
+============================================================
+Task ID: v1_Chd5YUxjYVpXRUotYWxrZFVQOF9lcTRRVRIX...
+Total steps: 1
+Execution time: 245.94s
+
+# Comprehensive Analysis of the French Capital: Demographic,
+# Economic, and Historical Dimensions of Paris
+
+**Key Points**
+*   **The capital of France is Paris**, acting as the undisputed
+    political, economic, and cultural epicenter of the nation.
+*   Data indicates that the Paris metropolitan area commands a
+    Gross Domestic Product (GDP) exceeding $1.03 trillion ...
+```
+
+**OpenAI o4-mini-deep-research:**
+
+```bash
+uv run python cli/deep-research-cli.py \
+  --provider openai \
+  --model o4-mini-deep-research-2025-06-26 \
+  --base-url https://api.openai.com/v1 \
+  research "What is the capital of France?"
+```
+
+Expected output:
+
+```text
+============================================================
+RESEARCH REPORT
+============================================================
+Task ID: resp_0e55abdae3d3ce390069dca3c7d78c819f91...
+Total steps: 22
+Search queries: 10
+Citations: 1
+Execution time: 34.34s
+
+The capital of France is **Paris**
+(www.britannica.com/place/Paris)
+
+============================================================
+CITATIONS
+============================================================
+1. Paris | Definition, Map, Population, Facts, & History
+   https://www.britannica.com/place/Paris
+```
+
+**DR-Tulu** (requires a running [dr-tulu](https://github.com/allenai/dr-tulu) service; see [Dr Tulu provider example](#dr-tulu-provider-example)):
+
+```bash
+uv run python cli/deep-research-cli.py \
+  --provider dr-tulu \
+  --base-url http://localhost:8080/ \
+  research "What is the capital of France?"
+```
+
+Expected output:
+
+```text
+============================================================
+RESEARCH REPORT
+============================================================
+Task ID: 7f3a1b2c-...
+Total steps: 4
+Citations: 2
+Execution time: 18.72s
+
+The capital of France is Paris. Paris has served as the
+French capital since the late 10th century ...
+
+============================================================
+CITATIONS
+============================================================
+1. Source 1
+   https://en.wikipedia.org/wiki/Paris
+2. Source 2
+   https://www.britannica.com/place/Paris
+```
+
+View resolved configuration or all available options:
+
+```bash
 uv run python cli/deep-research-cli.py config --pretty
-
-# Show all available options
 uv run python cli/deep-research-cli.py --help
 ```
 
