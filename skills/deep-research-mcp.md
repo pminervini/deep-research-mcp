@@ -1,3 +1,4 @@
+---
 name: deep-research-mcp
 description: Use this guide only for the `deep-research-mcp` repository/project when you need to run, integrate, or debug its CLI, Python API, or MCP server. It covers this repo's direct agent execution, provider/backend selection, OpenAI Responses with o4-mini-deep-research, Gemini Deep Research, DR-Tulu integration requirements, clarification workflows, status polling, and HTTP or stdio MCP usage. Do not use it for Deep Research systems in general, for unrelated MCP servers, or for the Textual TUI.
 ---
