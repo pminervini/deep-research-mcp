@@ -250,7 +250,7 @@ Optional env variables for Open Deep Research tools:
 ### Install The Included Skill In Claude Code Or Codex
 
 This repository also ships a repo-specific skill guide at
-[`skills/deep-research-mcp.md`](skills/deep-research-mcp.md).
+[`skills/deep-research-mcp/SKILL.md`](skills/deep-research-mcp/SKILL.md).
 
 Installing that file as a local skill gives Claude Code or Codex a focused
 playbook for this repository's CLI, Python API, providers, and MCP server.
@@ -269,7 +269,7 @@ Personal install:
 
 ```bash
 mkdir -p ~/.claude/skills/deep-research-mcp
-cp /path/to/deep-research-mcp/skills/deep-research-mcp.md \
+cp /path/to/deep-research-mcp/skills/deep-research-mcp/SKILL.md \
   ~/.claude/skills/deep-research-mcp/SKILL.md
 ```
 
@@ -277,7 +277,7 @@ If you prefer to keep the installed skill linked to this checkout:
 
 ```bash
 mkdir -p ~/.claude/skills/deep-research-mcp
-ln -sf /path/to/deep-research-mcp/skills/deep-research-mcp.md \
+ln -sf /path/to/deep-research-mcp/skills/deep-research-mcp/SKILL.md \
   ~/.claude/skills/deep-research-mcp/SKILL.md
 ```
 
@@ -285,7 +285,7 @@ Project-local install from the repository root:
 
 ```bash
 mkdir -p .claude/skills/deep-research-mcp
-cp skills/deep-research-mcp.md .claude/skills/deep-research-mcp/SKILL.md
+cp skills/deep-research-mcp/SKILL.md .claude/skills/deep-research-mcp/SKILL.md
 ```
 
 After that, restart Claude Code or open a new session if the skill does not
@@ -308,7 +308,7 @@ Personal install:
 
 ```bash
 mkdir -p ~/.agents/skills/deep-research-mcp
-cp /path/to/deep-research-mcp/skills/deep-research-mcp.md \
+cp /path/to/deep-research-mcp/skills/deep-research-mcp/SKILL.md \
   ~/.agents/skills/deep-research-mcp/SKILL.md
 ```
 
@@ -316,7 +316,7 @@ Or keep the installed skill linked to this checkout:
 
 ```bash
 mkdir -p ~/.agents/skills/deep-research-mcp
-ln -sf /path/to/deep-research-mcp/skills/deep-research-mcp.md \
+ln -sf /path/to/deep-research-mcp/skills/deep-research-mcp/SKILL.md \
   ~/.agents/skills/deep-research-mcp/SKILL.md
 ```
 
@@ -324,7 +324,7 @@ Project-local install from the repository root:
 
 ```bash
 mkdir -p .agents/skills/deep-research-mcp
-cp skills/deep-research-mcp.md .agents/skills/deep-research-mcp/SKILL.md
+cp skills/deep-research-mcp/SKILL.md .agents/skills/deep-research-mcp/SKILL.md
 ```
 
 If your Codex setup still follows older CLI conventions that use
