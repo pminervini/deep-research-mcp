@@ -114,7 +114,7 @@ Gemini Deep Research provider example:
 ```toml
 [research]
 provider = "gemini"
-model = "deep-research-pro-preview-12-2025"     # Gemini Deep Research agent id
+model = "deep-research-preview-04-2026"     # Gemini Deep Research agent id
 api_key = "YOUR_GEMINI_API_KEY"                # Defaults to GEMINI_API_KEY or GOOGLE_API_KEY
 base_url = "https://generativelanguage.googleapis.com"
 timeout = 1800
@@ -611,7 +611,7 @@ In `agent` mode, the TUI applies provider-aware defaults:
 - `openai` + `responses`: model `o4-mini-deep-research-2025-06-26`, base URL `https://api.openai.com/v1`
 - `openai` + `chat_completions`: model `gpt-5-mini`, base URL `https://api.openai.com/v1`
 - `dr-tulu`: model `dr-tulu`, base URL `http://localhost:8080/`
-- `gemini`: model `deep-research-pro-preview-12-2025`, base URL `https://generativelanguage.googleapis.com`
+- `gemini`: model `deep-research-preview-04-2026`, base URL `https://generativelanguage.googleapis.com`
 - `open-deep-research`: model `openai/qwen/qwen3-coder-30b`, base URL `http://localhost:1234/v1`
 
 Switching provider or OpenAI API style automatically refreshes the model and
@@ -639,7 +639,7 @@ base URL defaults. You can still override those fields manually afterward.
 ```bash
 uv run python cli/deep-research-cli.py \
   --provider gemini \
-  --model deep-research-pro-preview-12-2025 \
+  --model deep-research-preview-04-2026 \
   --base-url https://generativelanguage.googleapis.com \
   research "What is the capital of France?"
 ```
@@ -1146,7 +1146,7 @@ Configuration class for the research agent.
 - `model`: Model identifier
   - OpenAI: Responses model (e.g., `gpt-5-mini`)
   - Dr Tulu: logical provider id (default: `dr-tulu`)
-  - Gemini: Deep Research agent id (for example `deep-research-pro-preview-12-2025`)
+  - Gemini: Deep Research agent id (for example `deep-research-preview-04-2026`)
   - Open Deep Research: LiteLLM model id (e.g., `openai/qwen/qwen3-coder-30b`)
 - `api_key`: API key for the configured endpoint (optional). Defaults to env `OPENAI_API_KEY` for `openai`, `DR_TULU_API_KEY` for `dr-tulu`, `GEMINI_API_KEY` / `GOOGLE_API_KEY` for `gemini`.
 - `base_url`: Provider API base URL (optional). Defaults to `https://api.openai.com/v1` for `openai`, `http://localhost:8080/` for `dr-tulu`, `https://generativelanguage.googleapis.com` for `gemini`, and `http://localhost:1234/v1` for `open-deep-research`.

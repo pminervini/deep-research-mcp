@@ -20,8 +20,9 @@ from deep_research_mcp.results import (
 
 from .base import ResearchBackend
 
-GEMINI_DEEP_RESEARCH_AGENT = "deep-research-pro-preview-12-2025"
+GEMINI_DEEP_RESEARCH_AGENT = "deep-research-preview-04-2026"
 GEMINI_API_VERSION = "v1beta"
+GEMINI_API_REVISION = "2026-05-20"
 GEMINI_TERMINAL_STATUSES = {"completed", "failed", "cancelled", "incomplete"}
 
 
@@ -71,7 +72,11 @@ class GeminiResearchBackend(ResearchBackend):
     async def get_task_status(self, task_id: str) -> ResearchTaskStatus:
         """Return task status for the Gemini provider."""
         try:
-            interaction = await run_blocking(self.gemini_interactions.get, task_id)
+            interaction = await run_blocking(
+                self.gemini_interactions.get,
+                task_id,
+                extra_headers=self._api_revision_headers(),
+            )
             completed_at = (
                 interaction.updated
                 if interaction.status in GEMINI_TERMINAL_STATUSES
@@ -107,6 +112,7 @@ class GeminiResearchBackend(ResearchBackend):
             background=True,
             input=request_input,
             store=True,
+            extra_headers=self._api_revision_headers(),
         )
         self.logger.info(f"Research task started: {interaction.id}")
         final_interaction = await self._wait_for_completion(interaction.id)
@@ -118,7 +124,11 @@ class GeminiResearchBackend(ResearchBackend):
 
         while time.time() - start_time < self.config.timeout:
             try:
-                interaction = await run_blocking(self.gemini_interactions.get, task_id)
+                interaction = await run_blocking(
+                    self.gemini_interactions.get,
+                    task_id,
+                    extra_headers=self._api_revision_headers(),
+                )
 
                 if interaction.status == "completed":
                     self.logger.info(f"Research completed: {task_id}")
@@ -142,7 +152,11 @@ class GeminiResearchBackend(ResearchBackend):
 
         self.logger.warning(f"Task {task_id} timed out, attempting cancellation")
         try:
-            await run_blocking(self.gemini_interactions.cancel, task_id)
+            await run_blocking(
+                self.gemini_interactions.cancel,
+                task_id,
+                extra_headers=self._api_revision_headers(),
+            )
         except Exception:
             pass
 
@@ -165,12 +179,10 @@ class GeminiResearchBackend(ResearchBackend):
                     return f"Research task failed: {error_message}"
             return f"Research task failed: {error_details}"
 
-        outputs = getattr(interaction, "outputs", None) or []
-        for output in reversed(outputs):
-            if getattr(output, "type", None) == "text" and getattr(
-                output, "text", None
-            ):
-                return f"Research task {interaction.status}: {output.text}"
+        for step in reversed(self._get_interaction_steps(interaction)):
+            output_text = self._extract_step_text(step)
+            if output_text:
+                return f"Research task {interaction.status}: {output_text}"
 
         return f"Research task {interaction.id} ended with status {interaction.status}"
 
@@ -182,8 +194,8 @@ class GeminiResearchBackend(ResearchBackend):
                 task_id=interaction.id,
             )
 
-        outputs = getattr(interaction, "outputs", None) or []
-        if not outputs:
+        steps = self._get_interaction_steps(interaction)
+        if not steps:
             return ResearchResult.error(
                 message="No output received", task_id=interaction.id
             )
@@ -191,53 +203,48 @@ class GeminiResearchBackend(ResearchBackend):
         source_lookup: dict[str, dict[str, str]] = {}
         search_queries: list[str] = []
         reasoning_steps = 0
-        final_report = ""
+        final_report_parts: list[str] = []
 
-        for output in outputs:
-            output_type = getattr(output, "type", None)
-            if output_type == "text" and getattr(output, "text", None):
-                final_report = output.text
-            elif output_type == "thought":
+        for step in steps:
+            step_type = getattr(step, "type", None)
+            output_text = self._extract_step_text(step)
+            if output_text:
+                final_report_parts.append(output_text)
+            elif step_type == "thought":
                 reasoning_steps += 1
-            elif output_type == "google_search_call":
+            elif step_type == "google_search_call":
                 queries = (
-                    getattr(getattr(output, "arguments", None), "queries", None) or []
+                    getattr(getattr(step, "arguments", None), "queries", None) or []
                 )
                 search_queries.extend(query for query in queries if query)
-            elif output_type == "google_search_result":
-                for result in getattr(output, "result", None) or []:
+            elif step_type == "url_context_result":
+                for result in getattr(step, "result", None) or []:
                     if getattr(result, "url", None):
                         source_lookup[result.url] = {
                             "title": getattr(result, "title", None) or result.url,
                             "url": result.url,
                         }
-            elif output_type == "url_context_result":
-                for result in getattr(output, "result", None) or []:
-                    if getattr(result, "url", None):
-                        source_lookup[result.url] = {
-                            "title": result.url,
-                            "url": result.url,
-                        }
 
         citations: list[ResearchCitation] = []
         seen_urls: set[str] = set()
-        text_output = next(
-            (
-                output
-                for output in reversed(outputs)
-                if getattr(output, "type", None) == "text"
-                and getattr(output, "text", None)
-            ),
-            None,
-        )
 
-        if text_output and getattr(text_output, "annotations", None):
-            for annotation in text_output.annotations:
-                source = getattr(annotation, "source", None)
-                if not source:
+        for step in steps:
+            for annotation in self._extract_step_annotations(step):
+                citation_url = (
+                    getattr(annotation, "url", None)
+                    or getattr(annotation, "source", None)
+                    or getattr(annotation, "document_uri", None)
+                )
+                if not citation_url:
                     continue
+                citation_title = (
+                    getattr(annotation, "title", None)
+                    or getattr(annotation, "file_name", None)
+                    or getattr(annotation, "name", None)
+                    or citation_url
+                )
                 citation_info = source_lookup.get(
-                    source, {"title": source, "url": source}
+                    citation_url, {"title": citation_title, "url": citation_url}
                 )
                 citation_url = citation_info["url"]
                 if citation_url in seen_urls:
@@ -265,9 +272,45 @@ class GeminiResearchBackend(ResearchBackend):
 
         return ResearchResult.completed(
             task_id=interaction.id,
-            final_report=final_report,
+            final_report="\n".join(final_report_parts).strip(),
             citations=citations,
             reasoning_steps=reasoning_steps,
             search_queries=search_queries,
-            total_steps=len(outputs),
+            total_steps=len(steps),
         )
+
+    @staticmethod
+    def _api_revision_headers() -> dict[str, str]:
+        """Request the current Interactions API steps schema explicitly."""
+        return {"Api-Revision": GEMINI_API_REVISION}
+
+    @staticmethod
+    def _get_interaction_steps(interaction) -> list[Any]:
+        """Return Gemini Interaction steps from the current SDK schema."""
+        steps = getattr(interaction, "steps", None)
+        if steps:
+            return list(steps)
+        return []
+
+    @staticmethod
+    def _extract_step_text(step) -> str:
+        """Extract text from a current-schema model output step."""
+        if getattr(step, "type", None) != "model_output":
+            return ""
+
+        text_parts: list[str] = []
+        for content in getattr(step, "content", None) or []:
+            content_text = getattr(content, "text", None)
+            if content_text:
+                text_parts.append(content_text)
+        return "\n".join(text_parts).strip()
+
+    @staticmethod
+    def _extract_step_annotations(step) -> list[Any]:
+        """Extract citation annotations from a current-schema model output step."""
+        annotations: list[Any] = []
+        for content in getattr(step, "content", None) or []:
+            content_annotations = getattr(content, "annotations", None)
+            if content_annotations:
+                annotations.extend(content_annotations)
+        return annotations

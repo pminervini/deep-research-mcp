@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
     [
         ("openai", "gpt-5-mini", "responses"),
         ("openai", "gpt-5-mini", "chat_completions"),
-        ("gemini", "deep-research-pro-preview-12-2025", "responses"),
+        ("gemini", "deep-research-preview-04-2026", "responses"),
     ],
 )
 async def test_mcp_server_with_providers(provider, model, api_style):
