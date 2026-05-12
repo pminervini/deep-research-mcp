@@ -6,6 +6,7 @@ This tests the underlying components that the MCP server uses.
 """
 
 import os
+from types import SimpleNamespace
 
 import pytest
 
@@ -72,7 +73,7 @@ def test_gemini_agent_initialization():
     old_api_key = os.environ.get("RESEARCH_API_KEY")
 
     os.environ["RESEARCH_PROVIDER"] = "gemini"
-    os.environ["RESEARCH_MODEL"] = "deep-research-pro-preview-12-2025"
+    os.environ["RESEARCH_MODEL"] = "deep-research-preview-04-2026"
     os.environ["RESEARCH_API_KEY"] = "gemini-test-key"
 
     try:
@@ -97,6 +98,57 @@ def test_gemini_agent_initialization():
             os.environ["RESEARCH_API_KEY"] = old_api_key
         else:
             os.environ.pop("RESEARCH_API_KEY", None)
+
+
+def test_gemini_extract_results_uses_current_steps_schema():
+    """Gemini Interactions now return steps, not legacy outputs."""
+    backend = object.__new__(GeminiResearchBackend)
+    interaction = SimpleNamespace(
+        id="interaction-test",
+        status="completed",
+        steps=[
+            SimpleNamespace(
+                type="user_input",
+                content=[SimpleNamespace(type="text", text="Research test")],
+            ),
+            SimpleNamespace(type="thought", summary=[]),
+            SimpleNamespace(
+                type="google_search_call",
+                arguments=SimpleNamespace(queries=["test query"]),
+            ),
+            SimpleNamespace(
+                type="model_output",
+                content=[
+                    SimpleNamespace(
+                        type="text",
+                        text="Final report",
+                        annotations=[
+                            SimpleNamespace(
+                                type="url_citation",
+                                title="Example",
+                                url="https://example.com",
+                            )
+                        ],
+                    )
+                ],
+            ),
+            SimpleNamespace(
+                type="model_output",
+                content=[SimpleNamespace(type="text", text="Sources block")],
+            ),
+        ],
+    )
+
+    result = backend._extract_results(interaction)
+
+    assert result.status == "completed"
+    assert result.final_report == "Final report\nSources block"
+    assert result.reasoning_steps == 1
+    assert result.search_queries == ["test query"]
+    assert result.total_steps == 5
+    assert [(citation.title, citation.url) for citation in result.citations] == [
+        ("Example", "https://example.com")
+    ]
 
 
 def test_dr_tulu_agent_initialization():

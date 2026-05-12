@@ -147,7 +147,7 @@ def get_provider_defaults(
         return ProviderDefaults(
             provider=provider,
             api_style="responses",
-            model="deep-research-pro-preview-12-2025",
+            model="deep-research-preview-04-2026",
             base_url="https://generativelanguage.googleapis.com",
         )
     if provider == "open-deep-research":

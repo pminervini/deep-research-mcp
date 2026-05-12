@@ -15,7 +15,7 @@ def test_provider_defaults_for_gemini():
     defaults = TUI.get_provider_defaults("gemini", "responses")
 
     assert defaults.provider == "gemini"
-    assert defaults.model == "deep-research-pro-preview-12-2025"
+    assert defaults.model == "deep-research-preview-04-2026"
     assert defaults.base_url == "https://generativelanguage.googleapis.com"
 
 

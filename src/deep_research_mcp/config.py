@@ -189,7 +189,7 @@ class ResearchConfig:
                 "RESEARCH_BASE_URL", "OPENAI_BASE_URL", default=default_base_url
             )
         elif provider in {"gemini"}:
-            default_model = "deep-research-pro-preview-12-2025"
+            default_model = "deep-research-preview-04-2026"
             default_base_url = "https://generativelanguage.googleapis.com"
             api_key = get_setting_first(
                 "RESEARCH_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"

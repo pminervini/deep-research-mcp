@@ -339,7 +339,7 @@ def test_gemini_provider_defaults():
     try:
         config = ResearchConfig.from_env()
         assert config.provider == "gemini"
-        assert config.model == "deep-research-pro-preview-12-2025"
+        assert config.model == "deep-research-preview-04-2026"
         assert config.base_url == "https://generativelanguage.googleapis.com"
     finally:
         if old_provider:
@@ -440,7 +440,7 @@ def test_provider_alias_env_var():
     try:
         config = ResearchConfig.from_env()
         assert config.provider == "gemini"
-        assert config.model == "deep-research-pro-preview-12-2025"
+        assert config.model == "deep-research-preview-04-2026"
     finally:
         if old_provider:
             os.environ["PROVIDER"] = old_provider

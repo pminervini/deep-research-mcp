@@ -39,9 +39,7 @@ async def test_provider_change_updates_model_and_base_url():
         app.query_one("#provider", Select).value = "gemini"
         await pilot.pause()
 
-        assert (
-            app.query_one("#model", Input).value == "deep-research-pro-preview-12-2025"
-        )
+        assert app.query_one("#model", Input).value == "deep-research-preview-04-2026"
         assert (
             app.query_one("#base-url", Input).value
             == "https://generativelanguage.googleapis.com"
