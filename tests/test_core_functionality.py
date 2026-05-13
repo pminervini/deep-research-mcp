@@ -139,7 +139,7 @@ def test_gemini_extract_results_uses_current_steps_schema():
         ],
     )
 
-    result = backend._extract_results(interaction)
+    result = backend.extract_results(interaction)
 
     assert result.status == "completed"
     assert result.final_report == "Final report\nSources block"
