@@ -116,7 +116,7 @@ class GeminiResearchBackend(ResearchBackend):
         )
         self.logger.info(f"Research task started: {interaction.id}")
         final_interaction = await self._wait_for_completion(interaction.id)
-        return self._extract_results(final_interaction)
+        return self.extract_results(final_interaction)
 
     async def _wait_for_completion(self, task_id: str):
         """Poll Gemini Interactions until completion or timeout."""
@@ -186,7 +186,7 @@ class GeminiResearchBackend(ResearchBackend):
 
         return f"Research task {interaction.id} ended with status {interaction.status}"
 
-    def _extract_results(self, interaction) -> ResearchResult:
+    def extract_results(self, interaction) -> ResearchResult:
         """Extract and normalize Gemini Interactions output."""
         if interaction.status != "completed":
             return ResearchResult.failed(
