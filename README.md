@@ -242,6 +242,23 @@ base_url = "https://api.your-provider.com/v1"
 timeout = 600
 ```
 
+Tuning Engines governed endpoint example:
+
+```toml
+[research]
+provider = "openai"
+api_style = "chat_completions"
+model = "gpt-5.4-mini"
+api_key = "sk-te-..."
+base_url = "https://api.tuningengines.com/v1"
+timeout = 600
+```
+
+Use this when you want Deep Research MCP to keep owning the research workflow
+and MCP tools while Tuning Engines provides centralized model access, tenant
+policy, traces, approvals, and usage reporting through an OpenAI-compatible
+runtime endpoint.
+
 Optional env variables for Open Deep Research tools:
 
 - `SERPAPI_API_KEY` or `SERPER_API_KEY`: enable Google-style search
