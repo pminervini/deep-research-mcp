@@ -15,7 +15,7 @@ from deep_research_mcp.results import (
     ResearchTaskStatus,
 )
 
-from .base import ResearchBackend
+from .base import ResearchBackend, TaskStartedCallback
 
 
 class DrTuluResearchBackend(ResearchBackend):
@@ -26,9 +26,10 @@ class DrTuluResearchBackend(ResearchBackend):
         query: str,
         system_prompt: str | None = None,
         include_code_interpreter: bool = True,
+        on_task_started: TaskStartedCallback | None = None,
     ) -> ResearchResult:
         """Run research via the Dr Tulu /chat endpoint."""
-        del include_code_interpreter
+        del include_code_interpreter, on_task_started
 
         task_id = str(uuid.uuid4())
         start_time = time.time()

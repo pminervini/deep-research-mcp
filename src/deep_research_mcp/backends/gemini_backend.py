@@ -18,7 +18,7 @@ from deep_research_mcp.results import (
     ResearchTaskStatus,
 )
 
-from .base import ResearchBackend
+from .base import ResearchBackend, TaskStartedCallback
 
 GEMINI_DEEP_RESEARCH_AGENT = "deep-research-preview-04-2026"
 GEMINI_API_VERSION = "v1beta"
@@ -60,11 +60,12 @@ class GeminiResearchBackend(ResearchBackend):
         query: str,
         system_prompt: str | None = None,
         include_code_interpreter: bool = True,
+        on_task_started: TaskStartedCallback | None = None,
     ) -> ResearchResult:
         """Run research via Gemini Deep Research."""
         try:
             return await self._run_research(
-                query, system_prompt, include_code_interpreter
+                query, system_prompt, include_code_interpreter, on_task_started
             )
         except ResearchError as error:
             return ResearchResult.failed(message=str(error))
@@ -92,11 +93,23 @@ class GeminiResearchBackend(ResearchBackend):
             self.logger.error(f"Error checking status for task {task_id}: {error}")
             return ResearchTaskStatus.error_status(task_id=task_id, error=str(error))
 
+    async def get_task_result(self, task_id: str) -> ResearchResult | None:
+        """Fetch the full result of a completed Gemini interaction."""
+        interaction = await run_blocking(
+            self.gemini_interactions.get,
+            task_id,
+            extra_headers=self._api_revision_headers(),
+        )
+        if interaction.status != "completed":
+            return None
+        return self.extract_results(interaction)
+
     async def _run_research(
         self,
         query: str,
         system_prompt: str | None = None,
         include_code_interpreter: bool = True,
+        on_task_started: TaskStartedCallback | None = None,
     ) -> ResearchResult:
         """Run Gemini Deep Research via the Interactions API."""
         if include_code_interpreter:
@@ -115,6 +128,8 @@ class GeminiResearchBackend(ResearchBackend):
             extra_headers=self._api_revision_headers(),
         )
         self.logger.info(f"Research task started: {interaction.id}")
+        if on_task_started:
+            await on_task_started(interaction.id)
         final_interaction = await self._wait_for_completion(interaction.id)
         return self.extract_results(final_interaction)
 
@@ -150,19 +165,27 @@ class GeminiResearchBackend(ResearchBackend):
                 self.logger.error(f"Error polling task {task_id}: {error}")
                 await asyncio.sleep(5)
 
-        self.logger.warning(f"Task {task_id} timed out, attempting cancellation")
-        try:
-            await run_blocking(
-                self.gemini_interactions.cancel,
-                task_id,
-                extra_headers=self._api_revision_headers(),
+        if self.config.cancel_on_timeout:
+            self.logger.warning(f"Task {task_id} timed out, attempting cancellation")
+            try:
+                await run_blocking(
+                    self.gemini_interactions.cancel,
+                    task_id,
+                    extra_headers=self._api_revision_headers(),
+                )
+            except Exception:
+                pass
+            raise TaskTimeoutError(
+                f"Research task {task_id} did not complete within "
+                f"{self.config.timeout} seconds and was cancelled"
             )
-        except Exception:
-            pass
 
+        self.logger.warning(f"Task {task_id} timed out, leaving it running")
         raise TaskTimeoutError(
             f"Research task {task_id} did not complete within "
-            f"{self.config.timeout} seconds"
+            f"{self.config.timeout} seconds. The task is still running; "
+            f"use research_status with task ID {task_id} to retrieve the "
+            "result later"
         )
 
     def _extract_failure_message(self, interaction) -> str:

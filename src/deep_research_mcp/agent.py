@@ -17,6 +17,7 @@ from openai.types.chat import ChatCompletionMessageParam
 
 from deep_research_mcp.async_utils import run_blocking
 from deep_research_mcp.backends import ResearchBackend, build_research_backend
+from deep_research_mcp.backends.base import TaskStartedCallback
 from deep_research_mcp.clarification import (
     ClarificationManager,
     build_clarification_client_kwargs,
@@ -47,6 +48,7 @@ class DeepResearchAgent:
         system_prompt: str | None = None,
         include_code_interpreter: bool = True,
         callback_url: str | None = None,
+        on_task_started: TaskStartedCallback | None = None,
     ) -> ResearchResult:
         """
         Perform deep research on a query with full async handling.
@@ -56,6 +58,8 @@ class DeepResearchAgent:
             system_prompt: Optional system instructions for research approach
             include_code_interpreter: Whether to enable code execution
             callback_url: Optional webhook URL for completion notification
+            on_task_started: Optional async callback invoked with the provider
+                task ID as soon as the research task is created
 
         Returns:
             Dictionary with final report, citations, and metadata
@@ -71,6 +75,7 @@ class DeepResearchAgent:
             query=enhanced_query,
             system_prompt=system_prompt,
             include_code_interpreter=include_code_interpreter,
+            on_task_started=on_task_started,
         )
 
         if result.execution_time is None:
@@ -100,6 +105,10 @@ class DeepResearchAgent:
     async def get_task_status(self, task_id: str) -> ResearchTaskStatus:
         """Check the status of a provider-specific research task."""
         return await self.backend.get_task_status(task_id)
+
+    async def get_task_result(self, task_id: str) -> ResearchResult | None:
+        """Fetch the full result of a completed task, or None if unsupported."""
+        return await self.backend.get_task_result(task_id)
 
     def start_clarification(self, user_query: str) -> dict[str, Any]:
         """

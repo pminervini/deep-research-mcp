@@ -83,6 +83,7 @@ base_url = "https://api.openai.com/v1"      # OpenAI: OpenAI-compatible endpoint
 # Task behavior
 timeout = 1800
 poll_interval = 30
+cancel_on_timeout = false  # When true, cancel the provider task if it exceeds timeout. Default false: the task keeps running and the result can be recovered with research_status
 
 # Largely based on https://cookbook.openai.com/examples/deep_research_api/introduction_to_deep_research_api_agents
 [clarification]                                       # Optional query clarification component
@@ -96,6 +97,8 @@ base_url = "https://api.openai.com/v1"  # Optional, overrides base_url
 [logging]
 level = "INFO"
 ```
+
+Note on precedence: `[research] api_key` and `base_url` map to the `RESEARCH_API_KEY` and `RESEARCH_BASE_URL` settings, which apply to *every* provider. If you switch provider via an environment override (e.g. `RESEARCH_PROVIDER=openai`) while the file is configured for another provider, also override `RESEARCH_API_KEY` and `RESEARCH_BASE_URL`, otherwise the file's key and endpoint are used.
 
 OpenAI provider example:
 
@@ -391,6 +394,15 @@ claude --mcp-config ./.mcp.json
 ```
 
 Kick off work with `deep_research` or `research_with_context`, note the returned job ID, and call `research_status` to stream progress without letting any single tool call stagnate.
+
+Output size: Claude Code limits MCP tool output (about 25,000 tokens by default, configurable via `MAX_MCP_OUTPUT_TOKENS`). The research tools declare the `anthropic/maxResultSizeChars` annotation so recent Claude Code versions accept large reports without extra configuration; on older versions, raise the limit before launching the CLI:
+
+```bash
+export MAX_MCP_OUTPUT_TOKENS=50000
+claude
+```
+
+Timeout recovery: if a research task exceeds the configured `timeout`, the server leaves the provider task running by default and returns its task ID; call `research_status` with that ID to retrieve the full report once it completes. Pass `--cancel-on-timeout` to `deep-research-mcp` (or set `cancel_on_timeout = true` in `~/.deep_research`) to restore the old cancel behavior.
 
 2. **Use in Claude Code**:
    - The research tools will appear in Claude Code's tool palette

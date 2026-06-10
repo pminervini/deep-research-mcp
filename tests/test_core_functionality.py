@@ -151,6 +151,90 @@ def test_gemini_extract_results_uses_current_steps_schema():
     ]
 
 
+def test_openai_extract_results_dedupes_citations_and_joins_blocks():
+    """The final message may not be last, may have several blocks, and may repeat URLs."""
+    backend = object.__new__(OpenAIResearchBackend)
+    response = SimpleNamespace(
+        id="resp-test",
+        status="completed",
+        output=[
+            SimpleNamespace(
+                type="web_search_call",
+                action=SimpleNamespace(query="canberra facts"),
+            ),
+            SimpleNamespace(
+                type="message",
+                content=[
+                    SimpleNamespace(
+                        type="output_text",
+                        text="First block.",
+                        annotations=[
+                            SimpleNamespace(
+                                type="url_citation",
+                                title="Example",
+                                url="https://example.com",
+                            ),
+                            SimpleNamespace(
+                                type="url_citation",
+                                title="Example duplicate",
+                                url="https://example.com",
+                            ),
+                        ],
+                    ),
+                    SimpleNamespace(
+                        type="output_text",
+                        text="Second block.",
+                        annotations=[
+                            SimpleNamespace(
+                                type="url_citation",
+                                title="Other",
+                                url="https://other.example.com",
+                            )
+                        ],
+                    ),
+                ],
+            ),
+            SimpleNamespace(type="reasoning", summary=[]),
+        ],
+    )
+
+    result = backend._extract_openai_results(response)
+
+    assert result.status == "completed"
+    assert result.final_report == "First block.\nSecond block."
+    assert result.search_queries == ["canberra facts"]
+    assert [
+        (citation.index, citation.title, citation.url) for citation in result.citations
+    ] == [
+        (1, "Example", "https://example.com"),
+        (2, "Other", "https://other.example.com"),
+    ]
+
+
+def test_render_citations_avoids_duplicating_url_only_titles():
+    """Citations without a real title render the URL once, not as [url](url)."""
+    from deep_research_mcp.mcp_server import _render_citations
+    from deep_research_mcp.results import ResearchCitation
+
+    result = ResearchResult.completed(
+        task_id="task-test",
+        final_report="Report",
+        citations=[
+            ResearchCitation(
+                index=1,
+                title="https://example.com/very-long-redirect",
+                url="https://example.com/very-long-redirect",
+            ),
+            ResearchCitation(index=2, title="Example", url="https://example.com"),
+        ],
+    )
+
+    assert _render_citations(result) == (
+        "1. <https://example.com/very-long-redirect>\n"
+        "2. [Example](https://example.com)"
+    )
+
+
 def test_dr_tulu_agent_initialization():
     """Test Dr Tulu agent initialization without making network calls."""
     old_provider = os.environ.get("RESEARCH_PROVIDER")

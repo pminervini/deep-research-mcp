@@ -56,7 +56,7 @@ Configuration
 Exposed Tools
 - deep_research: autonomous research with web search and analysis (supports clarification)
 - research_with_context: research using enriched queries from clarification
-- research_status: check status of running research tasks
+- research_status: check status of running research tasks; returns the full report once completed
 
 Development
 - Testing, linting, formatting, and type-checking commands are documented in README.md. Use those as the single source of truth.

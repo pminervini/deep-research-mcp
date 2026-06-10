@@ -148,6 +148,38 @@ def test_toml_boolean_parsing():
             del os.environ["RESEARCH_MODEL"]
 
 
+def test_cancel_on_timeout_parsing():
+    """cancel_on_timeout defaults to False and parses env/TOML booleans."""
+    original_val = os.environ.get("RESEARCH_CANCEL_ON_TIMEOUT")
+    original_model = os.environ.get("RESEARCH_MODEL")
+
+    try:
+        os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
+        os.environ.pop("RESEARCH_CANCEL_ON_TIMEOUT", None)
+
+        config = ResearchConfig.from_env()
+        assert config.cancel_on_timeout is False
+
+        os.environ["RESEARCH_CANCEL_ON_TIMEOUT"] = "true"
+        config = ResearchConfig.from_env()
+        assert config.cancel_on_timeout is True
+
+        os.environ["RESEARCH_CANCEL_ON_TIMEOUT"] = "false"
+        config = ResearchConfig.from_env()
+        assert config.cancel_on_timeout is False
+
+    finally:
+        if original_val is not None:
+            os.environ["RESEARCH_CANCEL_ON_TIMEOUT"] = original_val
+        else:
+            os.environ.pop("RESEARCH_CANCEL_ON_TIMEOUT", None)
+
+        if original_model is not None:
+            os.environ["RESEARCH_MODEL"] = original_model
+        else:
+            os.environ.pop("RESEARCH_MODEL", None)
+
+
 def test_config_defaults():
     """Test configuration defaults are correct"""
     # Clean environment

@@ -89,6 +89,7 @@ class ResearchConfig:
     api_style: str = "responses"
     timeout: float = 1800.0
     poll_interval: float = 30.0
+    cancel_on_timeout: bool = False
     log_level: str = "INFO"
     enable_clarification: bool = False
     enable_reasoning_summaries: bool = False
@@ -216,6 +217,9 @@ class ResearchConfig:
                     "RESEARCH_POLL_INTERVAL", default=str(cls.poll_interval)
                 )
                 or cls.poll_interval
+            ),
+            cancel_on_timeout=get_bool_setting(
+                "RESEARCH_CANCEL_ON_TIMEOUT", "CANCEL_ON_TIMEOUT", default=False
             ),
             log_level=get_setting_first("LOGGING_LEVEL", default=cls.log_level)
             or cls.log_level,
