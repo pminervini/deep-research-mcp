@@ -73,6 +73,14 @@ Requirements:
 # Global agent instance
 research_agent: DeepResearchAgent | None = None
 
+# Config overrides set from command-line arguments, applied on agent creation.
+_config_overrides: dict[str, bool] = {}
+
+# Claude Code persists tool results above its default size threshold to disk
+# unless the tool declares a higher limit; research reports are inherently
+# large, so request the maximum allowed (500k chars).
+RESEARCH_TOOL_META = {"anthropic/maxResultSizeChars": 500_000}
+
 # Initialize FastMCP server at module level with metadata
 mcp = FastMCP(
     name=f"deep-research (v{__version__})",
@@ -106,6 +114,8 @@ def _apply_logging_config(log_level: str) -> None:
 def _build_research_agent() -> DeepResearchAgent:
     """Load configuration, apply logging, and construct a research agent."""
     config = ResearchConfig.load()
+    if "cancel_on_timeout" in _config_overrides:
+        config.cancel_on_timeout = _config_overrides["cancel_on_timeout"]
     config.validate()
     _apply_logging_config(config.log_level)
     return DeepResearchAgent(config)
@@ -167,9 +177,17 @@ def _resolve_system_prompt(system_instructions: str) -> str:
 
 
 def _render_citations(result: ResearchResult) -> str:
-    """Render citations as a markdown list."""
+    """Render citations as a markdown list.
+
+    When the title is just the URL (e.g. Gemini grounding redirects carry no
+    title), render the URL once instead of duplicating it as link text.
+    """
     return "\n".join(
-        f"{citation.index}. [{citation.title}]({citation.url})"
+        (
+            f"{citation.index}. <{citation.url}>"
+            if citation.title == citation.url
+            else f"{citation.index}. [{citation.title}]({citation.url})"
+        )
         for citation in result.citations
     )
 
@@ -240,12 +258,24 @@ async def _run_research_with_progress(
         await _safe_report_progress(ctx, progress=0, message=start_message, total=None)
         heartbeat_task = asyncio.create_task(_progress_heartbeat(ctx, heartbeat_label))
 
+    async def report_task_started(task_id: str) -> None:
+        if ctx:
+            await _safe_report_progress(
+                ctx,
+                progress=0,
+                message=(
+                    f"Research task started (task ID: {task_id}). If this call "
+                    "is lost, recover the result with research_status."
+                ),
+            )
+
     try:
         return await agent.research(
             query=query,
             system_prompt=_resolve_system_prompt(system_instructions),
             include_code_interpreter=include_analysis,
             callback_url=callback_url or None,
+            on_task_started=report_task_started,
         )
     except ResearchError:
         if ctx:
@@ -301,7 +331,7 @@ async def _finalize_research_response(
 
 
 # Define the actual async functions that will be wrapped by FastMCP
-@mcp.tool()
+@mcp.tool(meta=RESEARCH_TOOL_META)
 async def deep_research(
     query: Annotated[
         str,
@@ -420,7 +450,7 @@ You can proceed with the research using the same query."""
         return f"Unexpected error: {str(e)}"
 
 
-@mcp.tool()
+@mcp.tool(meta=RESEARCH_TOOL_META)
 async def research_status(
     task_id: Annotated[
         str,
@@ -433,17 +463,20 @@ async def research_status(
     **Use when:**
     - Research is taking a long time (>5 minutes)
     - Want to check if a task completed successfully
-    - Need creation/completion timestamps
+    - Need to recover the report from a task whose original call was lost
 
     **Returns:** Task status ('running', 'completed', 'failed') with timestamps.
+    When the task is completed, the full research report is also returned.
     """
     global research_agent
 
-    if not research_agent:
-        return "Research agent not initialized. Please run a research query first."
+    try:
+        agent = _ensure_research_agent()
+    except Exception as e:
+        return f"Failed to initialize research agent: {str(e)}"
 
     try:
-        status = await research_agent.get_task_status(task_id)
+        status = await agent.get_task_status(task_id)
 
         if status.status == "error":
             return f"Error checking status: {status.error or 'Unknown error'}"
@@ -459,6 +492,19 @@ async def research_status(
         if status.message:
             result += f"\nMessage: {status.message}"
 
+        if status.status == "completed":
+            try:
+                task_result = await agent.get_task_result(task_id)
+            except Exception as error:
+                logger.error(f"Error fetching result for task {task_id}: {error}")
+                task_result = None
+            if task_result and task_result.is_completed:
+                report = _render_research_markdown(
+                    title=f"Research Report (recovered): {task_id}",
+                    result=task_result,
+                )
+                return f"{result}\n\n{report}"
+
         return result
 
     except Exception as e:
@@ -466,7 +512,7 @@ async def research_status(
         return f"Error checking status: {str(e)}"
 
 
-@mcp.tool()
+@mcp.tool(meta=RESEARCH_TOOL_META)
 async def research_with_context(
     session_id: Annotated[
         str,
@@ -586,8 +632,22 @@ def main():
         default=8080,
         help="Port to bind for HTTP transport (default: 8080)",
     )
+    parser.add_argument(
+        "--cancel-on-timeout",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help=(
+            "Cancel the provider research task when it exceeds the configured "
+            "timeout. Defaults to the cancel_on_timeout config value (false), "
+            "which leaves the task running so the result can be recovered "
+            "with research_status."
+        ),
+    )
 
     args = parser.parse_args()
+
+    if args.cancel_on_timeout is not None:
+        _config_overrides["cancel_on_timeout"] = args.cancel_on_timeout
 
     logger.info(f"Starting Deep Research MCP server with {args.transport} transport...")
 

@@ -17,7 +17,7 @@ from deep_research_mcp.results import (
     ResearchTaskStatus,
 )
 
-from .base import ResearchBackend
+from .base import ResearchBackend, TaskStartedCallback
 
 
 class OpenDeepResearchBackend(ResearchBackend):
@@ -152,9 +152,10 @@ Additionally, if after some searching you find out that you need more informatio
         query: str,
         system_prompt: str | None = None,
         include_code_interpreter: bool = True,
+        on_task_started: TaskStartedCallback | None = None,
     ) -> ResearchResult:
         """Run research via the Open Deep Research provider."""
-        del include_code_interpreter
+        del include_code_interpreter, on_task_started
         return await self._run_research(query, system_prompt)
 
     async def get_task_status(self, task_id: str) -> ResearchTaskStatus:

@@ -30,7 +30,7 @@ from deep_research_mcp.results import (
     ResearchTaskStatus,
 )
 
-from .base import ResearchBackend
+from .base import ResearchBackend, TaskStartedCallback
 
 
 class OpenAIResearchBackend(ResearchBackend):
@@ -49,6 +49,7 @@ class OpenAIResearchBackend(ResearchBackend):
         query: str,
         system_prompt: str | None = None,
         include_code_interpreter: bool = True,
+        on_task_started: TaskStartedCallback | None = None,
     ) -> ResearchResult:
         """Run research via the OpenAI provider."""
         if self.config.api_style == "chat_completions":
@@ -61,6 +62,8 @@ class OpenAIResearchBackend(ResearchBackend):
                 self._build_input_messages(query, system_prompt),
                 self._build_tools(include_code_interpreter),
             )
+            if on_task_started:
+                await on_task_started(response.id)
             final_response = await self._wait_for_completion(response.id)
             return self._extract_openai_results(final_response)
         except ResearchError as error:
@@ -85,6 +88,16 @@ class OpenAIResearchBackend(ResearchBackend):
         except Exception as error:
             self.logger.error(f"Error checking status for task {task_id}: {error}")
             return ResearchTaskStatus.error_status(task_id=task_id, error=str(error))
+
+    async def get_task_result(self, task_id: str) -> ResearchResult | None:
+        """Fetch the full result of a completed Responses API task."""
+        if self.config.api_style == "chat_completions":
+            return None
+
+        response = await run_blocking(self.client.responses.retrieve, task_id)
+        if response.status != "completed":
+            return None
+        return self._extract_openai_results(response)
 
     def _build_input_messages(
         self, query: str, system_prompt: str | None
@@ -309,15 +322,23 @@ class OpenAIResearchBackend(ResearchBackend):
                 self.logger.error(f"Error polling task {task_id}: {error}")
                 await asyncio.sleep(5)
 
-        self.logger.warning(f"Task {task_id} timed out, attempting cancellation")
-        try:
-            await run_blocking(self.client.responses.cancel, task_id)
-        except Exception:
-            pass
+        if self.config.cancel_on_timeout:
+            self.logger.warning(f"Task {task_id} timed out, attempting cancellation")
+            try:
+                await run_blocking(self.client.responses.cancel, task_id)
+            except Exception:
+                pass
+            raise TaskTimeoutError(
+                f"Research task {task_id} did not complete within "
+                f"{self.config.timeout} seconds and was cancelled"
+            )
 
+        self.logger.warning(f"Task {task_id} timed out, leaving it running")
         raise TaskTimeoutError(
             f"Research task {task_id} did not complete within "
-            f"{self.config.timeout} seconds"
+            f"{self.config.timeout} seconds. The task is still running; "
+            f"use research_status with task ID {task_id} to retrieve the "
+            "result later"
         )
 
     def _extract_openai_results(self, response) -> ResearchResult:
@@ -343,54 +364,54 @@ class OpenAIResearchBackend(ResearchBackend):
                 message="No output received", task_id=response.id
             )
 
-        final_output = response.output[-1]
-        final_report = final_output.content[0].text if final_output.content else ""
+        final_output = next(
+            (
+                item
+                for item in reversed(response.output)
+                if getattr(item, "type", None) == "message"
+            ),
+            response.output[-1],
+        )
+        content_blocks = final_output.content or []
+        final_report = "\n".join(
+            block.text for block in content_blocks if getattr(block, "text", None)
+        )
 
         citations: list[ResearchCitation] = []
-        if final_output.content and final_output.content[0].annotations:
-            for index, annotation in enumerate(final_output.content[0].annotations):
+        seen_urls: set[str] = set()
+        for block in content_blocks:
+            for index, annotation in enumerate(
+                getattr(block, "annotations", None) or []
+            ):
                 if annotation.type == "url_citation":
-                    citations.append(
-                        ResearchCitation(
-                            index=index + 1,
-                            title=annotation.title,
-                            url=annotation.url,
-                        )
-                    )
+                    title = annotation.title
+                    url = annotation.url
                 elif annotation.type == "file_citation":
-                    citations.append(
-                        ResearchCitation(
-                            index=index + 1,
-                            title=f"File: {annotation.filename}",
-                            url=f"file://{annotation.file_id}/{annotation.filename}",
-                        )
-                    )
+                    title = f"File: {annotation.filename}"
+                    url = f"file://{annotation.file_id}/{annotation.filename}"
                 elif annotation.type == "container_file_citation":
-                    citations.append(
-                        ResearchCitation(
-                            index=index + 1,
-                            title=f"Container File: {annotation.filename}",
-                            url=(
-                                "container://"
-                                f"{annotation.container_id}/"
-                                f"{annotation.file_id}/"
-                                f"{annotation.filename}"
-                            ),
-                        )
+                    title = f"Container File: {annotation.filename}"
+                    url = (
+                        "container://"
+                        f"{annotation.container_id}/"
+                        f"{annotation.file_id}/"
+                        f"{annotation.filename}"
                     )
                 elif annotation.type == "file_path":
-                    citations.append(
-                        ResearchCitation(
-                            index=index + 1,
-                            title=f"File Path: {annotation.file_id}",
-                            url=f"file://{annotation.file_id}",
-                        )
-                    )
+                    title = f"File Path: {annotation.file_id}"
+                    url = f"file://{annotation.file_id}"
                 else:
                     self.logger.warning(
                         f"Unknown annotation type '{annotation.type}' "
                         f"at index {index}, skipping"
                     )
+                    continue
+                if url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                citations.append(
+                    ResearchCitation(index=len(citations) + 1, title=title, url=url)
+                )
 
         reasoning_steps = [
             item.summary

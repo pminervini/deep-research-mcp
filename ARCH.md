@@ -327,18 +327,21 @@ The MCP server exposes three main tools to clients like Claude Code. Each tool a
 
 ### `research_status()`
 
-**Purpose**: Check the status of a running research task.
+**Purpose**: Check the status of a running research task and recover the report of a completed one.
 
 **Arguments**:
 - `task_id` (string, required): UUID returned by `deep_research()` tool
 
-**Returns**: String containing task status information
+**Returns**: String containing task status information. When the task is completed and the provider supports result retrieval (OpenAI Responses API, Gemini Interactions API), the full rendered research report is appended.
 
 **Return Structure**:
 ```
 Task [task_id] status: [status]
 Created at: [timestamp]
 Completed at: [timestamp]  # Only if completed
+
+# Research Report (recovered): [task_id]  # Only if completed
+...full report with metadata and citations...
 ```
 
 **Example Response Dictionary** (internal format):
