@@ -198,6 +198,7 @@ def test_openai_extract_results_dedupes_citations_and_joins_blocks():
         ],
     )
 
+    # pylint: disable=protected-access
     result = backend._extract_openai_results(response)
 
     assert result.status == "completed"
