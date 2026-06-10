@@ -42,6 +42,7 @@ class OpenAIResearchBackend(ResearchBackend):
         client_kwargs["api_key"] = config.api_key or MISSING_OPENAI_API_KEY_PLACEHOLDER
         if config.base_url:
             client_kwargs["base_url"] = config.base_url
+        client_kwargs["timeout"] = httpx.Timeout(config.timeout, connect=10.0)
         self.client = OpenAI(**client_kwargs)
 
     async def research(
@@ -152,13 +153,8 @@ class OpenAIResearchBackend(ResearchBackend):
         start_time = time.time()
 
         try:
-            client = OpenAI(
-                api_key=self.client.api_key,
-                base_url=str(self.client.base_url),
-                timeout=httpx.Timeout(self.config.timeout, connect=10.0),
-            )
             response = await run_blocking(
-                self._create_chat_completions_request, client, messages
+                self._create_chat_completions_request, messages
             )
             return self._extract_chat_completions_results(
                 response, time.time() - start_time
@@ -178,10 +174,10 @@ class OpenAIResearchBackend(ResearchBackend):
         reraise=True,
     )
     def _create_chat_completions_request(
-        self, client: OpenAI, messages: list[ChatCompletionMessageParam]
+        self, messages: list[ChatCompletionMessageParam]
     ):
         """Retry-wrapped Chat Completions API call."""
-        return client.chat.completions.create(
+        return self.client.chat.completions.create(
             model=self.config.model, messages=messages
         )
 

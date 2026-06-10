@@ -15,20 +15,22 @@ from .gemini_backend import GeminiResearchBackend
 from .open_deep_research_backend import OpenDeepResearchBackend
 from .openai_backend import OpenAIResearchBackend
 
+_BACKENDS: dict[str, type[ResearchBackend]] = {
+    "openai": OpenAIResearchBackend,
+    "dr-tulu": DrTuluResearchBackend,
+    "gemini": GeminiResearchBackend,
+    "open-deep-research": OpenDeepResearchBackend,
+}
+
 
 def build_research_backend(
     config: ResearchConfig, logger: logging.Logger
 ) -> ResearchBackend:
     """Construct the provider-specific backend for the current configuration."""
-    if config.provider in {"openai"}:
-        return OpenAIResearchBackend(config, logger)
-    if config.provider in {"dr-tulu"}:
-        return DrTuluResearchBackend(config, logger)
-    if config.provider in {"gemini"}:
-        return GeminiResearchBackend(config, logger)
-    if config.provider in {"open-deep-research"}:
-        return OpenDeepResearchBackend(config, logger)
-    raise ConfigurationError(f"Provider '{config.provider}' is not supported")
+    backend_cls = _BACKENDS.get(config.provider)
+    if backend_cls is None:
+        raise ConfigurationError(f"Provider '{config.provider}' is not supported")
+    return backend_cls(config, logger)
 
 
 __all__ = [

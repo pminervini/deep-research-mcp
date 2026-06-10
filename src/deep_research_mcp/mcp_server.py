@@ -374,8 +374,6 @@ async def deep_research(
 
     **Note:** Uses provider-native research backends - monitor costs as research can generate substantial tokens.
     """
-    global research_agent
-
     try:
         agent = _ensure_research_agent()
     except Exception as e:
@@ -468,8 +466,6 @@ async def research_status(
     **Returns:** Task status ('running', 'completed', 'failed') with timestamps.
     When the task is completed, the full research report is also returned.
     """
-    global research_agent
-
     try:
         agent = _ensure_research_agent()
     except Exception as e:
@@ -551,8 +547,6 @@ async def research_with_context(
 
     **Returns:** Complete research report with citations and metadata
     """
-    global research_agent
-
     try:
         agent = _ensure_research_agent()
     except Exception as e:

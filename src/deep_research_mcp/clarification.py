@@ -37,14 +37,14 @@ def build_clarification_client_kwargs(config: ResearchConfig) -> OpenAIClientKwa
 
     api_key = config.clarification_api_key
     if not api_key:
-        if config.provider in {"openai"}:
+        if config.provider == "openai":
             api_key = config.api_key
         else:
             api_key = os.environ.get("OPENAI_API_KEY")
 
     base_url = config.clarification_base_url
     if not base_url:
-        if config.provider in {"openai"}:
+        if config.provider == "openai":
             base_url = config.base_url
         else:
             base_url = os.environ.get("OPENAI_BASE_URL")

@@ -20,6 +20,35 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_CONFIG_PATH = Path.home() / ".deep_research"
 
+# Per-provider (default model, default base URL, extra API-key settings,
+# extra base-URL settings). The openai default model also depends on api_style.
+_PROVIDER_DEFAULTS: dict[str, tuple[str, str, tuple[str, ...], tuple[str, ...]]] = {
+    "openai": (
+        "o4-mini-deep-research-2025-06-26",
+        "https://api.openai.com/v1",
+        ("OPENAI_API_KEY",),
+        ("OPENAI_BASE_URL",),
+    ),
+    "gemini": (
+        "deep-research-preview-04-2026",
+        "https://generativelanguage.googleapis.com",
+        ("GEMINI_API_KEY", "GOOGLE_API_KEY"),
+        ("GEMINI_BASE_URL",),
+    ),
+    "dr-tulu": (
+        "dr-tulu",
+        "http://localhost:8080/",
+        ("DR_TULU_API_KEY",),
+        ("DR_TULU_BASE_URL",),
+    ),
+    "open-deep-research": (
+        "openai/qwen/qwen3-coder-30b",
+        "http://localhost:1234/v1",
+        ("OPENAI_API_KEY",),
+        ("OPENAI_BASE_URL",),
+    ),
+}
+
 
 def load_config_file(config_path: Path | str | None = None) -> dict[str, Any]:
     """Load configuration data from a TOML file without mutating process state."""
@@ -150,56 +179,25 @@ class ResearchConfig:
             or cls.api_style
         )
 
-        if provider in {"openai"} and api_style not in {
-            "responses",
-            "chat_completions",
-        }:
-            raise ConfigurationError(
-                f"Invalid api_style '{api_style}'. Must be 'responses' or 'chat_completions'"
-            )
-
-        if provider not in {"openai"} and api_style not in {
-            "responses",
-            "chat_completions",
-        }:
+        if api_style not in {"responses", "chat_completions"}:
+            if provider == "openai":
+                raise ConfigurationError(
+                    f"Invalid api_style '{api_style}'. Must be 'responses' or 'chat_completions'"
+                )
             api_style = cls.api_style
 
-        if provider in {"dr-tulu"}:
-            default_model = "dr-tulu"
-            default_base_url = "http://localhost:8080/"
-            api_key = get_setting_first("RESEARCH_API_KEY", "DR_TULU_API_KEY")
-            base_url = get_setting_first(
-                "RESEARCH_BASE_URL", "DR_TULU_BASE_URL", default=default_base_url
-            )
-        elif provider in {"open-deep-research"}:
-            default_model = "openai/qwen/qwen3-coder-30b"
-            default_base_url = "http://localhost:1234/v1"
-            api_key = get_setting_first("RESEARCH_API_KEY", "OPENAI_API_KEY")
-            base_url = get_setting_first(
-                "RESEARCH_BASE_URL", "OPENAI_BASE_URL", default=default_base_url
-            )
-        elif provider in {"openai"}:
-            default_model = (
-                "gpt-5-mini"
-                if api_style == "chat_completions"
-                else "o4-mini-deep-research-2025-06-26"
-            )
-            default_base_url = "https://api.openai.com/v1"
-            api_key = get_setting_first("RESEARCH_API_KEY", "OPENAI_API_KEY")
-            base_url = get_setting_first(
-                "RESEARCH_BASE_URL", "OPENAI_BASE_URL", default=default_base_url
-            )
-        elif provider in {"gemini"}:
-            default_model = "deep-research-preview-04-2026"
-            default_base_url = "https://generativelanguage.googleapis.com"
-            api_key = get_setting_first(
-                "RESEARCH_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"
-            )
-            base_url = get_setting_first(
-                "RESEARCH_BASE_URL", "GEMINI_BASE_URL", default=default_base_url
-            )
-        else:
+        if provider not in _PROVIDER_DEFAULTS:
             raise ConfigurationError(f"Provider '{provider}' is not supported")
+
+        default_model, default_base_url, api_key_keys, base_url_keys = (
+            _PROVIDER_DEFAULTS[provider]
+        )
+        if provider == "openai" and api_style == "chat_completions":
+            default_model = "gpt-5-mini"
+        api_key = get_setting_first("RESEARCH_API_KEY", *api_key_keys)
+        base_url = get_setting_first(
+            "RESEARCH_BASE_URL", *base_url_keys, default=default_base_url
+        )
 
         return cls(
             api_key=api_key,
