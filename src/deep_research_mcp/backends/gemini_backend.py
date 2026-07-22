@@ -123,14 +123,19 @@ class GeminiResearchBackend(ResearchBackend):
             self.gemini_interactions.create,
             agent=self.config.model or GEMINI_DEEP_RESEARCH_AGENT,
             background=True,
+            stream=False,
             input=request_input,
             store=True,
             extra_headers=self._api_revision_headers(),
         )
-        self.logger.info(f"Research task started: {interaction.id}")
+        task_id = getattr(interaction, "id", None)
+        if not isinstance(task_id, str) or not task_id:
+            raise ResearchError("Gemini did not return a research task ID")
+
+        self.logger.info(f"Research task started: {task_id}")
         if on_task_started:
-            await on_task_started(interaction.id)
-        final_interaction = await self._wait_for_completion(interaction.id)
+            await on_task_started(task_id)
+        final_interaction = await self._wait_for_completion(task_id)
         return self.extract_results(final_interaction)
 
     async def _wait_for_completion(self, task_id: str):
