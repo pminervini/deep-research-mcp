@@ -14,7 +14,9 @@ dependencies = [
     "google-genai>=2.2.0",
     "httpx>=0.25.0",
     "instructor>=1.10.0",
-    "mcp[cli]>=1.17.0",
+    # Stay on stable v1 until we deliberately migrate across v2's breaking changes.
+    # https://github.com/modelcontextprotocol/python-sdk
+    "mcp[cli]>=1.28.1,<2",
     "openai>=1.88",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
