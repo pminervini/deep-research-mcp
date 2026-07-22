@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
         ("openai", "gpt-5-mini", "responses"),
         ("openai", "gpt-5-mini", "chat_completions"),
         ("gemini", "deep-research-preview-04-2026", "responses"),
+        ("youcom", "standard", "responses"),
     ],
 )
 async def test_mcp_server_with_providers(provider, model, api_style):
@@ -63,6 +64,16 @@ async def run_provider_check(provider, model, api_style="responses"):
         # from ~/.deep_research when running against Gemini.
         env_overrides["RESEARCH_API_KEY"] = gemini_key
         env_overrides["RESEARCH_BASE_URL"] = "https://generativelanguage.googleapis.com"
+    elif provider == "youcom":
+        youcom_key = os.environ.get("YDC_API_KEY")
+        if not youcom_key:
+            pytest.skip(
+                "YDC_API_KEY not set; skipping You.com provider check"
+            )
+        # Override both so we don't inherit a stale openai api_key / base_url
+        # from ~/.deep_research when running against You.com.
+        env_overrides["RESEARCH_API_KEY"] = youcom_key
+        env_overrides["RESEARCH_BASE_URL"] = "https://api.you.com"
 
     old_values: dict[str, str | None] = {
         key: os.environ.get(key) for key in env_overrides
@@ -87,6 +98,8 @@ async def run_provider_check(provider, model, api_style="responses"):
         assert cfg.api_style == api_style
         if provider == "openai":
             assert cfg.model == "gpt-5-mini"
+        elif provider == "youcom":
+            assert cfg.model == "standard"
         else:
             assert cfg.model == model
 

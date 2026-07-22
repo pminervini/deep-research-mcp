@@ -74,11 +74,11 @@ Common settings:
 
 ```toml
 [research]                                  # Core Deep Research functionality
-provider = "openai"                         # Available options: "openai", "dr-tulu", "gemini", "open-deep-research" -- defaults to "openai"
+provider = "openai"                         # Available options: "openai", "dr-tulu", "gemini", "open-deep-research", "youcom" -- defaults to "openai"
 api_style = "responses"                     # Only applies to provider="openai"; use "chat_completions" for Perplexity, Groq, Ollama, etc.
-model = "o4-mini-deep-research-2025-06-26"  # OpenAI: model identifier; Dr Tulu: logical provider id; Gemini: agent id; ODR: LiteLLM model identifier
+model = "o4-mini-deep-research-2025-06-26"  # OpenAI: model identifier; Dr Tulu: logical provider id; Gemini: agent id; ODR: LiteLLM model identifier; You.com: research effort level
 api_key = "your-api-key"                    # API key, optional
-base_url = "https://api.openai.com/v1"      # OpenAI: OpenAI-compatible endpoint; Dr Tulu: service base URL; Gemini: https://generativelanguage.googleapis.com; ODR: LiteLLM-compatible endpoint
+base_url = "https://api.openai.com/v1"      # OpenAI: OpenAI-compatible endpoint; Dr Tulu: service base URL; Gemini: https://generativelanguage.googleapis.com; ODR: LiteLLM-compatible endpoint; You.com: https://api.you.com
 
 # Task behavior
 timeout = 1800
@@ -120,6 +120,18 @@ provider = "gemini"
 model = "deep-research-preview-04-2026"     # Gemini Deep Research agent id
 api_key = "YOUR_GEMINI_API_KEY"                # Defaults to GEMINI_API_KEY or GOOGLE_API_KEY
 base_url = "https://generativelanguage.googleapis.com"
+timeout = 1800
+poll_interval = 30
+```
+
+You.com Research provider example:
+
+```toml
+[research]
+provider = "youcom"
+model = "standard"                         # Research effort level: "lite", "standard", "deep", or "exhaustive"
+api_key = "YOUR_YDC_API_KEY"              # Defaults to YDC_API_KEY (required)
+base_url = "https://api.you.com"          # You.com Research API endpoint
 timeout = 1800
 poll_interval = 30
 ```

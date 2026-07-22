@@ -14,12 +14,14 @@ from .dr_tulu_backend import DrTuluResearchBackend
 from .gemini_backend import GeminiResearchBackend
 from .open_deep_research_backend import OpenDeepResearchBackend
 from .openai_backend import OpenAIResearchBackend
+from .youcom_backend import YoucomResearchBackend
 
 _BACKENDS: dict[str, type[ResearchBackend]] = {
     "openai": OpenAIResearchBackend,
     "dr-tulu": DrTuluResearchBackend,
     "gemini": GeminiResearchBackend,
     "open-deep-research": OpenDeepResearchBackend,
+    "youcom": YoucomResearchBackend,
 }
 
 
@@ -36,8 +38,9 @@ def build_research_backend(
 __all__ = [
     "ResearchBackend",
     "OpenAIResearchBackend",
-    "DrTuluResearchBackend",
+    "DrTuluResearchBackend", 
     "GeminiResearchBackend",
     "OpenDeepResearchBackend",
+    "YoucomResearchBackend",
     "build_research_backend",
 ]
