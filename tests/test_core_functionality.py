@@ -151,6 +151,19 @@ def test_gemini_extract_results_uses_current_steps_schema():
     ]
 
 
+@pytest.mark.asyncio
+async def test_gemini_research_fails_without_task_id():
+    """Gemini task creation must return an ID before polling can start."""
+    backend = object.__new__(GeminiResearchBackend)
+    backend.config = SimpleNamespace(model=None)
+    backend.gemini_interactions = SimpleNamespace(create=lambda **_: SimpleNamespace())
+
+    result = await backend.research("Research test", include_code_interpreter=False)
+
+    assert result.status == "failed"
+    assert result.message == "Gemini did not return a research task ID"
+
+
 def test_openai_extract_results_dedupes_citations_and_joins_blocks():
     """The final message may not be last, may have several blocks, and may repeat URLs."""
     backend = object.__new__(OpenAIResearchBackend)
