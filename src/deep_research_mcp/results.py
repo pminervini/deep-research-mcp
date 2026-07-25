@@ -18,6 +18,18 @@ class ResearchCitation:
 
 
 @dataclass(slots=True)
+class ResearchArtifact:
+    """A MIME-typed file or media item returned by a research provider."""
+
+    index: int
+    name: str
+    mime_type: str
+    content_type: str
+    data: str | None = None
+    uri: str | None = None
+
+
+@dataclass(slots=True)
 class ResearchResult:
     """Normalized result for every research execution path."""
 
@@ -25,6 +37,7 @@ class ResearchResult:
     task_id: str | None = None
     final_report: str = ""
     citations: list[ResearchCitation] = field(default_factory=list)
+    artifacts: list[ResearchArtifact] = field(default_factory=list)
     reasoning_steps: int = 0
     search_queries: list[str] = field(default_factory=list)
     total_steps: int = 0
@@ -39,6 +52,7 @@ class ResearchResult:
         task_id: str,
         final_report: str,
         citations: list[ResearchCitation] | None = None,
+        artifacts: list[ResearchArtifact] | None = None,
         reasoning_steps: int = 0,
         search_queries: list[str] | None = None,
         total_steps: int = 0,
@@ -50,6 +64,7 @@ class ResearchResult:
             task_id=task_id,
             final_report=final_report,
             citations=citations or [],
+            artifacts=artifacts or [],
             reasoning_steps=reasoning_steps,
             search_queries=search_queries or [],
             total_steps=total_steps,

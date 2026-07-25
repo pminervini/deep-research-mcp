@@ -46,8 +46,11 @@ import asyncio
 import logging
 from contextlib import suppress
 from typing import Annotated, Literal, cast
+from urllib.parse import quote
 
+from mcp import types as mcp_types
 from mcp.server.fastmcp import Context, FastMCP
+from pydantic import AnyUrl
 
 from deep_research_mcp import __version__
 from deep_research_mcp.agent import DeepResearchAgent
@@ -192,6 +195,17 @@ def _render_citations(result: ResearchResult) -> str:
     )
 
 
+def _render_artifacts(result: ResearchResult) -> str:
+    """Render returned provider files without embedding their base64 payloads."""
+    artifact_lines: list[str] = []
+    for artifact in result.artifacts:
+        label = f"`{artifact.name}` ({artifact.mime_type})"
+        if artifact.uri:
+            label = f"[{artifact.name}]({artifact.uri}) ({artifact.mime_type})"
+        artifact_lines.append(f"{artifact.index}. {label}")
+    return "\n".join(artifact_lines)
+
+
 def _render_research_markdown(
     *,
     title: str,
@@ -204,6 +218,7 @@ def _render_research_markdown(
         f"- **Total research steps**: {result.total_steps}",
         f"- **Search queries executed**: {len(result.search_queries)}",
         f"- **Citations found**: {len(result.citations)}",
+        f"- **Files returned**: {len(result.artifacts)}",
         f"- **Task ID**: {result.task_id}",
     ]
 
@@ -235,7 +250,74 @@ def _render_research_markdown(
     if citations:
         markdown_lines.append(citations)
 
+    artifacts = _render_artifacts(result)
+    if artifacts:
+        markdown_lines.extend(["", "## Returned Files", artifacts])
+
     return "\n".join(markdown_lines)
+
+
+def _artifact_content_block(
+    result: ResearchResult, artifact_index: int
+) -> mcp_types.ContentBlock | None:
+    """Convert one normalized artifact to the richest matching MCP content block."""
+    artifact = result.artifacts[artifact_index]
+    if artifact.data is not None:
+        if artifact.mime_type.startswith("image/"):
+            return mcp_types.ImageContent(
+                type="image",
+                data=artifact.data,
+                mimeType=artifact.mime_type,
+            )
+        if artifact.mime_type.startswith("audio/"):
+            return mcp_types.AudioContent(
+                type="audio",
+                data=artifact.data,
+                mimeType=artifact.mime_type,
+            )
+
+        task_id = quote(result.task_id or "unknown-task", safe="")
+        filename = quote(artifact.name, safe="")
+        resource_uri = f"gemini-artifact://{task_id}/{artifact.index}/{filename}"
+        return mcp_types.EmbeddedResource(
+            type="resource",
+            resource=mcp_types.BlobResourceContents(
+                uri=AnyUrl(resource_uri),
+                mimeType=artifact.mime_type,
+                blob=artifact.data,
+            ),
+        )
+
+    if artifact.uri:
+        try:
+            return mcp_types.ResourceLink(
+                type="resource_link",
+                name=artifact.name,
+                uri=AnyUrl(artifact.uri),
+                mimeType=artifact.mime_type,
+                description=f"Gemini {artifact.content_type} output",
+            )
+        except ValueError:
+            logger.warning(f"Gemini returned an invalid artifact URI: {artifact.uri}")
+    return None
+
+
+def _build_research_content(
+    markdown: str, result: ResearchResult
+) -> str | list[mcp_types.ContentBlock]:
+    """Attach Gemini files to a report while preserving text-only compatibility."""
+    if not result.artifacts:
+        return markdown
+
+    content: list[mcp_types.ContentBlock] = [
+        mcp_types.TextContent(type="text", text=markdown)
+    ]
+    content.extend(
+        block
+        for index in range(len(result.artifacts))
+        if (block := _artifact_content_block(result, index)) is not None
+    )
+    return content
 
 
 async def _run_research_with_progress(
@@ -305,19 +387,20 @@ async def _finalize_research_response(
     title: str,
     intro_lines: list[str] | None = None,
     extra_metadata_lines: list[str] | None = None,
-) -> str:
+) -> str | list[mcp_types.ContentBlock]:
     """Convert a completed research run into the tool's final string response."""
     if result.is_completed:
         if ctx:
             await _safe_report_progress(
                 ctx, progress=1, total=1, message=success_message
             )
-        return _render_research_markdown(
+        markdown = _render_research_markdown(
             title=title,
             result=result,
             intro_lines=intro_lines,
             extra_metadata_lines=extra_metadata_lines,
         )
+        return _build_research_content(markdown, result)
 
     failure_message = result.message or "Unknown error"
     if ctx:
@@ -331,7 +414,7 @@ async def _finalize_research_response(
 
 
 # Define the actual async functions that will be wrapped by FastMCP
-@mcp.tool(meta=RESEARCH_TOOL_META)
+@mcp.tool(meta=RESEARCH_TOOL_META, structured_output=False)
 async def deep_research(
     query: Annotated[
         str,
@@ -354,7 +437,7 @@ async def deep_research(
         "Optional webhook URL notified with a completion payload when the research finishes. Leave empty to disable callbacks.",
     ] = "",
     ctx: Context | None = None,
-) -> str:
+) -> str | list[mcp_types.ContentBlock]:
     """
     Performs autonomous deep research using the configured provider with web search and analysis capabilities.
 
@@ -370,7 +453,8 @@ async def deep_research(
     - Complex topics needing multiple source synthesis
     - Academic-style research with proper citations
 
-    **Returns:** Structured markdown report with citations, metadata, and research insights.
+    **Returns:** Structured markdown plus any provider-returned images, audio, video,
+    documents, or other MIME-typed files as MCP content blocks.
 
     **Note:** Uses provider-native research backends - monitor costs as research can generate substantial tokens.
     """
@@ -448,13 +532,13 @@ You can proceed with the research using the same query."""
         return f"Unexpected error: {str(e)}"
 
 
-@mcp.tool(meta=RESEARCH_TOOL_META)
+@mcp.tool(meta=RESEARCH_TOOL_META, structured_output=False)
 async def research_status(
     task_id: Annotated[
         str,
         "Research task ID returned by deep_research tool. Format: UUID string like 'abc123-def456-ghi789'",
     ],
-) -> str:
+) -> str | list[mcp_types.ContentBlock]:
     """
     Check the current status and progress of a running research task.
 
@@ -499,7 +583,7 @@ async def research_status(
                     title=f"Research Report (recovered): {task_id}",
                     result=task_result,
                 )
-                return f"{result}\n\n{report}"
+                return _build_research_content(f"{result}\n\n{report}", task_result)
 
         return result
 
@@ -508,7 +592,7 @@ async def research_status(
         return f"Error checking status: {str(e)}"
 
 
-@mcp.tool(meta=RESEARCH_TOOL_META)
+@mcp.tool(meta=RESEARCH_TOOL_META, structured_output=False)
 async def research_with_context(
     session_id: Annotated[
         str,
@@ -531,7 +615,7 @@ async def research_with_context(
         "Optional webhook URL notified with a completion payload when the research finishes. Leave empty to disable callbacks.",
     ] = "",
     ctx: Context | None = None,
-) -> str:
+) -> str | list[mcp_types.ContentBlock]:
     """
     Perform research using an enriched query based on clarification answers.
 
@@ -545,7 +629,8 @@ async def research_with_context(
     - Creates an enriched, more specific research query
     - Performs comprehensive research with the enhanced query
 
-    **Returns:** Complete research report with citations and metadata
+    **Returns:** Complete research report with citations, metadata, and any
+    provider-returned MIME-typed files.
     """
     try:
         agent = _ensure_research_agent()

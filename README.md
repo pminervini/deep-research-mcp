@@ -124,6 +124,21 @@ timeout = 1800
 poll_interval = 30
 ```
 
+Gemini rich outputs:
+
+- With `include_analysis=true` (the MCP default), the backend enables Gemini
+  Deep Research's automatic visualization mode.
+- Every non-text `model_output` block is preserved in
+  `ResearchResult.artifacts`, including image, audio, video, document, and
+  future unknown content types with a MIME type.
+- MCP responses return images and audio as native MCP media blocks, other
+  inline files as MIME-typed embedded binary resources, and URI-only files as
+  resource links. The markdown report includes a `Returned Files` index.
+- Gemini Deep Research currently documents generated visualizations as image
+  outputs. The MIME-agnostic pass-through also handles other Interactions API
+  content types whenever Gemini returns them; it does not force the provider to
+  generate unsupported modalities.
+
 Dr Tulu provider example:
 
 ```toml
@@ -534,6 +549,7 @@ async def main():
     # Print results
     print(f"Report: {result.final_report}")
     print(f"Citations: {result.citations}")
+    print(f"Returned files: {result.artifacts}")
     print(f"Research steps: {result.reasoning_steps}")
     print(f"Execution time: {result.execution_time:.2f}s")
 

@@ -5,6 +5,7 @@ Tests for structured result models.
 """
 
 from deep_research_mcp.results import (
+    ResearchArtifact,
     ResearchCitation,
     ResearchResult,
     ResearchTaskStatus,
@@ -19,6 +20,15 @@ def test_research_result_completed_contract():
         citations=[
             ResearchCitation(index=1, title="Example", url="https://example.com")
         ],
+        artifacts=[
+            ResearchArtifact(
+                index=1,
+                name="chart.png",
+                mime_type="image/png",
+                content_type="image",
+                data="aW1hZ2U=",
+            )
+        ],
         search_queries=["example query"],
         total_steps=3,
         execution_time=1.5,
@@ -30,6 +40,8 @@ def test_research_result_completed_contract():
     assert result.final_report == "Structured report"
     assert len(result.citations) == 1
     assert result.citations[0].url == "https://example.com"
+    assert len(result.artifacts) == 1
+    assert result.artifacts[0].name == "chart.png"
 
 
 def test_research_task_status_helpers():

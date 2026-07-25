@@ -5,14 +5,19 @@ Gemini provider backend.
 """
 
 import asyncio
+import base64
+import mimetypes
+import re
 import time
 import warnings
 from typing import Any
+from urllib.parse import unquote, urlparse
 
 from deep_research_mcp.async_utils import run_blocking
 from deep_research_mcp.config import ResearchConfig
 from deep_research_mcp.errors import ResearchError, TaskTimeoutError
 from deep_research_mcp.results import (
+    ResearchArtifact,
     ResearchCitation,
     ResearchResult,
     ResearchTaskStatus,
@@ -114,14 +119,20 @@ class GeminiResearchBackend(ResearchBackend):
         """Run Gemini Deep Research via the Interactions API."""
         if include_code_interpreter:
             self.logger.debug(
-                "Gemini Deep Research does not expose a separate "
-                "code_execution toggle; ignoring include_code_interpreter"
+                "Enabling Gemini Deep Research automatic visualizations; "
+                "code execution remains provider-managed"
             )
 
         request_input = self._combine_system_prompt(query, system_prompt)
+        agent_config = (
+            {"type": "deep-research", "visualization": "auto"}
+            if include_code_interpreter
+            else None
+        )
         interaction = await run_blocking(
             self.gemini_interactions.create,
             agent=self.config.model or GEMINI_DEEP_RESEARCH_AGENT,
+            agent_config=agent_config,
             background=True,
             stream=False,
             input=request_input,
@@ -232,12 +243,17 @@ class GeminiResearchBackend(ResearchBackend):
         search_queries: list[str] = []
         reasoning_steps = 0
         final_report_parts: list[str] = []
+        artifacts: list[ResearchArtifact] = []
 
         for step in steps:
             step_type = getattr(step, "type", None)
             output_text = self._extract_step_text(step)
             if output_text:
                 final_report_parts.append(output_text)
+            if step_type == "model_output":
+                artifacts.extend(
+                    self._extract_step_artifacts(step, start_index=len(artifacts) + 1)
+                )
             elif step_type == "thought":
                 reasoning_steps += 1
             elif step_type == "google_search_call":
@@ -302,6 +318,7 @@ class GeminiResearchBackend(ResearchBackend):
             task_id=interaction.id,
             final_report="\n".join(final_report_parts).strip(),
             citations=citations,
+            artifacts=artifacts,
             reasoning_steps=reasoning_steps,
             search_queries=search_queries,
             total_steps=len(steps),
@@ -342,3 +359,99 @@ class GeminiResearchBackend(ResearchBackend):
             if content_annotations:
                 annotations.extend(content_annotations)
         return annotations
+
+    @classmethod
+    def _extract_step_artifacts(
+        cls, step, *, start_index: int
+    ) -> list[ResearchArtifact]:
+        """Extract every non-text Gemini content block without MIME filtering."""
+        if getattr(step, "type", None) != "model_output":
+            return []
+
+        artifacts: list[ResearchArtifact] = []
+        for content in getattr(step, "content", None) or []:
+            content_type = str(cls._content_value(content, "type") or "file")
+            if content_type == "text":
+                continue
+
+            data = cls._content_value(content, "data")
+            uri = cls._content_value(content, "uri")
+            if data is None and not uri:
+                continue
+            if isinstance(data, bytes):
+                data = base64.b64encode(data).decode("ascii")
+            elif data is not None and not isinstance(data, str):
+                data = str(data)
+
+            artifact_index = start_index + len(artifacts)
+            mime_type = str(
+                cls._content_value(content, "mime_type") or "application/octet-stream"
+            )
+            artifact_uri = str(uri) if uri else None
+            artifacts.append(
+                ResearchArtifact(
+                    index=artifact_index,
+                    name=cls._artifact_name(
+                        content,
+                        content_type=content_type,
+                        mime_type=mime_type,
+                        uri=artifact_uri,
+                        index=artifact_index,
+                    ),
+                    mime_type=mime_type,
+                    content_type=content_type,
+                    data=data,
+                    uri=artifact_uri,
+                )
+            )
+
+        return artifacts
+
+    @staticmethod
+    def _content_value(content, field: str):
+        """Read a field from SDK models, dictionaries, or unknown raw blocks."""
+        if isinstance(content, dict):
+            return content.get(field)
+
+        value = getattr(content, field, None)
+        if value is not None:
+            return value
+
+        raw_content = getattr(content, "raw", None)
+        if isinstance(raw_content, dict):
+            return raw_content.get(field)
+        return None
+
+    @classmethod
+    def _artifact_name(
+        cls,
+        content,
+        *,
+        content_type: str,
+        mime_type: str,
+        uri: str | None,
+        index: int,
+    ) -> str:
+        """Choose a safe filename for a returned Gemini artifact."""
+        candidate = next(
+            (
+                cls._content_value(content, field)
+                for field in ("file_name", "filename", "name")
+                if cls._content_value(content, field)
+            ),
+            None,
+        )
+        if not candidate and uri:
+            candidate = unquote(urlparse(uri).path.rsplit("/", 1)[-1])
+
+        extension = mimetypes.guess_extension(mime_type.split(";", 1)[0]) or ".bin"
+        if extension == ".jpe":
+            extension = ".jpg"
+
+        filename = str(candidate or f"gemini-{content_type}-{index}{extension}")
+        filename = re.sub(r"[^A-Za-z0-9._-]+", "_", filename).strip("._")
+        if not filename:
+            filename = f"gemini-{content_type}-{index}{extension}"
+        if "." not in filename:
+            filename += extension
+        return filename

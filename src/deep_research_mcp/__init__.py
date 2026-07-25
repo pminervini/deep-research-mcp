@@ -11,6 +11,7 @@ from deep_research_mcp.config import ResearchConfig
 from deep_research_mcp.errors import ResearchError, TaskTimeoutError
 from deep_research_mcp.prompts import PromptManager
 from deep_research_mcp.results import (
+    ResearchArtifact,
     ResearchCitation,
     ResearchResult,
     ResearchTaskStatus,
@@ -20,6 +21,7 @@ __all__ = [
     "DeepResearchAgent",
     "ResearchConfig",
     "ResearchError",
+    "ResearchArtifact",
     "ResearchCitation",
     "ResearchResult",
     "ResearchTaskStatus",

@@ -114,14 +114,14 @@ The project is composed of five main layers:
 5.  **Provider Backends (`backends/`)**: This layer isolates provider-specific initialization, request execution, polling, and result extraction.
     *   `backends/base.py` defines the backend interface used by `DeepResearchAgent`.
     *   `backends/openai_backend.py` implements the OpenAI Responses API and Chat Completions flows, including citation extraction and background polling.
-    *   `backends/gemini_backend.py` implements Gemini Deep Research over the Interactions API, including polling and result normalization.
+    *   `backends/gemini_backend.py` implements Gemini Deep Research over the Interactions API, including polling, automatic visualization requests, and MIME-agnostic result normalization.
     *   `backends/dr_tulu_backend.py` implements the DR-Tulu research agent integration via Allen AI's `/chat` endpoint.
     *   `backends/open_deep_research_backend.py` implements the Open Deep Research integration with smolagents and text-browser tooling.
 
 6.  **External Services**: This layer represents the external systems used:
     * Provider `openai` with `api_style = "responses"` (default): OpenAI Responses API (web search + code interpreter tools), OpenAI Chat API for clarification agents and instruction builder.
     * Provider `openai` with `api_style = "chat_completions"`: OpenAI Chat Completions API -- works with any OpenAI-compatible provider (Perplexity, Groq, Ollama, vLLM, etc.). No built-in tools (web_search_preview, code_interpreter); no background mode or polling.
-    * Provider `gemini`: Gemini Deep Research agent over the Interactions API. Background execution and polling are required; built-in Google Search and URL context are provided by Gemini.
+    * Provider `gemini`: Gemini Deep Research agent over the Interactions API. Background execution and polling are required; built-in Google Search and URL context are provided by Gemini. Non-text content blocks are normalized as research artifacts and passed through MCP without restricting their MIME type.
     * Provider `dr-tulu`: Allen AI's DR-Tulu research agent accessed via its `/chat` endpoint. A lightweight integration that delegates research to a separately hosted DR-Tulu service.
     * Provider `open-deep-research`: smolagents stack with a text browser and search tools; optional OpenAI-compatible LLM endpoint via LiteLLM.
 
@@ -177,7 +177,8 @@ The project is composed of five main layers:
     -   `_init_gemini()`: Initializes the Gemini `google-genai` client and Interactions resource with beta API settings.
     -   `_run_research()`: Starts a Gemini Deep Research background interaction and normalizes the completed result.
     -   `_wait_for_completion()`: Polls Gemini interaction status until completion, failure, or timeout.
-    -   `_extract_results()`: Parses Gemini interaction outputs into the project's standard report/citation format.
+    -   `_extract_results()`: Parses Gemini interaction outputs into the project's standard report, citation, and returned-artifact format.
+    -   `_extract_step_artifacts()`: Preserves image, audio, video, document, and unknown future file blocks with their base64 data or URI and MIME metadata.
     -   `get_task_status()`: Returns Gemini interaction status metadata.
 
 ### `src/deep_research_mcp/backends/dr_tulu_backend.py`
@@ -271,7 +272,9 @@ The MCP server exposes three main tools to clients like Claude Code. Each tool a
 - `request_clarification` (boolean, optional, default=False): Return clarifying questions instead of starting research
 - `callback_url` (string, optional): Webhook URL notified with a completion payload after research finishes
 
-**Returns**: String containing formatted markdown report
+**Returns**: Formatted markdown, plus MCP rich content blocks when the provider
+returns files. Images and audio use native MCP blocks; other inline file types
+use MIME-typed embedded resources; URI-only artifacts use resource links.
 
 **Return Structure**: When `request_clarification=False` (normal research):
 ```
@@ -283,6 +286,7 @@ The MCP server exposes three main tools to clients like Claude Code. Each tool a
 - **Total research steps**: [number]
 - **Search queries executed**: [number]
 - **Citations found**: [number]
+- **Files returned**: [number]
 - **Task ID**: [uuid]
 - **Execution time**: [seconds]
 
@@ -290,6 +294,10 @@ The MCP server exposes three main tools to clients like Claude Code. Each tool a
 1. [Title](URL)
 2. [Title](URL)
 ...
+
+## Returned Files
+1. `chart.png` (image/png)
+2. [data.csv](https://example.com/data.csv) (text/csv)
 ```
 
 **Return Structure**: When `request_clarification=True`:

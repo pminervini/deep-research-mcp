@@ -6,9 +6,11 @@ This tests the underlying components that the MCP server uses.
 """
 
 import os
+import logging
 from types import SimpleNamespace
 
 import pytest
+from mcp import types as mcp_types
 
 from deep_research_mcp.agent import DeepResearchAgent
 from deep_research_mcp.backends import (
@@ -17,7 +19,11 @@ from deep_research_mcp.backends import (
     OpenAIResearchBackend,
 )
 from deep_research_mcp.config import ResearchConfig
-from deep_research_mcp.results import ResearchResult, ResearchTaskStatus
+from deep_research_mcp.results import (
+    ResearchArtifact,
+    ResearchResult,
+    ResearchTaskStatus,
+)
 
 
 @pytest.fixture
@@ -151,6 +157,118 @@ def test_gemini_extract_results_uses_current_steps_schema():
     ]
 
 
+def test_gemini_extract_results_preserves_all_mime_typed_outputs():
+    """Gemini media, documents, and unknown future file blocks remain available."""
+    backend = object.__new__(GeminiResearchBackend)
+    interaction = SimpleNamespace(
+        id="interaction-files",
+        status="completed",
+        steps=[
+            SimpleNamespace(
+                type="model_output",
+                content=[
+                    SimpleNamespace(type="text", text="Report", annotations=[]),
+                    SimpleNamespace(
+                        type="image",
+                        data="aW1hZ2U=",
+                        mime_type="image/png",
+                        uri=None,
+                    ),
+                    SimpleNamespace(
+                        type="audio",
+                        data=None,
+                        mime_type="audio/mpeg",
+                        uri="https://example.com/audio.mp3",
+                    ),
+                    SimpleNamespace(
+                        type="document",
+                        data="cGRm",
+                        mime_type="application/pdf",
+                        uri=None,
+                    ),
+                    SimpleNamespace(
+                        type="video",
+                        data="dmlkZW8=",
+                        mime_type="video/mp4",
+                        uri=None,
+                    ),
+                    SimpleNamespace(
+                        type="spreadsheet",
+                        data="eGxzeA==",
+                        mime_type=(
+                            "application/vnd.openxmlformats-officedocument."
+                            "spreadsheetml.sheet"
+                        ),
+                        file_name="market analysis.xlsx",
+                        uri=None,
+                    ),
+                ],
+            )
+        ],
+    )
+
+    result = backend.extract_results(interaction)
+
+    assert result.final_report == "Report"
+    assert [
+        (artifact.content_type, artifact.mime_type) for artifact in result.artifacts
+    ] == [
+        ("image", "image/png"),
+        ("audio", "audio/mpeg"),
+        ("document", "application/pdf"),
+        ("video", "video/mp4"),
+        (
+            "spreadsheet",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ),
+    ]
+    assert result.artifacts[0].data == "aW1hZ2U="
+    assert result.artifacts[1].uri == "https://example.com/audio.mp3"
+    assert result.artifacts[4].name == "market_analysis.xlsx"
+
+
+@pytest.mark.asyncio
+async def test_gemini_analysis_enables_visualization_outputs():
+    """The analysis switch opts Gemini Deep Research into automatic visuals."""
+    create_arguments = {}
+
+    def create_interaction(**kwargs):
+        create_arguments.update(kwargs)
+        return SimpleNamespace(id="interaction-visuals")
+
+    backend = object.__new__(GeminiResearchBackend)
+    backend.config = SimpleNamespace(
+        model="deep-research-preview-04-2026",
+        timeout=1,
+        poll_interval=0,
+        cancel_on_timeout=False,
+    )
+    backend.logger = logging.getLogger(__name__)
+    backend.gemini_interactions = SimpleNamespace(
+        create=create_interaction,
+        get=lambda *_args, **_kwargs: SimpleNamespace(
+            id="interaction-visuals",
+            status="completed",
+            steps=[
+                SimpleNamespace(
+                    type="model_output",
+                    content=[
+                        SimpleNamespace(type="text", text="Report", annotations=[])
+                    ],
+                )
+            ],
+        ),
+    )
+
+    result = await backend.research("Research test", include_code_interpreter=True)
+
+    assert result.is_completed
+    assert create_arguments["agent_config"] == {
+        "type": "deep-research",
+        "visualization": "auto",
+    }
+
+
 @pytest.mark.asyncio
 async def test_gemini_research_fails_without_task_id():
     """Gemini task creation must return an ID before polling can start."""
@@ -247,6 +365,69 @@ def test_render_citations_avoids_duplicating_url_only_titles():
         "1. <https://example.com/very-long-redirect>\n"
         "2. [Example](https://example.com)"
     )
+
+
+def test_mcp_research_content_returns_every_artifact_type():
+    """MCP uses native media blocks and generic resources for other files."""
+    from deep_research_mcp.mcp_server import _build_research_content
+
+    result = ResearchResult.completed(
+        task_id="task-files",
+        final_report="Report",
+        artifacts=[
+            ResearchArtifact(
+                index=1,
+                name="chart.png",
+                mime_type="image/png",
+                content_type="image",
+                data="aW1hZ2U=",
+            ),
+            ResearchArtifact(
+                index=2,
+                name="narration.mp3",
+                mime_type="audio/mpeg",
+                content_type="audio",
+                data="YXVkaW8=",
+            ),
+            ResearchArtifact(
+                index=3,
+                name="report.pdf",
+                mime_type="application/pdf",
+                content_type="document",
+                data="cGRm",
+            ),
+            ResearchArtifact(
+                index=4,
+                name="clip.mp4",
+                mime_type="video/mp4",
+                content_type="video",
+                uri="https://example.com/clip.mp4",
+            ),
+            ResearchArtifact(
+                index=5,
+                name="data.xlsx",
+                mime_type=(
+                    "application/vnd.openxmlformats-officedocument."
+                    "spreadsheetml.sheet"
+                ),
+                content_type="spreadsheet",
+                data="eGxzeA==",
+            ),
+        ],
+    )
+
+    content = _build_research_content("# Report", result)
+
+    assert isinstance(content, list)
+    assert isinstance(content[0], mcp_types.TextContent)
+    assert isinstance(content[1], mcp_types.ImageContent)
+    assert isinstance(content[2], mcp_types.AudioContent)
+    assert isinstance(content[3], mcp_types.EmbeddedResource)
+    assert content[3].resource.mimeType == "application/pdf"
+    assert isinstance(content[4], mcp_types.ResourceLink)
+    assert str(content[4].uri) == "https://example.com/clip.mp4"
+    assert isinstance(content[5], mcp_types.EmbeddedResource)
+    assert content[5].resource.mimeType.endswith("spreadsheetml.sheet")
 
 
 def test_dr_tulu_agent_initialization():
