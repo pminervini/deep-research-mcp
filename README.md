@@ -24,7 +24,30 @@ A Python-based agent that integrates research providers with Claude Code through
 
 ## Installation
 
-Recommended setup (resolves the latest compatible versions):
+### Run Without Cloning
+
+With `uv` and Git installed, run the packaged commands directly from GitHub.
+`uvx` builds an isolated environment and reuses it from the local uv cache:
+
+```bash
+uvx --from "git+https://github.com/pminervini/deep-research-mcp.git@main" \
+  deep-research-cli --help
+
+uvx --from "git+https://github.com/pminervini/deep-research-mcp.git@main" \
+  deep-research-mcp --help
+```
+
+For reproducible installation, replace `main` with a release tag or commit SHA.
+The `openai-codex` device login is also available without a checkout:
+
+```bash
+uvx --from "git+https://github.com/pminervini/deep-research-mcp.git@main" \
+  deep-research-cli auth login
+```
+
+### Source Checkout
+
+Recommended development setup (resolves the latest compatible versions):
 
 ```bash
 # Install runtime dependencies + project in editable mode
@@ -56,8 +79,9 @@ pip install -e .
 
 - `src/deep_research_mcp/agent.py`: orchestration layer; owns callbacks and delegates provider work to backends
 - `src/deep_research_mcp/backends/`: provider-specific implementations for OpenAI, OpenAI Codex subscription, Gemini, DR-Tulu, and Open Deep Research
+- `src/deep_research_mcp/cli.py`: installed `deep-research-cli` implementation
 - `src/deep_research_mcp/mcp_server.py`: FastMCP server and tool entrypoints
-- `cli/deep-research-cli.py`: unified CLI for agent mode, MCP client mode, and configuration viewing
+- `cli/deep-research-cli.py`: compatibility wrapper for source-checkout usage
 - `cli/deep-research-tui.py`: interactive full-screen terminal UI for research, status checks, and saving output to disk
 - `tests/`: `pytest` suite covering configuration, MCP integration, results, and UI flows
 
@@ -115,12 +139,12 @@ Authenticate before starting the CLI or MCP server:
 
 ```bash
 # Recommended: independent device-code session
-uv run python cli/deep-research-cli.py auth login
+uv run deep-research-cli auth login
 
 # Optional short-lived import; never copies the Codex refresh token
-uv run python cli/deep-research-cli.py auth login --import-codex
+uv run deep-research-cli auth login --import-codex
 
-uv run python cli/deep-research-cli.py auth status
+uv run deep-research-cli auth status
 ```
 
 Credentials are stored independently in `~/.deep_research_auth.json` with
@@ -382,8 +406,16 @@ Choose one of the transports below.
 
 **Option A: stdio (recommended when Claude Code should spawn the server itself)**
 
-If your provider credentials are already stored in `~/.deep_research`, the
-minimal setup is:
+Clone-free user installation:
+
+```bash
+claude mcp add --scope user --transport stdio deep-research -- \
+  uvx --from "git+https://github.com/pminervini/deep-research-mcp.git@main" \
+  deep-research-mcp
+```
+
+For a source checkout with provider credentials already stored in
+`~/.deep_research`, use:
 
 ```bash
 claude mcp add deep-research -- uv run --directory /path/to/deep-research-mcp deep-research-mcp
@@ -447,7 +479,16 @@ Choose one of the transports below.
 
 **Option A: stdio (recommended when Codex should spawn the server itself)**
 
-Add the MCP server configuration to your `~/.codex/config.toml` file:
+Clone-free installation:
+
+```bash
+codex mcp add deep-research -- \
+  uvx --from "git+https://github.com/pminervini/deep-research-mcp.git@main" \
+  deep-research-mcp
+```
+
+For a source checkout, add the MCP server configuration to
+`~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.deep-research]
@@ -595,8 +636,10 @@ Notes:
 
 ### Command-Line Interface
 
-The unified CLI at `cli/deep-research-cli.py` provides direct access to all
-research functionality from the terminal. It supports two modes of operation:
+The installed `deep-research-cli` command provides direct access to all
+research functionality from the terminal. Its implementation lives in
+`src/deep_research_mcp/cli.py`, while `cli/deep-research-cli.py` remains a
+source-checkout compatibility wrapper. It supports two modes of operation:
 **agent mode** (default) which runs `DeepResearchAgent` directly, and **MCP
 client mode** which connects to a running MCP server over HTTP.
 
@@ -669,7 +712,7 @@ base URL defaults. You can still override those fields manually afterward.
 #### Notes
 
 - In `mcp` mode, set `MCP Server URL` to a running Streamable HTTP endpoint such as `http://127.0.0.1:8080/mcp`.
-- The TUI reuses the same config-loading behavior as `cli/deep-research-cli.py`, so `~/.deep_research` and any startup overrides still apply.
+- The TUI reuses the same config-loading behavior as `deep-research-cli`, so `~/.deep_research` and any startup overrides still apply.
 - Direct-agent JSON rendering is available through the `JSON Output` toggle; MCP mode saves the textual tool response exactly as returned by the server.
 - The current layout is designed for terminals at least 100 columns wide and 28 rows tall.
 
@@ -678,7 +721,7 @@ base URL defaults. You can still override those fields manually afterward.
 **Gemini Deep Research:**
 
 ```bash
-uv run python cli/deep-research-cli.py \
+uv run deep-research-cli \
   --provider gemini \
   --model deep-research-preview-04-2026 \
   --base-url https://generativelanguage.googleapis.com \
@@ -708,7 +751,7 @@ Execution time: 245.94s
 **OpenAI GPT-5.6 Sol research:**
 
 ```bash
-uv run python cli/deep-research-cli.py \
+uv run deep-research-cli \
   --provider openai \
   --model gpt-5.6-sol \
   --base-url https://api.openai.com/v1 \
@@ -740,8 +783,8 @@ CITATIONS
 **OpenAI Codex subscription research:**
 
 ```bash
-uv run python cli/deep-research-cli.py auth login
-uv run python cli/deep-research-cli.py \
+uv run deep-research-cli auth login
+uv run deep-research-cli \
   --provider openai-codex \
   research "What is the capital of France?"
 ```
@@ -749,7 +792,7 @@ uv run python cli/deep-research-cli.py \
 **DR-Tulu** (requires a running [dr-tulu](https://github.com/allenai/dr-tulu) service; see [Dr Tulu provider example](#dr-tulu-provider-example)):
 
 ```bash
-uv run python cli/deep-research-cli.py \
+uv run deep-research-cli \
   --provider dr-tulu \
   --base-url http://localhost:8080/ \
   research "What is the capital of France?"
@@ -781,8 +824,8 @@ CITATIONS
 View resolved configuration or all available options:
 
 ```bash
-uv run python cli/deep-research-cli.py config --pretty
-uv run python cli/deep-research-cli.py --help
+uv run deep-research-cli config --pretty
+uv run deep-research-cli --help
 ```
 
 #### Commands
@@ -791,28 +834,28 @@ uv run python cli/deep-research-cli.py --help
 
 ```bash
 # Simple research (agent mode)
-uv run python cli/deep-research-cli.py research "Economic impact of AI adoption"
+uv run deep-research-cli research "Economic impact of AI adoption"
 
 # Override provider and model for a single run
-uv run python cli/deep-research-cli.py --provider gemini research "Climate change policies"
+uv run deep-research-cli --provider gemini research "Climate change policies"
 
 # Use a custom system prompt from a file
-uv run python cli/deep-research-cli.py research "Healthcare trends" --system-prompt-file prompts/health.txt
+uv run deep-research-cli research "Healthcare trends" --system-prompt-file prompts/health.txt
 
 # Or pass the system prompt inline
-uv run python cli/deep-research-cli.py research "Healthcare trends" --system-prompt "Focus on peer-reviewed sources only"
+uv run deep-research-cli research "Healthcare trends" --system-prompt "Focus on peer-reviewed sources only"
 
 # Output as JSON (includes metadata, citations, execution time)
-uv run python cli/deep-research-cli.py research "AI safety" --json
+uv run deep-research-cli research "AI safety" --json
 
 # Save the report to a file
-uv run python cli/deep-research-cli.py research "Renewable energy" --output-file report.md
+uv run deep-research-cli research "Renewable energy" --output-file report.md
 
 # Disable code interpreter / data analysis tools
-uv run python cli/deep-research-cli.py research "Simple topic" --no-analysis
+uv run deep-research-cli research "Simple topic" --no-analysis
 
 # Notify a webhook when research completes
-uv run python cli/deep-research-cli.py research "Long query" --callback-url https://example.com/webhook
+uv run deep-research-cli research "Long query" --callback-url https://example.com/webhook
 ```
 
 #### Tested local OpenAI-compatible backends
@@ -826,7 +869,7 @@ local `llama-server` (from `llama.cpp`).
 Basic `research` flow:
 
 ```bash
-uv run python cli/deep-research-cli.py \
+uv run deep-research-cli \
   --provider openai \
   --api-style chat_completions \
   --base-url http://localhost:11434/v1 \
@@ -868,7 +911,7 @@ llama-server \
 Then point the CLI at the server:
 
 ```bash
-uv run python cli/deep-research-cli.py \
+uv run deep-research-cli \
   --provider openai \
   --api-style chat_completions \
   --base-url http://127.0.0.1:8081/v1 \
@@ -902,7 +945,7 @@ server over Streamable HTTP.
 uv run deep-research-mcp --transport http --host 127.0.0.1 --port 8080
 
 # Then run queries against it:
-uv run python cli/deep-research-cli.py research "AI trends" \
+uv run deep-research-cli research "AI trends" \
   --server-url http://127.0.0.1:8080/mcp
 ```
 
@@ -910,10 +953,10 @@ uv run python cli/deep-research-cli.py research "AI trends" \
 
 ```bash
 # Agent mode
-uv run python cli/deep-research-cli.py status abc123-def456-ghi789
+uv run deep-research-cli status abc123-def456-ghi789
 
 # MCP client mode
-uv run python cli/deep-research-cli.py status abc123-def456-ghi789 \
+uv run deep-research-cli status abc123-def456-ghi789 \
   --server-url http://127.0.0.1:8080/mcp
 ```
 
@@ -924,28 +967,28 @@ variables, and any CLI overrides.
 
 ```bash
 # JSON output (default), with secrets masked
-uv run python cli/deep-research-cli.py config
+uv run deep-research-cli config
 
 # Human-readable output
-uv run python cli/deep-research-cli.py config --pretty
+uv run deep-research-cli config --pretty
 
 # Show full API keys
-uv run python cli/deep-research-cli.py config --pretty --show-secrets
+uv run deep-research-cli config --pretty --show-secrets
 
 # See the effect of CLI overrides
-uv run python cli/deep-research-cli.py --provider gemini --timeout 600 config --pretty
+uv run deep-research-cli --provider gemini --timeout 600 config --pretty
 
 # Skip config validation
-uv run python cli/deep-research-cli.py config --no-validate
+uv run deep-research-cli config --no-validate
 ```
 
 **`auth {login,status,logout}`** -- manage the independent OpenAI Codex
 subscription session.
 
 ```bash
-uv run python cli/deep-research-cli.py auth login
-uv run python cli/deep-research-cli.py auth status
-uv run python cli/deep-research-cli.py auth logout
+uv run deep-research-cli auth login
+uv run deep-research-cli auth status
+uv run deep-research-cli auth logout
 ```
 
 #### Configuration Overrides

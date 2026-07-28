@@ -45,6 +45,7 @@ open-deep-research = [
 ]
 
 [project.scripts]
+deep-research-cli = "deep_research_mcp.cli:main"
 deep-research-mcp = "deep_research_mcp.mcp_server:main"
 
 [tool.setuptools]

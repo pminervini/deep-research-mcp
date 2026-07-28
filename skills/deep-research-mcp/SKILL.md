@@ -12,7 +12,7 @@ Repository: `https://github.com/pminervini/deep-research-mcp`
 ## Use When
 
 - You are working in or against the `deep-research-mcp` repository/project.
-- You need to run `cli/deep-research-cli.py` in direct agent mode.
+- You need to run `deep-research-cli` in direct agent mode.
 - You need to call `DeepResearchAgent` and `ResearchConfig` from Python.
 - You need to expose the `deep-research-mcp` project as an MCP server with `deep-research-mcp`.
 - You need to connect to the MCP server from another client over HTTP.
@@ -29,7 +29,7 @@ Repository: `https://github.com/pminervini/deep-research-mcp`
 
 There are three layers:
 
-1. `cli/deep-research-cli.py` is the user-facing CLI.
+1. `deep-research-cli` is the installed user-facing CLI.
 2. `src/deep_research_mcp/agent.py` orchestrates research, callbacks, and status checks.
 3. `src/deep_research_mcp/backends/*.py` performs provider-specific work.
 
@@ -115,7 +115,7 @@ DR-Tulu:
 This matters because the TOML file is flattened into keys like `RESEARCH_API_KEY` and `RESEARCH_BASE_URL`. If your saved config is pinned to Gemini and you run:
 
 ```bash
-uv run python cli/deep-research-cli.py --provider openai research "..."
+uv run deep-research-cli --provider openai research "..."
 ```
 
 you may still send the request to Gemini or send the Gemini key to OpenAI unless you also override:
@@ -127,7 +127,7 @@ you may still send the request to Gemini or send the Gemini key to OpenAI unless
 Safe pattern when switching providers from the command line:
 
 ```bash
-uv run python cli/deep-research-cli.py \
+uv run deep-research-cli \
   --provider openai \
   --api-style responses \
   --model gpt-5.6-sol \
@@ -184,13 +184,13 @@ Direct agent mode is the default when you do not pass `--server-url`.
 ### Basic Shape
 
 ```bash
-uv run python cli/deep-research-cli.py research "Your research query"
+uv run deep-research-cli research "Your research query"
 ```
 
 ### Useful Flags
 
 ```bash
-uv run python cli/deep-research-cli.py \
+uv run deep-research-cli \
   --provider openai \
   --api-style responses \
   --model gpt-5.6-sol \
@@ -223,7 +223,7 @@ Command:
 
 ```bash
 OPENAI_API_KEY="$OPENAI_API_KEY" \
-uv run python cli/deep-research-cli.py \
+uv run deep-research-cli \
   --provider openai \
   --api-style responses \
   --model gpt-5.6-sol \
@@ -267,7 +267,7 @@ Command:
 
 ```bash
 GEMINI_API_KEY="$GEMINI_API_KEY" \
-uv run python cli/deep-research-cli.py \
+uv run deep-research-cli \
   --provider gemini \
   --model deep-research-pro-preview-12-2025 \
   --timeout 900 \
@@ -307,7 +307,7 @@ Important Gemini-specific behavior:
 Command:
 
 ```bash
-uv run python cli/deep-research-cli.py \
+uv run deep-research-cli \
   --provider dr-tulu \
   --model dr-tulu \
   --base-url http://localhost:8080 \
@@ -348,7 +348,7 @@ Command:
 
 ```bash
 OPENAI_API_KEY="$OPENAI_API_KEY" \
-uv run python cli/deep-research-cli.py \
+uv run deep-research-cli \
   --provider openai \
   --api-key "$OPENAI_API_KEY" \
   --base-url https://api.openai.com/v1 \
@@ -529,7 +529,7 @@ When you pass `--server-url`, the CLI becomes an MCP client instead of creating 
 Command:
 
 ```bash
-uv run python cli/deep-research-cli.py \
+uv run deep-research-cli \
   research "Why can flow matching models use fewer inference steps than diffusion models?" \
   --server-url http://127.0.0.1:8081/mcp \
   --system-prompt "Answer in exactly 2 bullets and one takeaway sentence. Keep the whole answer under 140 words. Prefer technical sources." \
@@ -663,7 +663,7 @@ POST {base_url}/chat
 Correct direct CLI shape:
 
 ```bash
-uv run python cli/deep-research-cli.py \
+uv run deep-research-cli \
   --provider dr-tulu \
   --model dr-tulu \
   --base-url http://localhost:8080 \
@@ -733,7 +733,7 @@ Fix:
 
 ```bash
 OPENAI_API_KEY="$OPENAI_API_KEY" \
-uv run python cli/deep-research-cli.py \
+uv run deep-research-cli \
   --provider openai \
   --api-style responses \
   --model gpt-5.6-sol \
@@ -746,7 +746,7 @@ uv run python cli/deep-research-cli.py \
 
 ```bash
 GEMINI_API_KEY="$GEMINI_API_KEY" \
-uv run python cli/deep-research-cli.py \
+uv run deep-research-cli \
   --provider gemini \
   --model deep-research-pro-preview-12-2025 \
   --api-key "$GEMINI_API_KEY" \
@@ -768,7 +768,7 @@ uv run deep-research-mcp --transport http --host 127.0.0.1 --port 8081
 Terminal 2:
 
 ```bash
-uv run python cli/deep-research-cli.py \
+uv run deep-research-cli \
   research "Your query" \
   --server-url http://127.0.0.1:8081/mcp
 ```

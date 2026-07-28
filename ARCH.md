@@ -8,7 +8,9 @@ This document provides a detailed overview of the `deep-research-mcp` project ar
 - Dependency constraints are minimum-version (`>=`) specifications in `pyproject.toml`.
 - `requirements.txt` is a compatibility install file that also uses unpinned `>=` constraints.
 - `uv.lock` is not tracked, so CI/dev environments resolve the latest compatible versions.
-- The MCP server entrypoint is exposed as the console script `deep-research-mcp` (`deep_research_mcp.mcp_server:main`).
+- Console scripts expose the MCP server as `deep-research-mcp`
+  (`deep_research_mcp.mcp_server:main`) and the unified CLI, including Codex
+  authentication, as `deep-research-cli` (`deep_research_mcp.cli:main`).
 
 ## Architectural Diagram
 
@@ -80,6 +82,8 @@ The project is composed of four main layers:
     *   `agent.py` owns the top-level research flow, completion callbacks, status lookup, and delegation to the configured backend. It does not embed provider-specific execution logic directly.
     *   `config.py` handles loading and validating configuration from environment variables, including provider selection.
     *   `errors.py` defines custom exception classes for better error handling.
+    *   `cli.py` provides the installed direct-agent, MCP-client, configuration,
+        and Codex authentication commands.
 
 3.  **Provider Backends (`backends/`)**: This layer isolates provider-specific initialization, request execution, polling, and result extraction.
     *   `backends/base.py` defines the backend interface used by `DeepResearchAgent`.
@@ -108,6 +112,14 @@ The project is composed of four main layers:
     -   `_send_completion_callback()`: Sends a notification to a callback URL when the research is complete.
     -   `get_task_status()`: Allows checking the status of a running research task.
     -   `get_task_result()`: Retrieves a completed task result when the backend supports recovery.
+
+### `src/deep_research_mcp/cli.py`
+
+-   **Purpose**: Implements the installed `deep-research-cli` console command.
+-   **Key Functionality**:
+    -   Runs direct research or connects to a Streamable HTTP MCP server.
+    -   Displays resolved configuration and checks task status.
+    -   Manages the independent OpenAI Codex login, status, and logout flows.
 
 ### `src/deep_research_mcp/backends/__init__.py`
 

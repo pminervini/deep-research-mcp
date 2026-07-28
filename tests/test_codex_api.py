@@ -20,7 +20,7 @@ async def test_openai_codex_subscription_end_to_end():
     if not auth_status.logged_in:
         pytest.skip(
             "No usable OpenAI Codex session; run "
-            "`uv run python cli/deep-research-cli.py auth login`"
+            "`uv run deep-research-cli auth login`"
         )
 
     config = ResearchConfig.from_env(

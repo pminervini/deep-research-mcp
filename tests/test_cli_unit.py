@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import importlib.util
+from importlib.metadata import entry_points
 from pathlib import Path
 import sys
 from types import ModuleType
@@ -65,3 +66,12 @@ def test_codex_provider_and_auth_commands_are_exposed() -> None:
     assert login_args.force is True
     assert status_args.auth_action == "status"
     assert logout_args.auth_action == "logout"
+
+
+def test_unified_cli_is_exposed_as_an_installed_console_script() -> None:
+    scripts = {
+        entry.name: entry.value for entry in entry_points(group="console_scripts")
+    }
+
+    assert scripts["deep-research-cli"] == "deep_research_mcp.cli:main"
+    assert scripts["deep-research-mcp"] == "deep_research_mcp.mcp_server:main"
