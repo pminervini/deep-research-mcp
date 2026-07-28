@@ -1058,6 +1058,12 @@ uv run pytest --cov=deep_research_mcp tests/
 uv run pytest tests/test_agents.py
 ```
 
+When `~/.deep_research_auth.json` contains a current or refreshable
+`openai-codex` session, a normal `uv run pytest tests/` run automatically
+executes the live Codex end-to-end test and consumes subscription allowance.
+Without that session, the test is skipped. Use `-m "not api"` to exclude all
+live provider tests explicitly.
+
 ### Lint, Format, Type Check
 
 ```bash

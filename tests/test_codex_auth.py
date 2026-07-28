@@ -236,6 +236,41 @@ async def test_imported_expired_token_requires_independent_login(tmp_path: Path)
         await manager.get_valid_tokens()
 
 
+@pytest.mark.parametrize(
+    ("expires_in", "refresh_token", "logged_in"),
+    [
+        (3600, None, True),
+        (-1, "refresh-initial", True),
+        (-1, None, False),
+    ],
+)
+def test_status_reports_session_availability(
+    tmp_path: Path,
+    expires_in: float,
+    refresh_token: str | None,
+    logged_in: bool,
+):
+    expires_at = time.time() + expires_in
+    store_path = tmp_path / "auth.json"
+    store_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "access_token": _jwt(expires_at=expires_at),
+                "refresh_token": refresh_token,
+                "account_id": "account-123",
+                "expires_at": expires_at,
+                "source": "device",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    status = CodexAuthManager(store_path=store_path).status()
+
+    assert status.logged_in is logged_in
+
+
 @pytest.mark.asyncio
 async def test_device_login_replaces_valid_import_without_force(
     tmp_path: Path, codex_oauth_server

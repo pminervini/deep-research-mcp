@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
 
-"""Explicitly gated end-to-end check for the private Codex backend."""
+"""Credential-aware end-to-end check for the private Codex backend."""
 
 from __future__ import annotations
-
-import os
 
 import pytest
 
 from deep_research_mcp.agent import DeepResearchAgent
+from deep_research_mcp.codex_auth import CodexAuthManager
 from deep_research_mcp.config import ResearchConfig
 
 
@@ -16,9 +15,13 @@ from deep_research_mcp.config import ResearchConfig
 @pytest.mark.api
 @pytest.mark.integration
 async def test_openai_codex_subscription_end_to_end():
-    """Run only when the maintainer deliberately opts into subscription use."""
-    if os.environ.get("RUN_OPENAI_CODEX_E2E") != "1":
-        pytest.skip("Set RUN_OPENAI_CODEX_E2E=1 to run the Codex subscription test")
+    """Run whenever this project has a current or refreshable Codex session."""
+    auth_status = CodexAuthManager().status()
+    if not auth_status.logged_in:
+        pytest.skip(
+            "No usable OpenAI Codex session; run "
+            "`uv run python cli/deep-research-cli.py auth login`"
+        )
 
     config = ResearchConfig.from_env(
         {
