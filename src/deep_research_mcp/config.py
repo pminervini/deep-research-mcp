@@ -120,13 +120,7 @@ class ResearchConfig:
     poll_interval: float = 30.0
     cancel_on_timeout: bool = False
     log_level: str = "INFO"
-    enable_clarification: bool = False
     enable_reasoning_summaries: bool = False
-    triage_model: str = "gpt-5-mini"
-    clarifier_model: str = "gpt-5-mini"
-    clarification_base_url: str | None = None
-    clarification_api_key: str | None = None
-    instruction_builder_model: str = "gpt-5-mini"
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> ResearchConfig:
@@ -221,27 +215,6 @@ class ResearchConfig:
             ),
             log_level=get_setting_first("LOGGING_LEVEL", default=cls.log_level)
             or cls.log_level,
-            enable_clarification=get_bool_setting(
-                "ENABLE_CLARIFICATION", "CLARIFICATION_ENABLE", default=False
-            ),
-            triage_model=get_setting_first(
-                "CLARIFICATION_TRIAGE_MODEL", "TRIAGE_MODEL", default=cls.triage_model
-            )
-            or cls.triage_model,
-            clarifier_model=get_setting_first(
-                "CLARIFICATION_CLARIFIER_MODEL",
-                "CLARIFIER_MODEL",
-                default=cls.clarifier_model,
-            )
-            or cls.clarifier_model,
-            instruction_builder_model=get_setting_first(
-                "CLARIFICATION_INSTRUCTION_BUILDER_MODEL",
-                "INSTRUCTION_BUILDER_MODEL",
-                default=cls.instruction_builder_model,
-            )
-            or cls.instruction_builder_model,
-            clarification_base_url=get_setting_first("CLARIFICATION_BASE_URL"),
-            clarification_api_key=get_setting_first("CLARIFICATION_API_KEY"),
             enable_reasoning_summaries=get_bool_setting(
                 "ENABLE_REASONING_SUMMARIES", default=False
             ),

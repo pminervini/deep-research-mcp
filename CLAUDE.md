@@ -54,8 +54,7 @@ Configuration
 - The canonical ~/.deep_research TOML examples and key mappings are maintained in README.md. Refer there to avoid drift.
 
 Exposed Tools
-- deep_research: autonomous research with web search and analysis (supports clarification)
-- research_with_context: research using enriched queries from clarification
+- deep_research: autonomous research with web search and analysis
 - research_status: check status of running research tasks; returns the full report once completed
 
 Development

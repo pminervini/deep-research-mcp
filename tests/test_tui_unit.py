@@ -44,16 +44,3 @@ def test_provider_defaults_for_dr_tulu():
     assert defaults.api_style == "responses"
     assert defaults.model == "dr-tulu"
     assert defaults.base_url == "http://localhost:8080/"
-
-
-def test_normalize_answers_pads_missing_values():
-    normalized = TUI.normalize_answers(
-        ["Question 1?", "Question 2?", "Question 3?"],
-        ["One", "", "  "],
-    )
-
-    assert normalized == [
-        "One",
-        TUI.NO_ANSWER_PLACEHOLDER,
-        TUI.NO_ANSWER_PLACEHOLDER,
-    ]

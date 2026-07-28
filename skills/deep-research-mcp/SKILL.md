@@ -1,6 +1,6 @@
 ---
 name: deep-research-mcp
-description: Use this guide only for the `deep-research-mcp` repository/project when you need to run, integrate, or debug its CLI, Python API, or MCP server. It covers this repo's direct agent execution, provider/backend selection, OpenAI Responses with GPT-5.6 Sol, Gemini Deep Research, DR-Tulu integration requirements, clarification workflows, status polling, and HTTP or stdio MCP usage. Do not use it for Deep Research systems in general, for unrelated MCP servers, or for the Textual TUI.
+description: Use this guide only for the `deep-research-mcp` repository/project when you need to run, integrate, or debug its CLI, Python API, or MCP server. It covers this repo's direct agent execution, provider/backend selection, OpenAI Responses with GPT-5.6 Sol, Gemini Deep Research, DR-Tulu integration requirements, status polling, and HTTP or stdio MCP usage. Do not use it for Deep Research systems in general, for unrelated MCP servers, or for the Textual TUI.
 ---
 
 # Deep Research MCP
@@ -30,7 +30,7 @@ Repository: `https://github.com/pminervini/deep-research-mcp`
 There are three layers:
 
 1. `cli/deep-research-cli.py` is the user-facing CLI.
-2. `src/deep_research_mcp/agent.py` orchestrates research, clarification, instruction building, callbacks, and status checks.
+2. `src/deep_research_mcp/agent.py` orchestrates research, callbacks, and status checks.
 3. `src/deep_research_mcp/backends/*.py` performs provider-specific work.
 
 The CLI can run in two modes:
@@ -44,10 +44,9 @@ The MCP server entrypoint is the console script:
 uv run deep-research-mcp
 ```
 
-It exposes three tools:
+It exposes two tools:
 
 - `deep_research`
-- `research_with_context`
 - `research_status`
 
 ## Setup
@@ -89,13 +88,6 @@ Gemini:
 export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
 ```
 
-Clarification when the research provider is not OpenAI:
-
-```bash
-export CLARIFICATION_API_KEY="$OPENAI_API_KEY"
-export CLARIFICATION_BASE_URL="https://api.openai.com/v1"
-```
-
 DR-Tulu:
 
 - there is no single required key defined by `deep-research-mcp` itself
@@ -110,21 +102,6 @@ DR-Tulu:
 | `gemini` | `gemini_backend.py` | Gemini Interactions API with `background=True` | Yes | Uses `google-genai`; `include_analysis` is ignored by the backend |
 | `dr-tulu` | `dr_tulu_backend.py` | `POST {base_url}/chat` | No | Requires a separately running DR-Tulu service |
 | `open-deep-research` | `open_deep_research_backend.py` | Local Open Deep Research stack via `smolagents` | No | Needs extra optional dependencies |
-
-## Clarification Model Rule
-
-Clarification is not implemented inside the Gemini or DR-Tulu backends. It is handled separately by `clarification.py` using OpenAI-compatible chat models:
-
-- `triage_model`
-- `clarifier_model`
-- `instruction_builder_model`
-
-If your research provider is not `openai`, set either:
-
-- `CLARIFICATION_API_KEY` and `CLARIFICATION_BASE_URL`, or
-- `OPENAI_API_KEY` and optionally `OPENAI_BASE_URL`
-
-If clarification is disabled, `request_clarification=True` does not ask questions. It returns a "query is sufficient / clarification is disabled" response instead.
 
 ## Config Precedence And The Most Important Pitfall
 
@@ -235,7 +212,6 @@ Key flags:
 - `--api-style`
 - `--timeout`
 - `--poll-interval`
-- `--clarify`
 - `--system-prompt` or `--system-prompt-file`
 - `--no-analysis`
 - `--output-file`
@@ -524,20 +500,6 @@ RESEARCH_POLL_INTERVAL=10 \
 uv run deep-research-mcp --transport http --host 127.0.0.1 --port 8081
 ```
 
-If you want clarification on that server too:
-
-```bash
-RESEARCH_PROVIDER=gemini \
-RESEARCH_API_KEY="$GEMINI_API_KEY" \
-RESEARCH_BASE_URL=https://generativelanguage.googleapis.com \
-RESEARCH_MODEL=deep-research-pro-preview-12-2025 \
-RESEARCH_POLL_INTERVAL=10 \
-ENABLE_CLARIFICATION=true \
-CLARIFICATION_API_KEY="$OPENAI_API_KEY" \
-CLARIFICATION_BASE_URL=https://api.openai.com/v1 \
-uv run deep-research-mcp --transport http --host 127.0.0.1 --port 8082
-```
-
 ## MCP Tools
 
 ### `deep_research`
@@ -547,12 +509,12 @@ Use for normal research. Key inputs:
 - `query`
 - `system_instructions`
 - `include_analysis`
-- `request_clarification`
 - `callback_url`
 
-### `research_with_context`
-
-Use only after `deep_research(..., request_clarification=True)` returns a session ID and questions.
+The `query` must contain the complete research question and any user-provided
+context needed to answer it. Use `system_instructions` for research methodology,
+source, scope, and output requirements. Conversational hosts should ask any
+necessary follow-up questions before calling the tool.
 
 ### `research_status`
 
@@ -631,124 +593,6 @@ Observed output:
 ```text
 {'result': 'Task YOUR_TASK_ID status: completed\nCreated at: <created_at>\nCompleted at: <completed_at>'}
 ```
-
-## Full MCP Clarification Flow
-
-This only works if the server was started with `ENABLE_CLARIFICATION=true`.
-
-### Step 1: Ask For Clarification
-
-Code:
-
-```python
-import asyncio
-from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
-
-async def main() -> None:
-    async with streamablehttp_client("http://127.0.0.1:8082/mcp") as (read_stream, write_stream, _):
-        async with ClientSession(read_stream, write_stream) as session:
-            await session.initialize()
-            result = await session.call_tool(
-                "deep_research",
-                {
-                    "query": "quantum computing",
-                    "request_clarification": True,
-                    "include_analysis": False,
-                    "system_instructions": "",
-                    "callback_url": "",
-                },
-            )
-            print(result.structuredContent)
-
-asyncio.run(main())
-```
-
-Observed output excerpt:
-
-```text
-{'result': "# Clarifying Questions Needed
-
-**Original Query:** quantum computing
-
-**Why clarification is helpful:** The query 'quantum computing' is extremely broad and underspecified ...
-
-**Session ID:** `YOUR_SESSION_ID`
-
-**Please answer these questions to improve the research:**
-
-1. What is your goal? ...
-2. Who is the audience and technical level? ...
-3. Which subtopics interest you? ...
-...
-8. Any source preferences or restrictions? ..."}
-```
-
-### Step 2: Continue With `research_with_context`
-
-Code:
-
-```python
-import asyncio
-from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
-
-SESSION_ID = "YOUR_SESSION_ID"
-ANSWERS = [
-    "Compare technologies and identify recent research directions.",
-    "Graduate-level reader.",
-    "Hardware, error correction, and performance benchmarks.",
-    "Focus on 2024-2026 developments and near-term outlook.",
-    "Global, with emphasis on IBM, Google, and Quantinuum.",
-    "Short summary with citations.",
-    "Compare performance, error rates, and scalability.",
-    "Prefer peer-reviewed papers and official company or lab announcements.",
-]
-
-async def main() -> None:
-    async with streamablehttp_client("http://127.0.0.1:8082/mcp") as (read_stream, write_stream, _):
-        async with ClientSession(read_stream, write_stream) as session:
-            await session.initialize()
-            result = await session.call_tool(
-                "research_with_context",
-                {
-                    "session_id": SESSION_ID,
-                    "answers": ANSWERS,
-                    "system_instructions": "Answer in exactly 3 bullets and one takeaway sentence. Keep the whole answer under 180 words. Prefer technical and official sources.",
-                    "include_analysis": False,
-                    "callback_url": "",
-                },
-            )
-            print(result.structuredContent["result"])
-
-asyncio.run(main())
-```
-
-Observed output excerpt:
-
-```text
-# Enhanced Research Report
-
-**Original Query Enhanced With User Context**
-
-**Enriched Query:** Provide a concise, graduate-level summary with citations ... compares current quantum computing hardware platforms and error-correction approaches worldwide, focusing on developments from 2024-2026 ...
-
-# 2024-2026 Quantum Hardware Review
-
-Fault-tolerance is physically validated. Logical qubits are operational. Scaling hurdles are significant ...
-
-* **Architectural Breakthroughs:** Google achieved below-threshold surface codes ...
-* **Error Correction Advancements:** Landmark QEC demonstrations include Quantinuum's 23-second logical qubit ...
-* **Scaling Challenges:** Utility-scale operations remain constrained by severe engineering bottlenecks ...
-
-**Takeaway:** The 2024-2026 period successfully validated fault-tolerant quantum principles, but commercializing these architectures demands overcoming immense classical control and interconnect scaling barriers.
-```
-
-Important behavior:
-
-- `research_with_context` stores answers against the server-side clarification session.
-- If you restart the server, in-memory clarification sessions are lost.
-- In `deep-research-mcp`, clarification can be followed by instruction building, which means the final backend query may be more detailed than the simple Q/A pairs alone suggest.
 
 ## Backend-Specific Notes
 
@@ -861,21 +705,6 @@ Fix:
 - override `--base-url`
 - optionally override `--model`
 - or use a provider-specific config file with `--config`
-
-### Symptom: `request_clarification=True` says clarification is disabled
-
-Cause:
-
-- `ENABLE_CLARIFICATION` or `CLARIFICATION_ENABLE` was false when the agent/server was created
-
-Fix:
-
-```bash
-ENABLE_CLARIFICATION=true \
-CLARIFICATION_API_KEY="$OPENAI_API_KEY" \
-CLARIFICATION_BASE_URL=https://api.openai.com/v1 \
-uv run deep-research-mcp --transport http --host 127.0.0.1 --port 8082
-```
 
 ### Symptom: `research_status` is not useful
 

@@ -16,9 +16,6 @@ USAGE EXAMPLES:
   # Research with a specific provider and model
   uv run python cli/deep-research-cli.py --provider gemini research "Healthcare costs in the US"
 
-  # Research with interactive clarification
-  uv run python cli/deep-research-cli.py research "Quantum computing" --clarify
-
   # Research with a custom system prompt from file
   uv run python cli/deep-research-cli.py research "AI trends" --system-prompt-file prompts/custom.txt
 
@@ -40,7 +37,6 @@ import asyncio
 import json
 import logging
 import os
-import re
 import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -99,11 +95,6 @@ def build_cli_env(args: argparse.Namespace) -> dict[str, str]:
         "timeout": "RESEARCH_TIMEOUT",
         "poll_interval": "RESEARCH_POLL_INTERVAL",
         "log_level": "LOGGING_LEVEL",
-        "triage_model": "CLARIFICATION_TRIAGE_MODEL",
-        "clarifier_model": "CLARIFICATION_CLARIFIER_MODEL",
-        "clarification_base_url": "CLARIFICATION_BASE_URL",
-        "clarification_api_key": "CLARIFICATION_API_KEY",
-        "instruction_builder_model": "CLARIFICATION_INSTRUCTION_BUILDER_MODEL",
     }
 
     env = dict(os.environ)
@@ -113,8 +104,6 @@ def build_cli_env(args: argparse.Namespace) -> dict[str, str]:
         if value is not None:
             env[env_key] = str(value)
 
-    if getattr(args, "enable_clarification", False):
-        env["ENABLE_CLARIFICATION"] = "true"
     if getattr(args, "enable_reasoning_summaries", False):
         env["ENABLE_REASONING_SUMMARIES"] = "true"
 
@@ -146,8 +135,6 @@ def format_config(config: ResearchConfig, pretty: bool, show_secrets: bool) -> s
     if not show_secrets:
         if "api_key" in data:
             data["api_key"] = mask_secret(data["api_key"])
-        if "clarification_api_key" in data:
-            data["clarification_api_key"] = mask_secret(data["clarification_api_key"])
 
     if pretty:
         lines = [f"{k}: {data[k]}" for k in sorted(data.keys())]
@@ -246,7 +233,6 @@ async def mcp_research(
     query: str,
     system_instructions: str,
     include_analysis: bool,
-    request_clarification: bool,
     callback_url: str,
 ) -> tuple[int, str]:
     """Call the deep_research MCP tool. Returns (exit_code, output_text)."""
@@ -255,32 +241,6 @@ async def mcp_research(
             "deep_research",
             {
                 "query": query,
-                "system_instructions": system_instructions,
-                "include_analysis": include_analysis,
-                "request_clarification": request_clarification,
-                "callback_url": callback_url,
-            },
-            progress_callback=_mcp_progress_callback,
-        )
-        output = _render_mcp_result(result)
-        return (2 if result.isError else 0, output)
-
-
-async def mcp_research_with_context(
-    url: str,
-    session_id: str,
-    answers: list[str],
-    system_instructions: str,
-    include_analysis: bool,
-    callback_url: str,
-) -> tuple[int, str]:
-    """Call the research_with_context MCP tool."""
-    async with _mcp_connect(url) as session:
-        result = await session.call_tool(
-            "research_with_context",
-            {
-                "session_id": session_id,
-                "answers": answers,
                 "system_instructions": system_instructions,
                 "include_analysis": include_analysis,
                 "callback_url": callback_url,
@@ -303,14 +263,6 @@ async def mcp_status(url: str, task_id: str) -> tuple[int, str]:
         return (2 if result.isError else 0, output)
 
 
-def _parse_mcp_clarification(text: str) -> tuple[str | None, list[str]]:
-    """Parse session ID and questions from MCP clarification markdown output."""
-    session_match = re.search(r"Session ID:\s*`([^`]+)`", text)
-    session_id = session_match.group(1) if session_match else None
-    questions = re.findall(r"^\d+\.\s+(.+)$", text, re.MULTILINE)
-    return session_id, questions
-
-
 # ---------------------------------------------------------------------------
 # Command implementations
 # ---------------------------------------------------------------------------
@@ -326,53 +278,11 @@ def _resolve_system_prompt(args: argparse.Namespace) -> str:
     return DEFAULT_SYSTEM_PROMPT
 
 
-async def _agent_clarification_flow(agent: DeepResearchAgent, query: str) -> str:
-    """Run the interactive clarification flow. Returns the (possibly enriched) query."""
-    logger = structlog.get_logger()
-    logger.info("Starting clarification process...")
-
-    clarification_result = agent.start_clarification(query)
-
-    if not clarification_result.get("needs_clarification", False):
-        logger.info(
-            f"Assessment: {clarification_result.get('reasoning', 'Query is sufficient')}"
-        )
-        logger.info("Proceeding with original query")
-        return query
-
-    logger.info(
-        f"Reasoning: {clarification_result.get('reasoning', 'No reasoning provided')}"
-    )
-    print("\nPlease answer the following clarifying questions:")
-
-    questions = clarification_result.get("questions", [])
-    answers: list[str] = []
-
-    for i, question in enumerate(questions, 1):
-        print(f"\n{i}. {question}")
-        try:
-            answer = input("Your answer (or press Enter to skip): ").strip()
-        except EOFError:
-            answer = ""
-        answers.append(answer if answer else "[No answer provided]")
-
-    session_id = clarification_result.get("session_id")
-    if session_id:
-        agent.add_clarification_answers(session_id, answers)
-        enriched_query = agent.get_enriched_query(session_id)
-        if enriched_query:
-            logger.info(f"Enriched query: {enriched_query}")
-            return enriched_query
-
-    return query
-
-
 async def cmd_research(args: argparse.Namespace) -> int:
     """Execute the research command."""
     logger = structlog.get_logger()
     system_prompt = _resolve_system_prompt(args)
     include_analysis = not getattr(args, "no_analysis", False)
-    clarify = getattr(args, "clarify", False)
     callback_url = getattr(args, "callback_url", "") or ""
     server_url = getattr(args, "server_url", None)
     output_file = getattr(args, "output_file", None)
@@ -383,52 +293,13 @@ async def cmd_research(args: argparse.Namespace) -> int:
     if server_url:
         logger.info(f"Connecting to MCP server at {server_url}")
 
-        if clarify:
-            rc, text = await mcp_research(
-                url=server_url,
-                query=query,
-                system_instructions=system_prompt,
-                include_analysis=include_analysis,
-                request_clarification=True,
-                callback_url="",
-            )
-            if rc != 0:
-                print(text, file=sys.stderr)
-                return rc
-
-            session_id, questions = _parse_mcp_clarification(text)
-            if not session_id or not questions:
-                # No clarification needed, server returned assessment
-                print(text)
-                return 0
-
-            print("\nPlease answer the following clarifying questions:")
-            answers: list[str] = []
-            for i, question in enumerate(questions, 1):
-                print(f"\n{i}. {question}")
-                try:
-                    answer = input("Your answer (or press Enter to skip): ").strip()
-                except EOFError:
-                    answer = ""
-                answers.append(answer if answer else "[No answer provided]")
-
-            rc, text = await mcp_research_with_context(
-                url=server_url,
-                session_id=session_id,
-                answers=answers,
-                system_instructions=system_prompt,
-                include_analysis=include_analysis,
-                callback_url=callback_url,
-            )
-        else:
-            rc, text = await mcp_research(
-                url=server_url,
-                query=query,
-                system_instructions=system_prompt,
-                include_analysis=include_analysis,
-                request_clarification=False,
-                callback_url=callback_url,
-            )
+        rc, text = await mcp_research(
+            url=server_url,
+            query=query,
+            system_instructions=system_prompt,
+            include_analysis=include_analysis,
+            callback_url=callback_url,
+        )
 
         if rc != 0:
             print(text, file=sys.stderr)
@@ -442,8 +313,6 @@ async def cmd_research(args: argparse.Namespace) -> int:
     # --- Agent mode ---
     try:
         config = load_config(args)
-        if clarify:
-            config.enable_clarification = True
         config.validate()
 
         logger.info(f"Starting research with query: '{query}'")
@@ -451,12 +320,8 @@ async def cmd_research(args: argparse.Namespace) -> int:
 
         agent = DeepResearchAgent(config)
 
-        working_query = query
-        if clarify:
-            working_query = await _agent_clarification_flow(agent, query)
-
         result = await agent.research(
-            query=working_query,
+            query=query,
             system_prompt=system_prompt,
             include_code_interpreter=include_analysis,
             callback_url=callback_url or None,
@@ -612,37 +477,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Logging level",
     )
     cfg.add_argument(
-        "--enable-clarification",
-        action="store_true",
-        default=False,
-        help="Enable the clarification pipeline",
-    )
-    cfg.add_argument(
         "--enable-reasoning-summaries",
         action="store_true",
         default=False,
         help="Enable reasoning summaries",
     )
-    cfg.add_argument("--triage-model", default=None, help="Model for query triage")
-    cfg.add_argument(
-        "--clarifier-model", default=None, help="Model for query enrichment"
-    )
-    cfg.add_argument(
-        "--clarification-base-url",
-        default=None,
-        help="Base URL for clarification models",
-    )
-    cfg.add_argument(
-        "--clarification-api-key",
-        default=None,
-        help="API key for clarification models",
-    )
-    cfg.add_argument(
-        "--instruction-builder-model",
-        default=None,
-        help="Model for instruction building",
-    )
-
     # -- Subcommands --
     subparsers = parser.add_subparsers(dest="command", help="available commands")
 
@@ -651,11 +490,6 @@ def build_parser() -> argparse.ArgumentParser:
         "research", help="Perform deep research on a query"
     )
     p_research.add_argument("query", help="Research query")
-    p_research.add_argument(
-        "--clarify",
-        action="store_true",
-        help="Enable interactive clarification before research",
-    )
     prompt_group = p_research.add_mutually_exclusive_group()
     prompt_group.add_argument(
         "--system-prompt", default=None, help="Inline system prompt text"

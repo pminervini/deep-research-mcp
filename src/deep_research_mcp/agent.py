@@ -9,38 +9,24 @@ provider-specific execution to dedicated backend implementations.
 
 import logging
 import time
-from typing import Any
 
 import httpx
-from openai import OpenAI
-from openai.types.chat import ChatCompletionMessageParam
 
-from deep_research_mcp.async_utils import run_blocking
 from deep_research_mcp.backends import ResearchBackend, build_research_backend
 from deep_research_mcp.backends.base import TaskStartedCallback
-from deep_research_mcp.clarification import (
-    ClarificationManager,
-    build_clarification_client_kwargs,
-)
 from deep_research_mcp.config import ResearchConfig
-from deep_research_mcp.prompts.prompts import PromptManager
 from deep_research_mcp.results import ResearchResult, ResearchTaskStatus
 
 logger = logging.getLogger(__name__)
 
 
 class DeepResearchAgent:
-    """Provider-aware orchestrator for research, clarification, and callbacks."""
+    """Provider-aware orchestrator for research and callbacks."""
 
     def __init__(self, config: ResearchConfig):
         self.config = config
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
         self.backend: ResearchBackend = build_research_backend(config, self.logger)
-        self.clarification_manager = ClarificationManager(config)
-        self.prompt_manager = PromptManager()
-        self.instruction_client = (
-            self._create_instruction_client() if config.enable_clarification else None
-        )
 
     async def research(
         self,
@@ -66,13 +52,8 @@ class DeepResearchAgent:
         """
         start_time = time.time()
 
-        if self.config.enable_clarification:
-            enhanced_query = await self.build_research_instruction_async(query)
-        else:
-            enhanced_query = query
-
         result = await self.backend.research(
-            query=enhanced_query,
+            query=query,
             system_prompt=system_prompt,
             include_code_interpreter=include_code_interpreter,
             on_task_started=on_task_started,
@@ -109,95 +90,3 @@ class DeepResearchAgent:
     async def get_task_result(self, task_id: str) -> ResearchResult | None:
         """Fetch the full result of a completed task, or None if unsupported."""
         return await self.backend.get_task_result(task_id)
-
-    def start_clarification(self, user_query: str) -> dict[str, Any]:
-        """
-        Start clarification process for a query.
-
-        Args:
-            user_query: The original research query
-
-        Returns:
-            Dictionary with clarification status and questions, or indication to proceed
-        """
-        return self.clarification_manager.start_clarification(user_query)
-
-    async def start_clarification_async(self, user_query: str) -> dict[str, Any]:
-        """Start clarification without blocking the event loop."""
-        return await self.clarification_manager.start_clarification_async(user_query)
-
-    def add_clarification_answers(
-        self, session_id: str, answers: list[str]
-    ) -> dict[str, Any]:
-        """
-        Add answers to clarification questions.
-
-        Args:
-            session_id: Session identifier from start_clarification
-            answers: List of answers to the clarification questions
-
-        Returns:
-            Dictionary with session status
-        """
-        return self.clarification_manager.add_answers(session_id, answers)
-
-    def get_enriched_query(self, session_id: str) -> str | None:
-        """
-        Get enriched query from clarification session.
-
-        Args:
-            session_id: Session identifier
-
-        Returns:
-            Enriched query string or None if session not found
-        """
-        return self.clarification_manager.get_enriched_query(session_id)
-
-    async def get_enriched_query_async(self, session_id: str) -> str | None:
-        """Get an enriched query without blocking the event loop."""
-        return await self.clarification_manager.get_enriched_query_async(session_id)
-
-    def _create_instruction_client(self) -> OpenAI:
-        """
-        Create the OpenAI client for instruction building.
-        """
-        return OpenAI(**build_clarification_client_kwargs(self.config))
-
-    def build_research_instruction(self, query: str) -> str:
-        """
-        Convert a research query into a more precise research brief.
-
-        Args:
-            query: Original research query to enhance
-
-        Returns:
-            Enhanced research instruction string
-        """
-        if not self.instruction_client:
-            return query
-
-        try:
-            instruction_prompt = self.prompt_manager.get_instruction_builder_prompt(
-                query
-            )
-            messages: list[ChatCompletionMessageParam] = [
-                {"role": "user", "content": instruction_prompt}
-            ]
-            response = self.instruction_client.chat.completions.create(
-                model=self.config.instruction_builder_model,
-                messages=messages,
-            )
-            enhanced_instruction = (response.choices[0].message.content or "").strip()
-            if not enhanced_instruction:
-                return query
-            self.logger.info(
-                f"Enhanced research instruction created for query: {query[:50]}..."
-            )
-            return enhanced_instruction
-        except Exception as error:
-            self.logger.warning(f"Failed to build research instruction: {error}")
-            return query
-
-    async def build_research_instruction_async(self, query: str) -> str:
-        """Build research instructions without blocking the event loop."""
-        return await run_blocking(self.build_research_instruction, query)

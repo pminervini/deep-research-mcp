@@ -1,10 +1,8 @@
 # VHS Tape for Deep Research TUI Demo
 # https://github.com/charmbracelet/vhs
 #
-# Requires: brew install vhs; GEMINI_API_KEY or GOOGLE_API_KEY for Gemini.
+# Requires: brew install vhs
 # Regenerate: vhs docs/tui-demo.tape
-# After a full run, shorten the long wait (jump to results after ~6s intro):
-#   ./docs/trim-tui-demo-gif.sh
 
 Output docs/images/tui-demo.gif
 
@@ -13,22 +11,28 @@ Set FontSize 14
 Set Width 1400
 Set Height 900
 Set Padding 20
+Set Framerate 10
 Set Theme "Catppuccin Mocha"
 
-# Gemini via CLI; Save Path preset for the save demo at the end
-Type "cd /Users/pasquale/workspace/deep-research-mcp && uv run python cli/deep-research-tui.py --provider gemini --save-path docs/tui-demo-output.md --query 'What are three established facts about the planet Mars?'"
+# Start a local Dr Tulu-compatible endpoint so the demo is deterministic
+Hide
+Type "uv run python docs/tui-demo-server.py >/dev/null 2>&1 &"
+Enter
+Type "DEMO_SERVER_PID=$!"
+Enter
+Sleep 1s
+Type "clear"
+Enter
+Show
+
+# Launch the TUI with the query and save path preset
+Type "uv run python cli/deep-research-tui.py --provider dr-tulu --save-path docs/tui-demo-output.md --query 'What are three established facts about the planet Mars?'"
 Enter
 Sleep 3s
 
 # Start deep research
 Type "r"
-Sleep 500ms
-
-# Wait for Gemini deep research (typical run is a few minutes; allow headroom)
-Sleep 360s
-
-# Hold the completed report on screen
-Sleep 8s
+Sleep 5s
 
 # Save output to the path in Save Path (footer: Save)
 Type "s"
@@ -37,6 +41,14 @@ Sleep 3s
 # Quit TUI
 Type "q"
 Sleep 2s
+
+# Stop the local demo endpoint
+Hide
+Type "kill $DEMO_SERVER_PID && wait $DEMO_SERVER_PID 2>/dev/null"
+Enter
+Type "clear"
+Enter
+Show
 
 # Show the file written to disk
 Type "wc -c docs/tui-demo-output.md && head -n 35 docs/tui-demo-output.md"

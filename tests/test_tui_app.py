@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import pytest
 from textual.containers import Container
+from textual.css.query import NoMatches
 from textual.widgets import Input, Markdown, Select, Static, Switch
 
 from tests.tui_test_utils import load_tui_module
@@ -98,18 +99,13 @@ async def test_left_and_right_toggle_switch_values():
 
 
 @pytest.mark.asyncio
-async def test_clarification_panel_recomposes_answer_inputs():
+async def test_research_controls_do_not_include_clarification():
     app = TUI.DeepResearchTUI(build_startup_state())
 
-    async with app.run_test(size=(140, 42)) as pilot:
-        panel = app.query_one("#clarification-answers", TUI.ClarificationAnswersPanel)
-        panel.set_questions(["Scope by geography?", "Need pricing detail?"], ["Global"])
-        await pilot.pause()
-
-        answer_inputs = list(panel.query(Input))
-        assert len(answer_inputs) == 2
-        assert answer_inputs[0].value == "Global"
-        assert answer_inputs[1].value == ""
+    async with app.run_test(size=(140, 42)):
+        with pytest.raises(NoMatches):
+            app.query_one("#btn-clarify")
+        assert all(binding.key != "c" for binding in app.BINDINGS)
 
 
 @pytest.mark.asyncio

@@ -15,14 +15,12 @@ Transports:
 
 Features:
 - Deep research with multiple backend providers (OpenAI Responses API, Gemini Deep Research, Open Deep Research)
-- Clarification workflows to improve research quality
 - Task status monitoring for long‑running research
 - Configurable research parameters and system instructions
 - Support for data analysis and visualization capabilities
 
 Exposed tools:
-- deep_research: Main research tool with optional clarification
-- research_with_context: Research using clarification answers
+- deep_research: Main research tool
 - research_status: Monitor task progress
 
 Quick start:
@@ -89,10 +87,8 @@ mcp = FastMCP(
         "data analysis, and citation capabilities. Supports OpenAI Responses API, "
         "OpenAI Chat Completions API (compatible with Perplexity, Groq, Ollama, "
         "and other providers), Gemini Deep Research via the Interactions API, "
-        "and Open Deep Research. Use deep_research for "
-        "comprehensive research queries, research_with_context for "
-        "clarification-enhanced research, and research_status to monitor "
-        "long-running tasks."
+        "and Open Deep Research. Use deep_research for comprehensive research "
+        "queries and research_status to monitor long-running tasks."
     ),
     website_url="https://github.com/pminervini/deep-research-mcp",
     debug=False,
@@ -335,7 +331,10 @@ async def _finalize_research_response(
 async def deep_research(
     query: Annotated[
         str,
-        "Specific research question or topic. Examples: 'Latest quantum computing breakthroughs in 2024', 'Compare renewable energy adoption rates globally', 'Analyze Tesla's financial performance vs competitors'",
+        "Complete research question or topic, including any user-provided context "
+        "needed to answer it. Examples: 'Latest quantum computing breakthroughs "
+        "in 2024', 'Compare renewable energy adoption rates globally', "
+        "'Analyze Tesla's financial performance vs competitors'",
     ],
     system_instructions: Annotated[
         str,
@@ -345,10 +344,6 @@ async def deep_research(
         bool,
         "Enable code execution for data analysis, calculations, and visualizations. Useful for: statistical analysis, creating charts/graphs, processing datasets. Set to False for text-only research.",
     ] = True,
-    request_clarification: Annotated[
-        bool,
-        "When True, analyze the query and return clarifying questions instead of starting research. Use this to improve research quality for ambiguous queries.",
-    ] = False,
     callback_url: Annotated[
         str,
         "Optional webhook URL notified with a completion payload when the research finishes. Leave empty to disable callbacks.",
@@ -380,46 +375,6 @@ async def deep_research(
         return f"Failed to initialize research agent: {str(e)}"
 
     try:
-        # Handle clarification request
-        if request_clarification:
-            clarification_result = await agent.start_clarification_async(query)
-
-            if not clarification_result.get("needs_clarification", False):
-                return f"""# Query Analysis
-
-**Original Query:** {query}
-
-**Assessment:** {clarification_result.get('query_assessment', 'Query is sufficient for research')}
-
-**Recommendation:** {clarification_result.get('reasoning', 'Proceed with research directly')}
-
-You can proceed with the research using the same query."""
-
-            # Format clarifying questions for Claude Code
-            questions = clarification_result.get("questions", [])
-            session_id = clarification_result.get("session_id", "")
-            created_at = clarification_result.get("created_at", "")
-
-            questions_formatted = "\n".join(
-                [f"{i+1}. {q}" for i, q in enumerate(questions)]
-            )
-            created_at_line = f"\n**Created At:** {created_at}\n" if created_at else ""
-
-            return f"""# Clarifying Questions Needed
-
-**Original Query:** {query}
-
-**Why clarification is helpful:** {clarification_result.get('reasoning', 'Additional context will improve research quality')}
-
-**Session ID:** `{session_id}`
-{created_at_line}
-
-**Please answer these questions to improve the research:**
-
-{questions_formatted}
-
-**Instructions:** Use the `research_with_context` tool with your answers and the session ID above to proceed with enhanced research."""
-
         result = await _run_research_with_progress(
             agent=agent,
             query=query,
@@ -506,100 +461,6 @@ async def research_status(
     except Exception as e:
         logger.error(f"Error checking status: {e}")
         return f"Error checking status: {str(e)}"
-
-
-@mcp.tool(meta=RESEARCH_TOOL_META)
-async def research_with_context(
-    session_id: Annotated[
-        str,
-        "Session ID from clarification request. Get this from the deep_research tool when request_clarification=True",
-    ],
-    answers: Annotated[
-        list[str],
-        "List of answers to the clarifying questions, in the same order as the questions were presented",
-    ],
-    system_instructions: Annotated[
-        str,
-        "Custom research approach instructions. Examples: 'Focus on peer-reviewed sources only', 'Include financial data and charts', 'Prioritize recent developments from 2024-2025'. Leave empty for balanced analysis.",
-    ] = "",
-    include_analysis: Annotated[
-        bool,
-        "Enable code execution for data analysis, calculations, and visualizations. Useful for: statistical analysis, creating charts/graphs, processing datasets. Set to False for text-only research.",
-    ] = True,
-    callback_url: Annotated[
-        str,
-        "Optional webhook URL notified with a completion payload when the research finishes. Leave empty to disable callbacks.",
-    ] = "",
-    ctx: Context | None = None,
-) -> str:
-    """
-    Perform research using an enriched query based on clarification answers.
-
-    **Use after:**
-    - Calling `deep_research` with `request_clarification=True`
-    - Receiving clarifying questions and a session ID
-    - Gathering answers from the user
-
-    **What it does:**
-    - Takes your answers to clarifying questions
-    - Creates an enriched, more specific research query
-    - Performs comprehensive research with the enhanced query
-
-    **Returns:** Complete research report with citations and metadata
-    """
-    try:
-        agent = _ensure_research_agent()
-    except Exception as e:
-        return f"Failed to initialize research agent: {str(e)}"
-
-    try:
-        # Add answers to the clarification session
-        status_result = agent.add_clarification_answers(session_id, answers)
-
-        if "error" in status_result:
-            return f"Error with clarification session: {status_result['error']}"
-
-        # Get enriched query
-        enriched_query = await agent.get_enriched_query_async(session_id)
-
-        if not enriched_query:
-            return f"Could not retrieve enriched query for session {session_id}. Please check the session ID."
-
-        logger.info(f"Using enriched query: {enriched_query}")
-
-        result = await _run_research_with_progress(
-            agent=agent,
-            query=enriched_query,
-            system_instructions=system_instructions,
-            include_analysis=include_analysis,
-            callback_url=callback_url,
-            ctx=ctx,
-            start_message="Research with context started...",
-            heartbeat_label="Research with context in progress",
-            provider_error_message="Contextual research ended with provider error",
-            unexpected_error_message="Contextual research ended unexpectedly",
-        )
-        return await _finalize_research_response(
-            result=result,
-            ctx=ctx,
-            success_message="Contextual research completed successfully",
-            progress_failure_template="Contextual research failed: {failure_message}",
-            title="Enhanced Research Report",
-            intro_lines=[
-                "**Original Query Enhanced With User Context**",
-                "",
-                f"**Enriched Query:** {enriched_query}",
-                "",
-                f"**User Clarifications Provided:** {len(answers)} answers",
-                "",
-                "---",
-            ],
-            extra_metadata_lines=[f"- **Clarification Session**: {session_id}"],
-        )
-
-    except Exception as e:
-        logger.error(f"Error in research_with_context: {e}")
-        return f"Error performing enhanced research: {str(e)}"
 
 
 def main():

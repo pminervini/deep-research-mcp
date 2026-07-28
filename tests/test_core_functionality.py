@@ -24,9 +24,6 @@ from deep_research_mcp.results import ResearchResult, ResearchTaskStatus
 def test_config():
     """Test configuration fixture"""
     os.environ["RESEARCH_MODEL"] = "gpt-5-mini"  # Use cheap model for testing
-    os.environ["TRIAGE_MODEL"] = "gpt-5-mini"
-    os.environ["CLARIFIER_MODEL"] = "gpt-5-mini"
-    os.environ["INSTRUCTION_BUILDER_MODEL"] = "gpt-5-mini"
     return ResearchConfig.from_env()
 
 
@@ -41,11 +38,9 @@ def test_config_loading(test_config):
     assert test_config.model == "gpt-5-mini"
     assert test_config.timeout > 0
     assert test_config.poll_interval > 0
-    assert hasattr(test_config, "enable_clarification")
-    assert hasattr(test_config, "triage_model")
-    assert hasattr(test_config, "clarifier_model")
-    assert test_config.triage_model == "gpt-5-mini"
-    assert test_config.clarifier_model == "gpt-5-mini"
+    assert not hasattr(test_config, "enable_clarification")
+    assert not hasattr(test_config, "triage_model")
+    assert not hasattr(test_config, "clarifier_model")
 
 
 def test_config_validation():
@@ -63,7 +58,9 @@ def test_agent_initialization(test_config):
     assert agent.config == test_config
     assert isinstance(agent.backend, OpenAIResearchBackend)
     assert hasattr(agent.backend, "client")
-    assert hasattr(agent, "clarification_manager")
+    assert not hasattr(agent, "clarification_manager")
+    assert not hasattr(agent, "instruction_client")
+    assert not hasattr(agent, "prompt_manager")
 
 
 def test_gemini_agent_initialization():
@@ -82,7 +79,6 @@ def test_gemini_agent_initialization():
         assert agent.config.provider == "gemini"
         assert isinstance(agent.backend, GeminiResearchBackend)
         assert hasattr(agent.backend, "gemini_interactions")
-        assert agent.instruction_client is None
     finally:
         if old_provider:
             os.environ["RESEARCH_PROVIDER"] = old_provider
@@ -355,7 +351,6 @@ def test_dr_tulu_agent_initialization():
         assert agent.config.provider == "dr-tulu"
         assert isinstance(agent.backend, DrTuluResearchBackend)
         assert agent.config.base_url == "http://localhost:8080/"
-        assert agent.instruction_client is None
     finally:
         if old_provider:
             os.environ["RESEARCH_PROVIDER"] = old_provider
@@ -374,6 +369,8 @@ def test_dr_tulu_agent_initialization():
 
 
 @pytest.mark.asyncio
+@pytest.mark.api
+@pytest.mark.integration
 async def test_agent_status_check(test_agent):
     """Test agent's get_task_status method"""
     # Skip if no API key
@@ -408,146 +405,3 @@ async def test_research_dry_run(test_agent):
     # Check the result format
     assert isinstance(result, ResearchResult)
     assert result.status in {"completed", "failed", "error"}
-
-
-def test_start_clarification_returns_disabled_when_feature_off(test_agent):
-    """Test clarification returns a disabled response when the feature is off."""
-    test_agent.config.enable_clarification = False  # Disable to avoid API calls
-    result = test_agent.start_clarification("test query")
-    assert isinstance(result, dict)
-    assert result["needs_clarification"] == False
-
-
-@pytest.mark.asyncio
-async def test_start_clarification_async_returns_disabled_when_feature_off(test_agent):
-    """Async clarification should return a disabled response when the feature is off."""
-    test_agent.config.enable_clarification = False
-    result = await test_agent.start_clarification_async("test query")
-    assert isinstance(result, dict)
-    assert result["needs_clarification"] == False
-
-
-def test_config_clarification_enabled():
-    """Test clarification configuration when enabled"""
-    os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
-    os.environ["ENABLE_CLARIFICATION"] = "true"
-    os.environ["TRIAGE_MODEL"] = "gpt-5-mini"
-    os.environ["CLARIFIER_MODEL"] = "gpt-5-mini"
-
-    config = ResearchConfig.from_env()
-    assert config.enable_clarification == True
-    assert config.triage_model == "gpt-5-mini"
-    assert config.clarifier_model == "gpt-5-mini"
-
-    # Clean up
-    if "ENABLE_CLARIFICATION" in os.environ:
-        del os.environ["ENABLE_CLARIFICATION"]
-    if "TRIAGE_MODEL" in os.environ:
-        del os.environ["TRIAGE_MODEL"]
-    if "CLARIFIER_MODEL" in os.environ:
-        del os.environ["CLARIFIER_MODEL"]
-
-
-def test_instruction_builder_configuration(test_config):
-    """Test instruction builder configuration"""
-    assert hasattr(test_config, "instruction_builder_model")
-    assert test_config.instruction_builder_model == "gpt-5-mini"
-
-
-def test_instruction_builder_agent_initialization(test_agent):
-    """Test that agent has instruction builder components"""
-    assert hasattr(test_agent, "prompt_manager")
-    assert hasattr(test_agent, "instruction_client")
-    assert test_agent.prompt_manager is not None
-    # instruction_client should only be initialized when clarification is enabled
-    if test_agent.config.enable_clarification:
-        assert test_agent.instruction_client is not None
-    else:
-        assert test_agent.instruction_client is None
-
-
-def test_instruction_builder_with_clarification_enabled():
-    """Test that instruction client is initialized when clarification is enabled"""
-    os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
-    os.environ["ENABLE_CLARIFICATION"] = "true"
-    os.environ["INSTRUCTION_BUILDER_MODEL"] = "gpt-5-mini"
-
-    config = ResearchConfig.from_env()
-    agent = DeepResearchAgent(config)
-
-    assert agent.config.enable_clarification == True
-    assert agent.instruction_client is not None
-
-    # Clean up environment
-    del os.environ["ENABLE_CLARIFICATION"]
-
-
-def test_instruction_builder_prompt_loading(test_agent):
-    """Test that instruction builder prompt can be loaded"""
-    test_query = "What are the latest developments in quantum computing?"
-
-    try:
-        prompt = test_agent.prompt_manager.get_instruction_builder_prompt(test_query)
-        assert prompt is not None
-        assert isinstance(prompt, str)
-        assert "quantum computing" in prompt.lower()
-        assert "research" in prompt.lower()
-    except Exception as e:
-        # If prompt loading fails, it should be due to missing files, not code errors
-        assert "not found" in str(e).lower() or "no such file" in str(e).lower()
-
-
-@pytest.mark.asyncio
-async def test_instruction_builder_fallback(test_agent):
-    """Test that instruction builder gracefully falls back to original query on error"""
-    original_query = "test query for fallback"
-
-    # This should not raise an exception even if the API call fails
-    enhanced_query = test_agent.build_research_instruction(original_query)
-
-    # Should return at least the original query
-    assert enhanced_query is not None
-    assert isinstance(enhanced_query, str)
-    assert len(enhanced_query) > 0
-
-
-@pytest.mark.asyncio
-async def test_instruction_builder_async_returns_original_query_when_disabled(
-    test_agent,
-):
-    """Async instruction building should short-circuit when disabled."""
-    original_query = "test query for async fallback"
-    test_agent.config.enable_clarification = False
-    test_agent.instruction_client = None
-
-    enhanced_query = await test_agent.build_research_instruction_async(original_query)
-
-    assert enhanced_query == original_query
-
-
-def test_config_instruction_builder_env_override():
-    """Test instruction builder model can be overridden via environment"""
-    old_model = os.environ.get("RESEARCH_MODEL")
-    old_instruction_model = os.environ.get("INSTRUCTION_BUILDER_MODEL")
-
-    os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
-    os.environ["CLARIFICATION_INSTRUCTION_BUILDER_MODEL"] = "gpt-5-mini"
-
-    try:
-        config = ResearchConfig.from_env()
-        assert config.instruction_builder_model == "gpt-5-mini"
-        assert config.model == "gpt-5-mini"
-    finally:
-        if old_model:
-            os.environ["RESEARCH_MODEL"] = old_model
-        else:
-            if "RESEARCH_MODEL" in os.environ:
-                del os.environ["RESEARCH_MODEL"]
-
-        if old_instruction_model:
-            os.environ["CLARIFICATION_INSTRUCTION_BUILDER_MODEL"] = (
-                old_instruction_model
-            )
-        else:
-            if "CLARIFICATION_INSTRUCTION_BUILDER_MODEL" in os.environ:
-                del os.environ["CLARIFICATION_INSTRUCTION_BUILDER_MODEL"]

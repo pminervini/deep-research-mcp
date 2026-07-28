@@ -47,7 +47,6 @@ async def run_provider_check(provider, model, api_style="responses"):
         "PROVIDER": provider,
         "RESEARCH_PROVIDER": provider,
         "RESEARCH_MODEL": model,
-        "ENABLE_CLARIFICATION": "false",
         "RESEARCH_API_STYLE": api_style,
     }
 

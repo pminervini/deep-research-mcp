@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "deep-research-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "MCP server and agent for autonomous deep research workflows"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -13,14 +13,12 @@ authors = [{ name = "Deep Research MCP Contributors" }]
 dependencies = [
     "google-genai>=2.2.0",
     "httpx>=0.25.0",
-    "instructor>=1.10.0",
     # Stay on stable v1 until we deliberately migrate across v2's breaking changes.
     # https://github.com/modelcontextprotocol/python-sdk
     "mcp[cli]>=1.28.1,<2",
     "openai>=1.88",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
-    "pyyaml>=6.0",
     "structlog>=23.1.0",
     "tenacity>=8.2.0",
     "textual>=8.2.3",
@@ -54,9 +52,6 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.setuptools.package-data]
-deep_research_mcp = ["prompts/**/*.yaml"]
 
 [tool.pylint.main]
 fail-under = 10
@@ -103,6 +98,5 @@ module = [
     "huggingface_hub",
     "open_deep_research.*",
     "smolagents",
-    "yaml",
 ]
 ignore_missing_imports = true

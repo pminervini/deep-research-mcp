@@ -21,7 +21,6 @@ from tenacity import (
 )
 
 from deep_research_mcp.async_utils import run_blocking
-from deep_research_mcp.clarification import MISSING_OPENAI_API_KEY_PLACEHOLDER
 from deep_research_mcp.config import ResearchConfig
 from deep_research_mcp.errors import ResearchError, TaskTimeoutError
 from deep_research_mcp.results import (
@@ -31,6 +30,8 @@ from deep_research_mcp.results import (
 )
 
 from .base import ResearchBackend, TaskStartedCallback
+
+MISSING_OPENAI_API_KEY_PLACEHOLDER = "missing-openai-api-key"
 
 GPT_5_RESEARCH_MODEL_PATTERN = re.compile(
     r"^gpt-5(?:\.(?P<minor>\d+))?"

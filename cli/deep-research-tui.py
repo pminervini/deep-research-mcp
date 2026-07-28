@@ -4,8 +4,8 @@
 """
 Interactive full-screen terminal UI for Deep Research.
 
-A dark, keyboard-driven interface for running clarification, deep research,
-task status checks, and saving output to disk.
+A dark, keyboard-driven interface for running deep research, task status checks,
+and saving output to disk.
 
 USAGE:
     # Start in direct agent mode
@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -57,21 +56,6 @@ from deep_research_mcp import (
     ResearchError,
     ResearchResult,
 )
-
-NO_ANSWER_PLACEHOLDER = "[No answer provided]"
-
-
-def normalize_answers(questions: list[str], answers: list[str]) -> list[str]:
-    """Pad or substitute answers so len(result) == len(questions)."""
-    out: list[str] = []
-    for i, _ in enumerate(questions):
-        if i < len(answers):
-            text = answers[i].strip()
-            out.append(text if text else NO_ANSWER_PLACEHOLDER)
-        else:
-            out.append(NO_ANSWER_PLACEHOLDER)
-    return out
-
 
 DEFAULT_SYSTEM_PROMPT = """
 You are a professional researcher preparing a structured, data-driven report.
@@ -184,74 +168,6 @@ class StartupState:
     )
 
 
-class ClarificationAnswersPanel(Container):
-    """Dynamic panel for clarification question answers."""
-
-    DEFAULT_CSS = """
-    ClarificationAnswersPanel {
-        height: auto;
-        padding: 0 1;
-    }
-
-    ClarificationAnswersPanel .question-label {
-        margin-top: 1;
-        color: $accent;
-    }
-
-    ClarificationAnswersPanel Input {
-        margin-bottom: 1;
-    }
-    """
-
-    questions = reactive(list, recompose=True)
-    answers = reactive(list, recompose=True)
-
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self._questions: list[str] = []
-        self._answers: list[str] = []
-
-    def compose(self) -> ComposeResult:
-        if not self._questions:
-            yield Label("No clarification questions yet.", classes="question-label")
-            return
-        for i, question in enumerate(self._questions):
-            yield Label(f"{i + 1}. {question}", classes="question-label")
-            answer_value = self._answers[i] if i < len(self._answers) else ""
-            yield Input(
-                value=answer_value,
-                placeholder="Your answer...",
-                id=f"clarification-answer-{i}",
-            )
-
-    def set_questions(
-        self, questions: list[str], answers: list[str] | None = None
-    ) -> None:
-        """Set questions and optionally prefill answers, then recompose."""
-        self._questions = list(questions)
-        self._answers = list(answers) if answers else []
-        self.questions = self._questions
-        self.answers = self._answers
-
-    def get_answers(self) -> list[str]:
-        """Collect current answer values from input widgets."""
-        raw: list[str] = []
-        for i in range(len(self._questions)):
-            try:
-                inp = self.query_one(f"#clarification-answer-{i}", Input)
-                raw.append(inp.value)
-            except Exception:
-                raw.append("")
-        return normalize_answers(self._questions, raw)
-
-    def clear(self) -> None:
-        """Clear all questions and answers."""
-        self._questions = []
-        self._answers = []
-        self.questions = []
-        self.answers = []
-
-
 class DeepResearchTUI(App):
     """Interactive TUI for Deep Research."""
 
@@ -359,7 +275,7 @@ class DeepResearchTUI(App):
 
     #button-grid {
         layout: grid;
-        grid-size: 2;
+        grid-size: 3;
         grid-gutter: 1;
         height: auto;
         margin-top: 1;
@@ -433,18 +349,6 @@ class DeepResearchTUI(App):
         color: $panel;
     }
 
-    #clarification-section {
-        height: auto;
-        margin-top: 1;
-        border: round $panel;
-        padding: 1;
-        background: $surface;
-    }
-
-    #clarification-section.hidden {
-        display: none;
-    }
-
     #status-bar {
         dock: bottom;
         height: 1;
@@ -456,7 +360,6 @@ class DeepResearchTUI(App):
 
     BINDINGS = [
         Binding("q", "quit", "Quit", show=True),
-        Binding("c", "run_clarification", "Clarify", show=True),
         Binding("r", "run_research", "Research", show=True),
         Binding("t", "check_status", "Status", show=True),
         Binding("s", "save_output", "Save", show=True),
@@ -465,8 +368,6 @@ class DeepResearchTUI(App):
     mode = reactive("agent")
     provider = reactive("openai")
     api_style = reactive("responses")
-    current_session_id: str | None = None
-    clarification_questions: list[str] = []
 
     _focusable_ids: list[str] = [
         "#mode",
@@ -481,7 +382,6 @@ class DeepResearchTUI(App):
         "#json-output",
         "#query-area",
         "#system-prompt-area",
-        "#btn-clarify",
         "#btn-research",
         "#btn-status",
         "#btn-save",
@@ -596,12 +496,7 @@ class DeepResearchTUI(App):
                 yield Label("System Prompt", classes="field-label")
                 yield TextArea(id="system-prompt-area")
 
-                with Container(id="clarification-section", classes="hidden"):
-                    yield Label("Clarification Answers", classes="section-title")
-                    yield ClarificationAnswersPanel(id="clarification-answers")
-
                 with Grid(id="button-grid"):
-                    yield Button("Clarify", id="btn-clarify", variant="default")
                     yield Button("Research", id="btn-research", variant="primary")
                     yield Button("Status", id="btn-status", variant="default")
                     yield Button("Save", id="btn-save", variant="default")
@@ -696,23 +591,6 @@ class DeepResearchTUI(App):
     def handle_output_raw(self) -> None:
         self._output_view = "raw"
         self._apply_output_view()
-
-    def _show_clarification_section(self, questions: list[str]) -> None:
-        """Show the clarification section with questions."""
-        self.clarification_questions = questions
-        section = self.query_one("#clarification-section", Container)
-        section.remove_class("hidden")
-        panel = self.query_one("#clarification-answers", ClarificationAnswersPanel)
-        panel.set_questions(questions)
-
-    def _hide_clarification_section(self) -> None:
-        """Hide the clarification section."""
-        section = self.query_one("#clarification-section", Container)
-        section.add_class("hidden")
-        panel = self.query_one("#clarification-answers", ClarificationAnswersPanel)
-        panel.clear()
-        self.clarification_questions = []
-        self.current_session_id = None
 
     def on_key(self, event) -> None:
         """Handle arrow key navigation for form controls."""
@@ -819,10 +697,6 @@ class DeepResearchTUI(App):
             if self.provider == "openai":
                 self._update_provider_defaults()
 
-    @on(Button.Pressed, "#btn-clarify")
-    def handle_clarify_button(self) -> None:
-        self.action_run_clarification()
-
     @on(Button.Pressed, "#btn-research")
     def handle_research_button(self) -> None:
         self.action_run_research()
@@ -842,7 +716,6 @@ class DeepResearchTUI(App):
             api_style=self.query_one("#api-style", Select).value or "responses",
             model=self.query_one("#model", Input).value,
             base_url=self.query_one("#base-url", Input).value or None,
-            enable_clarification=True,
         )
 
     def _get_query(self) -> str:
@@ -859,116 +732,6 @@ class DeepResearchTUI(App):
 
     def _get_json_output(self) -> bool:
         return self.query_one("#json-output", Switch).value
-
-    def action_run_clarification(self) -> None:
-        """Run the clarification flow."""
-        query = self._get_query()
-        if not query:
-            self._set_status("Error: No query provided")
-            self.notify("Please enter a query first", severity="error")
-            return
-
-        if self.mode == "mcp":
-            self._run_mcp_clarification(query)
-        else:
-            self._run_agent_clarification(query)
-
-    @work(exclusive=True)
-    async def _run_agent_clarification(self, query: str) -> None:
-        """Run clarification via direct agent."""
-        self._set_status("Running clarification...")
-        self._set_output("Starting clarification process...\n")
-
-        try:
-            config = self._build_config()
-            agent = DeepResearchAgent(config)
-
-            result = agent.start_clarification(query)
-
-            if not result.get("needs_clarification", False):
-                reasoning = result.get("reasoning", "Query is sufficient")
-                self._append_output(f"\nAssessment: {reasoning}\n")
-                self._append_output("\nNo clarification needed. Ready for research.\n")
-                self._set_status("Clarification complete - no questions needed")
-                self.notify("No clarification needed", severity="information")
-                return
-
-            questions = result.get("questions", [])
-            session_id = result.get("session_id")
-            self.current_session_id = session_id
-
-            reasoning = result.get("reasoning", "")
-            self._append_output(f"\nReasoning: {reasoning}\n")
-            self._append_output(f"\nSession ID: {session_id}\n")
-            self._append_output("\nClarifying Questions:\n")
-            for i, q in enumerate(questions, 1):
-                self._append_output(f"  {i}. {q}\n")
-
-            self._show_clarification_section(questions)
-            self._set_status("Clarification questions ready - provide answers")
-            self.notify(
-                f"{len(questions)} clarification questions generated",
-                severity="information",
-            )
-
-        except Exception as e:
-            self._append_output(f"\nError: {e}\n")
-            self._set_status(f"Clarification error: {e}")
-            self.notify(f"Clarification failed: {e}", severity="error")
-
-    @work(exclusive=True)
-    async def _run_mcp_clarification(self, query: str) -> None:
-        """Run clarification via MCP client."""
-        self._set_status("Connecting to MCP server...")
-        self._set_output("Starting MCP clarification...\n")
-
-        server_url = self.query_one("#server-url", Input).value
-        system_prompt = self._get_system_prompt()
-        include_analysis = self._get_include_analysis()
-
-        try:
-            from mcp import ClientSession
-            from mcp.client.streamable_http import streamablehttp_client
-
-            async with streamablehttp_client(server_url) as (
-                read_stream,
-                write_stream,
-                _,
-            ):
-                async with ClientSession(read_stream, write_stream) as session:
-                    await session.initialize()
-
-                    result = await session.call_tool(
-                        "deep_research",
-                        {
-                            "query": query,
-                            "system_instructions": system_prompt,
-                            "include_analysis": include_analysis,
-                            "request_clarification": True,
-                            "callback_url": "",
-                        },
-                    )
-
-                    text = self._render_mcp_result(result)
-                    self._append_output(f"\n{text}\n")
-
-                    session_id, questions = self._parse_mcp_clarification(text)
-                    if session_id and questions:
-                        self.current_session_id = session_id
-                        self._show_clarification_section(questions)
-                        self._set_status("Clarification questions ready")
-                        self.notify(
-                            f"{len(questions)} questions received",
-                            severity="information",
-                        )
-                    else:
-                        self._set_status("Clarification complete")
-                        self.notify("No clarification needed", severity="information")
-
-        except Exception as e:
-            self._append_output(f"\nMCP Error: {e}\n")
-            self._set_status(f"MCP error: {e}")
-            self.notify(f"MCP connection failed: {e}", severity="error")
 
     def action_run_research(self) -> None:
         """Run the deep research flow."""
@@ -993,27 +756,14 @@ class DeepResearchTUI(App):
             config = self._build_config()
             agent = DeepResearchAgent(config)
 
-            working_query = query
-
-            if self.current_session_id and self.clarification_questions:
-                panel = self.query_one(
-                    "#clarification-answers", ClarificationAnswersPanel
-                )
-                answers = panel.get_answers()
-                agent.add_clarification_answers(self.current_session_id, answers)
-                enriched = agent.get_enriched_query(self.current_session_id)
-                if enriched:
-                    working_query = enriched
-                    self._append_output(f"\nEnriched query: {enriched}\n")
-
-            self._append_output(f"\nResearching: {working_query}\n")
+            self._append_output(f"\nResearching: {query}\n")
             self._append_output("\nPlease wait, this may take several minutes...\n")
 
             system_prompt = self._get_system_prompt()
             include_analysis = self._get_include_analysis()
 
             result = await agent.research(
-                query=working_query,
+                query=query,
                 system_prompt=system_prompt,
                 include_code_interpreter=include_analysis,
             )
@@ -1026,7 +776,6 @@ class DeepResearchTUI(App):
                 self._set_output(output)
                 self._set_status("Research completed")
                 self.notify("Research completed successfully", severity="information")
-                self._hide_clarification_section()
             else:
                 msg = result.message or "Unknown error"
                 self._append_output(f"\nResearch failed: {msg}\n")
@@ -1064,41 +813,18 @@ class DeepResearchTUI(App):
                 async with ClientSession(read_stream, write_stream) as session:
                     await session.initialize()
 
-                    if self.current_session_id and self.clarification_questions:
-                        panel = self.query_one(
-                            "#clarification-answers", ClarificationAnswersPanel
-                        )
-                        answers = panel.get_answers()
+                    self._append_output(f"\nResearching: {query}\n")
+                    self._append_output("\nPlease wait...\n")
 
-                        self._append_output(
-                            f"\nUsing session: {self.current_session_id}\n"
-                        )
-                        self._append_output("Sending answers and running research...\n")
-
-                        result = await session.call_tool(
-                            "research_with_context",
-                            {
-                                "session_id": self.current_session_id,
-                                "answers": answers,
-                                "system_instructions": system_prompt,
-                                "include_analysis": include_analysis,
-                                "callback_url": "",
-                            },
-                        )
-                    else:
-                        self._append_output(f"\nResearching: {query}\n")
-                        self._append_output("\nPlease wait...\n")
-
-                        result = await session.call_tool(
-                            "deep_research",
-                            {
-                                "query": query,
-                                "system_instructions": system_prompt,
-                                "include_analysis": include_analysis,
-                                "request_clarification": False,
-                                "callback_url": "",
-                            },
-                        )
+                    result = await session.call_tool(
+                        "deep_research",
+                        {
+                            "query": query,
+                            "system_instructions": system_prompt,
+                            "include_analysis": include_analysis,
+                            "callback_url": "",
+                        },
+                    )
 
                     text = self._render_mcp_result(result)
                     self._set_output(text)
@@ -1109,7 +835,6 @@ class DeepResearchTUI(App):
                     else:
                         self._set_status("Research completed")
                         self.notify("Research completed", severity="information")
-                        self._hide_clarification_section()
 
         except Exception as e:
             self._append_output(f"\nMCP Error: {e}\n")
@@ -1274,13 +999,6 @@ class DeepResearchTUI(App):
             else:
                 parts.append(str(item))
         return "\n".join(parts)
-
-    def _parse_mcp_clarification(self, text: str) -> tuple[str | None, list[str]]:
-        """Parse session ID and questions from MCP clarification output."""
-        session_match = re.search(r"Session ID:\s*`([^`]+)`", text)
-        session_id = session_match.group(1) if session_match else None
-        questions = re.findall(r"^\d+\.\s+(.+)$", text, re.MULTILINE)
-        return session_id, questions
 
 
 def build_parser() -> argparse.ArgumentParser:

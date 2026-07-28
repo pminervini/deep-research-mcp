@@ -37,8 +37,8 @@ These guidelines reduce common LLM coding mistakes. They bias toward caution ove
 ## Project Structure & Module Organization
 - `src/deep_research_mcp/`: core package.
   - `agent.py`: provider-aware research agent (OpenAI, open-deep-research).
-  - `mcp_server.py`: MCP server tools (`deep_research`, `research_with_context`, `research_status`).
-  - `config.py`, `errors.py`, `clarification.py`, `prompts/` (YAML prompt templates).
+  - `mcp_server.py`: MCP server tools (`deep_research`, `research_status`).
+  - `config.py`, `errors.py`: configuration and shared error types.
 - `cli/`: unified CLI tool (`deep-research-cli.py`) for agent mode, MCP client mode, and config viewing.
 - `tests/`: `pytest` suite (`test_*.py`) with markers configured in `pytest.ini`.
 - `pyproject.toml`, `requirements.txt` (unpinned compatibility install), `README.md`, `ARCH.md`, `LICENSE`.
@@ -71,7 +71,7 @@ These guidelines reduce common LLM coding mistakes. They bias toward caution ove
 - Add example commands/logs for new tools or flows; call out config/env impacts.
 
 ## Security & Configuration Tips
-- Do not commit secrets. Configure via `~/.deep_research` (TOML) or env vars (`OPENAI_API_KEY`, `OPENAI_BASE_URL`, `PROVIDER`, `RESEARCH_MODEL`, clarification settings).
+- Do not commit secrets. Configure via `~/.deep_research` (TOML) or env vars (`OPENAI_API_KEY`, `OPENAI_BASE_URL`, `PROVIDER`, `RESEARCH_MODEL`).
 - Gate network-dependent tests behind markers; avoid requiring keys in CI by default.
 
 ## Updating the TUI Demo GIF
@@ -89,10 +89,10 @@ The tape file uses VHS scripting syntax:
 - `Sleep Xs`: pause for X seconds/milliseconds
 
 Example workflow in the current tape:
-1. Start TUI with `uv run python cli/deep-research-tui.py`
-2. Navigate to Provider selector and switch to Gemini
-3. Navigate to Query area and enter a research question
-4. Press `r` to start research
-5. Press `q` to quit
+1. Start the deterministic local demo endpoint
+2. Start the TUI with a Dr Tulu provider and preset research query
+3. Press `r` to start research
+4. Press `s` to save the result
+5. Press `q` to quit and preview the saved report
 
 After regenerating, commit both the tape file and the new GIF.

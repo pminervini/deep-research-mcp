@@ -20,13 +20,14 @@ from deep_research_mcp import __version__
 import deep_research_mcp.mcp_server as mcp_server
 from deep_research_mcp.mcp_server import (
     deep_research,
-    research_status,
-    research_with_context,
     mcp,
+    research_status,
 )
 
 
 @pytest.mark.asyncio
+@pytest.mark.api
+@pytest.mark.integration
 async def test_research_status():
     """Test the research_status tool with a fake task ID"""
     mcp_server.research_agent = None
@@ -41,6 +42,8 @@ async def test_research_status():
 
 
 @pytest.mark.asyncio
+@pytest.mark.api
+@pytest.mark.integration
 async def test_deep_research_without_api():
     """Test deep_research tool initialization (without actual API call)"""
     result = await deep_research(
@@ -60,6 +63,8 @@ async def test_deep_research_without_api():
 
 
 @pytest.mark.asyncio
+@pytest.mark.api
+@pytest.mark.integration
 async def test_deep_research_invalid_api_key_graceful_error():
     """Test deep_research handles invalid API keys gracefully."""
     old_provider = os.environ.get("PROVIDER")
@@ -108,31 +113,32 @@ async def test_deep_research_invalid_api_key_graceful_error():
 
 
 @pytest.mark.asyncio
-async def test_research_with_context():
-    """Test the research_with_context tool"""
-    result = await research_with_context(
-        session_id="fake-session-id",
-        answers=["Answer 1", "Answer 2"],
-        system_instructions="Test instructions",
-        include_analysis=False,
-    )
+async def test_mcp_tool_schema_excludes_clarification():
+    """The public MCP contract contains only stateless research tools."""
+    tools = {tool.name: tool for tool in await mcp.list_tools()}
 
-    assert result is not None
-    assert isinstance(result, str)
-    # Should contain error about session not found or initialization failure
+    assert set(tools) == {"deep_research", "research_status"}
     assert (
-        "Session fake-session-id not found" in result
-        or "Failed to initialize research agent" in result
+        "request_clarification" not in tools["deep_research"].inputSchema["properties"]
     )
 
 
 @pytest.mark.asyncio
 async def test_stdio_server_initializes_and_exposes_tools():
     """Test stdio MCP handshake used by Claude Code."""
+    server_env = dict(os.environ)
+    server_env.update(
+        {
+            "PROVIDER": "dr-tulu",
+            "RESEARCH_PROVIDER": "dr-tulu",
+            "RESEARCH_MODEL": "dr-tulu",
+            "RESEARCH_BASE_URL": "http://127.0.0.1:18080",
+        }
+    )
     server = StdioServerParameters(
         command=sys.executable,
         args=["-m", "deep_research_mcp.mcp_server"],
-        env=dict(os.environ),
+        env=server_env,
         cwd=Path(__file__).resolve().parents[1],
     )
 
@@ -142,11 +148,13 @@ async def test_stdio_server_initializes_and_exposes_tools():
 
             tools = await session.list_tools()
             tool_names = {tool.name for tool in tools.tools}
-            assert {
-                "deep_research",
-                "research_status",
+            assert tool_names == {"deep_research", "research_status"}
+
+            removed_tool_result = await session.call_tool(
                 "research_with_context",
-            } <= tool_names
+                {"session_id": "removed", "answers": []},
+            )
+            assert removed_tool_result.isError is True
 
             result = await session.call_tool(
                 "research_status", {"task_id": "fake-task-id"}
@@ -157,10 +165,7 @@ async def test_stdio_server_initializes_and_exposes_tools():
                 item.text for item in (result.content or []) if hasattr(item, "text")
             ]
             rendered_text = "\n".join(text_items)
-            assert (
-                "Research agent not initialized" in rendered_text
-                or "Error checking status" in rendered_text
-            )
+            assert "status: unknown" in rendered_text
 
 
 def test_mcp_server_structure():
@@ -172,10 +177,9 @@ def test_mcp_server_structure():
     # Check that the exported functions are callable
     assert callable(deep_research)
     assert callable(research_status)
-    assert callable(research_with_context)
     assert callable(mcp_server.main)
 
     deep_research_signature = inspect.signature(deep_research)
-    research_with_context_signature = inspect.signature(research_with_context)
     assert "callback_url" in deep_research_signature.parameters
-    assert "callback_url" in research_with_context_signature.parameters
+    assert "request_clarification" not in deep_research_signature.parameters
+    assert not hasattr(mcp_server, "research_with_context")

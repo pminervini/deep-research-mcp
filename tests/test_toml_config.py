@@ -50,9 +50,9 @@ def test_load_merges_toml_with_environment_overrides(tmp_path):
     assert config.provider == "gemini"
     assert config.model == "env-model"
     assert config.timeout == 90.0
-    assert config.enable_clarification == True
-    assert config.triage_model == "file-triage"
-    assert config.clarifier_model == "env-clarifier"
+    assert not hasattr(config, "enable_clarification")
+    assert not hasattr(config, "triage_model")
+    assert not hasattr(config, "clarifier_model")
 
 
 def test_from_env_only_uses_explicit_environment_values():
@@ -63,89 +63,7 @@ def test_from_env_only_uses_explicit_environment_values():
 
     assert config.provider == "openai"
     assert config.model == "env-only-model"
-    assert config.enable_clarification == True
-
-
-def test_config_with_environment_variables():
-    """Test configuration loading from environment variables"""
-    # Clean environment first
-    env_vars = [
-        "RESEARCH_MODEL",
-        "ENABLE_CLARIFICATION",
-        "CLARIFICATION_TRIAGE_MODEL",
-        "CLARIFICATION_CLARIFIER_MODEL",
-        "CLARIFICATION_INSTRUCTION_BUILDER_MODEL",
-    ]
-    original_values = {}
-    for var in env_vars:
-        original_values[var] = os.environ.get(var)
-        if var in os.environ:
-            del os.environ[var]
-
-    try:
-        # Set test environment variables
-        os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
-        os.environ["ENABLE_CLARIFICATION"] = "true"
-        os.environ["CLARIFICATION_TRIAGE_MODEL"] = "gpt-5-mini"
-        os.environ["CLARIFICATION_CLARIFIER_MODEL"] = "gpt-5-mini"
-        os.environ["CLARIFICATION_INSTRUCTION_BUILDER_MODEL"] = "gpt-5-mini"
-
-        # Test config creation
-        config = ResearchConfig.from_env()
-
-        assert config.model == "gpt-5-mini"
-        assert config.enable_clarification == True
-        assert config.triage_model == "gpt-5-mini"
-        assert config.clarifier_model == "gpt-5-mini"
-        assert config.instruction_builder_model == "gpt-5-mini"
-
-    finally:
-        # Restore original environment
-        for var, value in original_values.items():
-            if value is not None:
-                os.environ[var] = value
-            elif var in os.environ:
-                del os.environ[var]
-
-
-def test_toml_boolean_parsing():
-    """Test that TOML boolean values are parsed correctly"""
-    # Clean environment
-    if "ENABLE_CLARIFICATION" in os.environ:
-        original_val = os.environ["ENABLE_CLARIFICATION"]
-    else:
-        original_val = None
-
-    if "RESEARCH_MODEL" in os.environ:
-        original_model = os.environ["RESEARCH_MODEL"]
-    else:
-        original_model = None
-
-    try:
-        os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
-
-        # Test various boolean representations
-        for bool_val in ["true", "True", "TRUE", "1", "yes", "Yes"]:
-            os.environ["ENABLE_CLARIFICATION"] = bool_val
-            config = ResearchConfig.from_env()
-            assert config.enable_clarification == True, f"Failed for value: {bool_val}"
-
-        for bool_val in ["false", "False", "FALSE", "0", "no", "No", ""]:
-            os.environ["ENABLE_CLARIFICATION"] = bool_val
-            config = ResearchConfig.from_env()
-            assert config.enable_clarification == False, f"Failed for value: {bool_val}"
-
-    finally:
-        # Restore environment
-        if original_val is not None:
-            os.environ["ENABLE_CLARIFICATION"] = original_val
-        elif "ENABLE_CLARIFICATION" in os.environ:
-            del os.environ["ENABLE_CLARIFICATION"]
-
-        if original_model is not None:
-            os.environ["RESEARCH_MODEL"] = original_model
-        elif "RESEARCH_MODEL" in os.environ:
-            del os.environ["RESEARCH_MODEL"]
+    assert not hasattr(config, "enable_clarification")
 
 
 def test_cancel_on_timeout_parsing():
@@ -185,10 +103,6 @@ def test_config_defaults():
     # Clean environment
     env_vars = [
         "RESEARCH_MODEL",
-        "ENABLE_CLARIFICATION",
-        "TRIAGE_MODEL",
-        "CLARIFIER_MODEL",
-        "INSTRUCTION_BUILDER_MODEL",
         "RESEARCH_TIMEOUT",
         "POLL_INTERVAL",
         "MAX_RETRIES",
@@ -207,10 +121,6 @@ def test_config_defaults():
 
         # Test defaults
         assert config.provider == "openai"
-        assert config.enable_clarification == False  # Default should be False
-        assert config.triage_model == "gpt-5-mini"  # Default
-        assert config.clarifier_model == "gpt-5-mini"  # Default
-        assert config.instruction_builder_model == "gpt-5-mini"  # Default
         assert config.timeout == 1800.0  # Default
         assert config.poll_interval == 30.0  # Default
         assert config.log_level == "INFO"

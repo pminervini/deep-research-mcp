@@ -53,14 +53,12 @@ pip install -e .
 
 ## Code Layout
 
-- `src/deep_research_mcp/agent.py`: orchestration layer; owns clarification, instruction building, callbacks, and delegates provider work to backends
+- `src/deep_research_mcp/agent.py`: orchestration layer; owns callbacks and delegates provider work to backends
 - `src/deep_research_mcp/backends/`: provider-specific implementations for OpenAI, Gemini, DR-Tulu, and Open Deep Research
 - `src/deep_research_mcp/mcp_server.py`: FastMCP server and tool entrypoints
-- `src/deep_research_mcp/clarification.py`: clarification agents, sessions, and enrichment flow
-- `src/deep_research_mcp/prompts/`: YAML prompt templates used by clarification and instruction building
 - `cli/deep-research-cli.py`: unified CLI for agent mode, MCP client mode, and configuration viewing
-- `cli/deep-research-tui.py`: interactive full-screen terminal UI for clarification, research, status checks, and saving output to disk
-- `tests/`: `pytest` suite covering configuration, MCP integration, prompts, results, and clarification flows
+- `cli/deep-research-tui.py`: interactive full-screen terminal UI for research, status checks, and saving output to disk
+- `tests/`: `pytest` suite covering configuration, MCP integration, results, and UI flows
 
 ## Configuration
 
@@ -84,15 +82,6 @@ base_url = "https://api.openai.com/v1"      # OpenAI: OpenAI-compatible endpoint
 timeout = 1800
 poll_interval = 30
 cancel_on_timeout = false  # When true, cancel the provider task if it exceeds timeout. Default false: the task keeps running and the result can be recovered with research_status
-
-# Largely based on https://cookbook.openai.com/examples/deep_research_api/introduction_to_deep_research_api_agents
-[clarification]                                       # Optional query clarification component
-enable = true
-triage_model = "gpt-5-mini"
-clarifier_model = "gpt-5-mini"
-instruction_builder_model = "gpt-5-mini"
-api_key = "YOUR_OPENAI_API_KEY"         # Optional, overrides api_key
-base_url = "https://api.openai.com/v1"  # Optional, overrides base_url
 
 [logging]
 level = "INFO"
@@ -393,7 +382,7 @@ export MCP_TOOL_TIMEOUT=14400000  # 4 hours
 claude --mcp-config ./.mcp.json
 ```
 
-Kick off work with `deep_research` or `research_with_context`, note the returned job ID, and call `research_status` to stream progress without letting any single tool call stagnate.
+Kick off work with `deep_research`, note the returned job ID, and call `research_status` to stream progress without letting any single tool call stagnate.
 
 Output size: Claude Code limits MCP tool output (about 25,000 tokens by default, configurable via `MAX_MCP_OUTPUT_TOKENS`). The research tools declare the `anthropic/maxResultSizeChars` annotation so recent Claude Code versions accept large reports without extra configuration; on older versions, raise the limit before launching the CLI:
 
@@ -407,7 +396,6 @@ Timeout recovery: if a research task exceeds the configured `timeout`, the serve
 2. **Use in Claude Code**:
    - The research tools will appear in Claude Code's tool palette
    - Simply ask Claude to "research [your topic]" and it will use the Deep Research agent
-   - For clarified research, ask Claude to "research [topic] with clarification" to get follow-up questions
 
 ### OpenAI Codex Integration
 
@@ -469,7 +457,6 @@ Without proper timeout configuration, long-running research queries may fail wit
 2. **Use in OpenAI Codex**:
    - The research tools will be available automatically when you start Codex
    - Ask Codex to "research [your topic]" and it will use the Deep Research MCP server
-   - For clarified research, ask for "research [topic] with clarification"
 
 ### Gemini CLI Integration
 
@@ -579,16 +566,18 @@ precedence over both the TOML file and environment variables.
 
 The repository also ships with a full-screen terminal UI at
 `cli/deep-research-tui.py`. It presents the same core functionality as the
-CLI in a dark, keyboard-driven interface for running clarification, deep
-research, task status checks, and saving output to disk.
+CLI in a dark, keyboard-driven interface for running deep research, task status
+checks, and saving output to disk.
 
 ![Deep Research TUI Demo](docs/images/tui-demo.gif)
 
 The TUI features a split-panel layout:
 - **Left panel**: Configuration controls for mode selection (Agent/MCP), provider settings, model configuration, query input, and system prompt
-- **Right panel**: Output display showing research results, clarification questions, or status information
+- **Right panel**: Output display showing research results or status information
 
-The animation above demonstrates the TUI workflow: selecting the Chat Completions API style, entering a research query about nuclear fusion, running the research, viewing results in the output panel, and saving the output to file.
+The animation above demonstrates the TUI workflow: loading a research query,
+running it through a local Dr Tulu-compatible demo endpoint, viewing the result
+in the output panel, and saving the output to a file.
 
 #### Quick Start
 
@@ -613,8 +602,8 @@ uv run python cli/deep-research-tui.py --provider gemini
 - Use `Left` / `Right` to toggle booleans and cycle through choice fields when a `Switch` or `Select` has focus.
 - Press `Enter` to activate buttons, toggle switches, cycle selects, or move forward from a single-line input.
 - `TextArea` widgets such as `Query` and `System Prompt` keep normal cursor-key editing behavior.
-- Use `c` to run clarification, `r` to run deep research, `t` to check task status, `s` to save the current output, and `q` to quit.
-- The right panel shows the latest clarification output, research report, or status response.
+- Use `r` to run deep research, `t` to check task status, `s` to save the current output, and `q` to quit.
+- The right panel shows the latest research report or status response.
 
 #### Provider Defaults
 
@@ -629,11 +618,8 @@ In `agent` mode, the TUI applies provider-aware defaults:
 Switching provider or OpenAI API style automatically refreshes the model and
 base URL defaults. You can still override those fields manually afterward.
 
-#### Clarification, Research, and Saving Output
+#### Research and Saving Output
 
-- In `agent` mode, `Run Clarification` calls the clarification flow directly through `DeepResearchAgent`.
-- In `mcp` mode, `Run Clarification` calls the MCP `deep_research` tool with `request_clarification=true`.
-- If clarification questions are returned, the TUI adds answer fields dynamically and uses those answers on the next research run.
 - `Run Deep Research` executes either the direct agent flow or the MCP client flow, depending on the selected mode.
 - `Save Output` writes the current contents of the output panel to the configured path, creating parent directories if needed.
 
@@ -812,48 +798,6 @@ Execution time: 14.33s
 ok
 ```
 
-Interactive clarification with Ollama needs the clarification models pinned to
-the same local endpoint. In testing, `qwen3.5:4b` worked for clarification,
-while `qwen3.5:0.8b` was too small to reliably satisfy the structured triage
-step.
-
-```bash
-uv run python cli/deep-research-cli.py \
-  --provider openai \
-  --api-style chat_completions \
-  --base-url http://localhost:11434/v1 \
-  --api-key test \
-  --model qwen3.5:0.8b \
-  --clarification-base-url http://localhost:11434/v1 \
-  --clarification-api-key test \
-  --triage-model qwen3.5:4b \
-  --clarifier-model qwen3.5:4b \
-  --instruction-builder-model qwen3.5:4b \
-  --timeout 180 \
-  research "best laptop" --clarify
-```
-
-Observed interaction:
-
-```text
-Starting clarification process...
-
-Please answer the following clarifying questions:
-
-1. What is your budget range?
-Your answer (or press Enter to skip): Under $1500
-
-2. What will you primarily use the laptop for (gaming, work, students, creative tasks)?
-Your answer (or press Enter to skip): Programming and general work
-
-3. Do you have a preferred operating system (macOS, Windows,)?
-Your answer (or press Enter to skip): macOS preferred, Windows acceptable
-
-...
-
-Enriched query: What are the best laptops under $1500 for professional programming work, preferably macOS with 16GB RAM, 512GB SSD, 13-15 inch display, and good battery life?
-```
-
 ##### llama-server
 
 Start a local OpenAI-compatible server and let it download a small GGUF model
@@ -894,57 +838,6 @@ Total steps: 1
 Execution time: 0.15s
 
 Ok
-```
-
-`--clarify` is model-sensitive on `llama-server`. Small tested models
-(`qwen2.5-0.5b` and `qwen2.5-3b`) completed the basic `research` command but
-did not reliably ask follow-up questions. Example output with
-`qwen2.5-3b`:
-
-```text
-Starting clarification process...
-Triage assessment: The query is focused on finding the best laptop, which is a common and specific research topic.
-Assessment: The query 'best laptop' is clear and specific enough for direct research.
-Proceeding with original query
-```
-
-**`research QUERY --clarify`** -- interactive clarification before research.
-
-The `--clarify` flag runs an interactive clarification flow: the agent
-analyzes your query, asks follow-up questions to improve specificity, and
-then performs research using an enriched query. This works in both agent mode
-and MCP client mode.
-
-In agent mode, `--clarify` automatically enables the clarification pipeline
-regardless of the `enable_clarification` setting in your config file.
-
-```bash
-# Interactive clarification (agent mode)
-uv run python cli/deep-research-cli.py research "Quantum computing applications" --clarify
-
-# Interactive clarification (MCP client mode)
-uv run python cli/deep-research-cli.py research "Quantum computing" --clarify \
-  --server-url http://localhost:8080/mcp
-```
-
-Example session:
-
-```
-Starting clarification process...
-
-Please answer the following clarifying questions:
-
-1. Are you interested in near-term applications or long-term theoretical possibilities?
-Your answer (or press Enter to skip): Near-term commercial applications
-
-2. Which industries are you most interested in?
-Your answer (or press Enter to skip): Finance and pharmaceuticals
-
-3. Should the report focus on specific hardware platforms?
-Your answer (or press Enter to skip):
-
-Enriched query: Quantum computing applications in finance and pharmaceuticals...
-Starting research with query: '...'
 ```
 
 **`research QUERY --server-url URL`** -- use MCP client mode.
@@ -1010,13 +903,7 @@ corresponding `ResearchConfig` field:
 | `--timeout SECONDS` | Max research timeout |
 | `--poll-interval SECONDS` | Task poll interval |
 | `--log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}` | Logging level |
-| `--enable-clarification` | Enable the clarification pipeline |
 | `--enable-reasoning-summaries` | Enable reasoning summaries |
-| `--triage-model MODEL` | Model for query triage |
-| `--clarifier-model MODEL` | Model for query enrichment |
-| `--clarification-base-url URL` | Base URL for clarification models |
-| `--clarification-api-key KEY` | API key for clarification models |
-| `--instruction-builder-model MODEL` | Model for instruction building |
 
 Configuration precedence (highest to lowest): CLI flags > environment
 variables > TOML config file (`~/.deep_research`) > built-in defaults.
@@ -1054,69 +941,7 @@ result = await agent.research(
     Include specific examples and data where available.
     """
 )
-
-# With clarification (requires ENABLE_CLARIFICATION=true)
-clarification_result = agent.start_clarification("quantum computing applications")
-if clarification_result.get("needs_clarification"):
-    # Answer questions programmatically or present to user
-    answers = ["Hardware applications", "Last 5 years", "Commercial products"]
-    agent.add_clarification_answers(clarification_result["session_id"], answers)
-    enriched_query = agent.get_enriched_query(clarification_result["session_id"])
-    result = await agent.research(enriched_query)
 ```
-
-## Clarification Features
-
-The agent includes an optional clarification system to improve research quality through follow-up questions.
-
-### Configuration
-
-Enable clarification in your `~/.deep_research` file:
-```toml
-[clarification]
-enable_clarification = true
-triage_model = "gpt-5-mini"                                    # Optional, defaults to gpt-5-mini
-clarifier_model = "gpt-5-mini"                                 # Optional, defaults to gpt-5-mini
-instruction_builder_model = "gpt-5-mini"                       # Optional, defaults to gpt-5-mini
-clarification_api_key = "YOUR_CLARIFICATION_API_KEY"           # Optional custom API key for clarification models
-clarification_base_url = "https://custom-api.example.com/v1"   # Optional custom endpoint for clarification models
-```
-
-Clarification and instruction-building remain OpenAI-compatible chat flows. If your main research provider is `dr-tulu`, `gemini`, or `open-deep-research`, set `clarification_api_key` / `clarification_base_url` explicitly, or provide `OPENAI_API_KEY` / `OPENAI_BASE_URL` in the environment for those helper models.
-
-### Usage Flow
-
-1. **Start Clarification**:
-   ```python
-   result = agent.start_clarification("your research query")
-   ```
-
-2. **Check if Questions are Needed**:
-   ```python
-   if result.get("needs_clarification"):
-       questions = result["questions"]
-       session_id = result["session_id"]
-   ```
-
-3. **Provide Answers**:
-   ```python
-   answers = ["answer1", "answer2", "answer3"]
-   agent.add_clarification_answers(session_id, answers)
-   ```
-
-4. **Get Enriched Query**:
-   ```python
-   enriched_query = agent.get_enriched_query(session_id)
-   final_result = await agent.research(enriched_query)
-   ```
-
-### Integration with AI Assistants
-
-When using with AI Assistants via MCP tools:
-
-1. **Request Clarification**: Use `deep_research()` with `request_clarification=True`
-2. **Answer Questions**: The AI Assistant will present questions to you
-3. **Deep Research**: The AI Asssitant will automatically use `research_with_context()` with your answers
 
 ## API Reference
 
@@ -1135,18 +960,6 @@ The main class for performing research operations.
   - Check the status of a research task
   - Returns: Task status information
 
-- `start_clarification(query)`
-  - Analyze query and generate clarifying questions if needed
-  - Returns: Dictionary with questions and session ID
-
-- `add_clarification_answers(session_id, answers)`
-  - Add answers to clarification questions
-  - Returns: Session status information
-
-- `get_enriched_query(session_id)`
-  - Generate enriched query from clarification session
-  - Returns: Enhanced query string
-
 ### ResearchConfig
 
 Configuration class for the research agent.
@@ -1164,11 +977,6 @@ Configuration class for the research agent.
 - `base_url`: Provider API base URL (optional). Defaults to `https://api.openai.com/v1` for `openai`, `http://localhost:8080/` for `dr-tulu`, `https://generativelanguage.googleapis.com` for `gemini`, and `http://localhost:1234/v1` for `open-deep-research`.
 - `timeout`: Maximum time for research in seconds (default: 1800)
 - `poll_interval`: Polling interval in seconds (default: 30)
-- `enable_clarification`: Enable clarifying questions (default: False)
-- `triage_model`: Model for query analysis (default: `gpt-5-mini`)
-- `clarifier_model`: Model for query enrichment (default: `gpt-5-mini`)
-- `clarification_api_key`: Custom API key for clarification models (optional; defaults to the main OpenAI credentials when `provider=openai`, otherwise falls back to env `OPENAI_API_KEY` if present)
-- `clarification_base_url`: Custom OpenAI-compatible endpoint for clarification models (optional; defaults to the main OpenAI endpoint when `provider=openai`, otherwise falls back to env `OPENAI_BASE_URL` if present)
 
 ## Development
 

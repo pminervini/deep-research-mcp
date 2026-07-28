@@ -4,12 +4,11 @@
 Deep Research MCP - OpenAI Deep Research Integration for Claude Code
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from deep_research_mcp.agent import DeepResearchAgent
 from deep_research_mcp.config import ResearchConfig
 from deep_research_mcp.errors import ResearchError, TaskTimeoutError
-from deep_research_mcp.prompts import PromptManager
 from deep_research_mcp.results import (
     ResearchCitation,
     ResearchResult,
@@ -24,5 +23,4 @@ __all__ = [
     "ResearchResult",
     "ResearchTaskStatus",
     "TaskTimeoutError",
-    "PromptManager",
 ]
