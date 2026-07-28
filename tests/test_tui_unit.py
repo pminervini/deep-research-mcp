@@ -28,6 +28,15 @@ def test_provider_defaults_for_openai_chat_completions():
     assert defaults.base_url == "https://api.openai.com/v1"
 
 
+def test_provider_defaults_for_openai_responses():
+    defaults = TUI.get_provider_defaults("openai", "responses")
+
+    assert defaults.provider == "openai"
+    assert defaults.api_style == "responses"
+    assert defaults.model == "gpt-5.6-sol"
+    assert defaults.base_url == "https://api.openai.com/v1"
+
+
 def test_provider_defaults_for_dr_tulu():
     defaults = TUI.get_provider_defaults("dr-tulu", "responses")
 

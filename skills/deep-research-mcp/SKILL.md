@@ -1,6 +1,6 @@
 ---
 name: deep-research-mcp
-description: Use this guide only for the `deep-research-mcp` repository/project when you need to run, integrate, or debug its CLI, Python API, or MCP server. It covers this repo's direct agent execution, provider/backend selection, OpenAI Responses with o4-mini-deep-research, Gemini Deep Research, DR-Tulu integration requirements, clarification workflows, status polling, and HTTP or stdio MCP usage. Do not use it for Deep Research systems in general, for unrelated MCP servers, or for the Textual TUI.
+description: Use this guide only for the `deep-research-mcp` repository/project when you need to run, integrate, or debug its CLI, Python API, or MCP server. It covers this repo's direct agent execution, provider/backend selection, OpenAI Responses with GPT-5.6 Sol, Gemini Deep Research, DR-Tulu integration requirements, clarification workflows, status polling, and HTTP or stdio MCP usage. Do not use it for Deep Research systems in general, for unrelated MCP servers, or for the Textual TUI.
 ---
 
 # Deep Research MCP
@@ -105,7 +105,7 @@ DR-Tulu:
 
 | Provider | Backend module | How research is executed | Status polling | Notes |
 | --- | --- | --- | --- | --- |
-| `openai` + `api_style=responses` | `openai_backend.py` | OpenAI Responses API in background mode with `web_search_preview`, optionally `code_interpreter` | Yes | Best match for `o4-mini-deep-research-*` |
+| `openai` + `api_style=responses` | `openai_backend.py` | OpenAI Responses API in background mode with GPT-5.6 Sol, `web_search`, and optionally `code_interpreter` | Yes | Default deep-research path |
 | `openai` + `api_style=chat_completions` | `openai_backend.py` | One-shot Chat Completions call | No persistent status | Useful for OpenAI-compatible providers like Perplexity, Groq, Ollama, vLLM |
 | `gemini` | `gemini_backend.py` | Gemini Interactions API with `background=True` | Yes | Uses `google-genai`; `include_analysis` is ignored by the backend |
 | `dr-tulu` | `dr_tulu_backend.py` | `POST {base_url}/chat` | No | Requires a separately running DR-Tulu service |
@@ -153,7 +153,7 @@ Safe pattern when switching providers from the command line:
 uv run python cli/deep-research-cli.py \
   --provider openai \
   --api-style responses \
-  --model o4-mini-deep-research-2025-06-26 \
+  --model gpt-5.6-sol \
   --api-key "$OPENAI_API_KEY" \
   --base-url https://api.openai.com/v1 \
   research "..."
@@ -167,7 +167,7 @@ uv run python cli/deep-research-cli.py \
 [research]
 provider = "openai"
 api_style = "responses"
-model = "o4-mini-deep-research-2025-06-26"
+model = "gpt-5.6-sol"
 api_key = "YOUR_OPENAI_API_KEY"
 base_url = "https://api.openai.com/v1"
 timeout = 1800
@@ -216,7 +216,7 @@ uv run python cli/deep-research-cli.py research "Your research query"
 uv run python cli/deep-research-cli.py \
   --provider openai \
   --api-style responses \
-  --model o4-mini-deep-research-2025-06-26 \
+  --model gpt-5.6-sol \
   --api-key "$OPENAI_API_KEY" \
   --base-url https://api.openai.com/v1 \
   --timeout 900 \
@@ -250,7 +250,7 @@ OPENAI_API_KEY="$OPENAI_API_KEY" \
 uv run python cli/deep-research-cli.py \
   --provider openai \
   --api-style responses \
-  --model o4-mini-deep-research-2025-06-26 \
+  --model gpt-5.6-sol \
   --api-key "$OPENAI_API_KEY" \
   --base-url https://api.openai.com/v1 \
   --timeout 900 \
@@ -407,7 +407,7 @@ async def main() -> None:
     config = ResearchConfig(
         provider="openai",
         api_style="responses",
-        model="o4-mini-deep-research-2025-06-26",
+        model="gpt-5.6-sol",
         api_key="YOUR_OPENAI_API_KEY",
         base_url="https://api.openai.com/v1",
         timeout=900,
@@ -757,9 +757,12 @@ Important behavior:
 - Implemented in `src/deep_research_mcp/backends/openai_backend.py`
 - Uses `client.responses.create(..., background=True)`
 - Polls with `client.responses.retrieve(task_id)`
-- Adds `web_search_preview`
+- Uses `web_search` for Responses models
+- Uses an unlimited returned-token budget for supported GPT-5 reasoning models
 - Adds `code_interpreter` only when `include_code_interpreter=True`
-- `enable_reasoning_summaries=True` adds `reasoning={"summary": "auto"}`
+- Omits `code_interpreter` for legacy Pro models that do not support it
+- Uses `xhigh` reasoning effort for GPT-5.2+ research models and `high` for earlier GPT-5 models
+- `enable_reasoning_summaries=True` adds `summary="auto"` to the reasoning settings
 
 Use this when you want:
 
@@ -904,7 +907,7 @@ OPENAI_API_KEY="$OPENAI_API_KEY" \
 uv run python cli/deep-research-cli.py \
   --provider openai \
   --api-style responses \
-  --model o4-mini-deep-research-2025-06-26 \
+  --model gpt-5.6-sol \
   --api-key "$OPENAI_API_KEY" \
   --base-url https://api.openai.com/v1 \
   research "Your query"

@@ -15,7 +15,7 @@ A Python-based agent that integrates research providers with Claude Code through
 - Python 3.11+
 - [uv](https://docs.astral.sh/uv/) installed
 - One of:
-  - OpenAI API access (Responses API models, e.g., `o4-mini-deep-research-2025-06-26`)
+  - OpenAI API access (Responses API model `gpt-5.6-sol`)
   - Gemini API access with the Interactions API / Deep Research agent enabled
   - DR-Tulu service running locally or remotely (see [DR-Tulu setup](#dr-tulu-provider-example))
   - Open Deep Research dependencies (installed via `uv sync --extra open-deep-research`)
@@ -76,7 +76,7 @@ Common settings:
 [research]                                  # Core Deep Research functionality
 provider = "openai"                         # Available options: "openai", "dr-tulu", "gemini", "open-deep-research" -- defaults to "openai"
 api_style = "responses"                     # Only applies to provider="openai"; use "chat_completions" for Perplexity, Groq, Ollama, etc.
-model = "o4-mini-deep-research-2025-06-26"  # OpenAI: model identifier; Dr Tulu: logical provider id; Gemini: agent id; ODR: LiteLLM model identifier
+model = "gpt-5.6-sol"                       # OpenAI: model identifier; Dr Tulu: logical provider id; Gemini: agent id; ODR: LiteLLM model identifier
 api_key = "your-api-key"                    # API key, optional
 base_url = "https://api.openai.com/v1"      # OpenAI: OpenAI-compatible endpoint; Dr Tulu: service base URL; Gemini: https://generativelanguage.googleapis.com; ODR: LiteLLM-compatible endpoint
 
@@ -105,7 +105,7 @@ OpenAI provider example:
 ```toml
 [research]
 provider = "openai"
-model = "o4-mini-deep-research-2025-06-26"  # OpenAI model
+model = "gpt-5.6-sol"                       # OpenAI model
 api_key = "YOUR_OPENAI_API_KEY"             # Defaults to OPENAI_API_KEY
 base_url = "https://api.openai.com/v1"      # OpenAI-compatible endpoint
 timeout = 1800
@@ -620,7 +620,7 @@ uv run python cli/deep-research-tui.py --provider gemini
 
 In `agent` mode, the TUI applies provider-aware defaults:
 
-- `openai` + `responses`: model `o4-mini-deep-research-2025-06-26`, base URL `https://api.openai.com/v1`
+- `openai` + `responses`: model `gpt-5.6-sol`, base URL `https://api.openai.com/v1`
 - `openai` + `chat_completions`: model `gpt-5-mini`, base URL `https://api.openai.com/v1`
 - `dr-tulu`: model `dr-tulu`, base URL `http://localhost:8080/`
 - `gemini`: model `deep-research-preview-04-2026`, base URL `https://generativelanguage.googleapis.com`
@@ -676,12 +676,12 @@ Execution time: 245.94s
     Gross Domestic Product (GDP) exceeding $1.03 trillion ...
 ```
 
-**OpenAI o4-mini-deep-research:**
+**OpenAI GPT-5.6 Sol research:**
 
 ```bash
 uv run python cli/deep-research-cli.py \
   --provider openai \
-  --model o4-mini-deep-research-2025-06-26 \
+  --model gpt-5.6-sol \
   --base-url https://api.openai.com/v1 \
   research "What is the capital of France?"
 ```

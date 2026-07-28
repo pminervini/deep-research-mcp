@@ -132,7 +132,7 @@ def get_provider_defaults(
         return ProviderDefaults(
             provider=provider,
             api_style="responses",
-            model="o4-mini-deep-research-2025-06-26",
+            model="gpt-5.6-sol",
             base_url="https://api.openai.com/v1",
         )
     if provider == "dr-tulu":

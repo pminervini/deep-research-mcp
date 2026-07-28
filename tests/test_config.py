@@ -254,6 +254,19 @@ def test_api_style_defaults_to_responses():
     assert config.api_style == "responses"
 
 
+def test_openai_responses_default_model():
+    """Test that OpenAI Responses defaults to the supported research model."""
+    config = ResearchConfig.from_env(
+        {
+            "RESEARCH_PROVIDER": "openai",
+            "RESEARCH_API_STYLE": "responses",
+            "OPENAI_API_KEY": "sk-test",
+        }
+    )
+
+    assert config.model == "gpt-5.6-sol"
+
+
 def test_api_style_from_env():
     """Test loading api_style from RESEARCH_API_STYLE env var"""
     old_api_style = os.environ.get("RESEARCH_API_STYLE")

@@ -24,7 +24,7 @@ DEFAULT_CONFIG_PATH = Path.home() / ".deep_research"
 # extra base-URL settings). The openai default model also depends on api_style.
 _PROVIDER_DEFAULTS: dict[str, tuple[str, str, tuple[str, ...], tuple[str, ...]]] = {
     "openai": (
-        "o4-mini-deep-research-2025-06-26",
+        "gpt-5.6-sol",
         "https://api.openai.com/v1",
         ("OPENAI_API_KEY",),
         ("OPENAI_BASE_URL",),
@@ -114,7 +114,7 @@ class ResearchConfig:
     api_key: str | None = None
     base_url: str | None = None
     provider: str = "openai"
-    model: str = "o4-mini-deep-research-2025-06-26"
+    model: str = "gpt-5.6-sol"
     api_style: str = "responses"
     timeout: float = 1800.0
     poll_interval: float = 30.0

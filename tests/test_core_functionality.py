@@ -225,6 +225,96 @@ def test_openai_extract_results_dedupes_citations_and_joins_blocks():
     ]
 
 
+@pytest.mark.parametrize(
+    ("model", "effort"),
+    [
+        ("gpt-5", "high"),
+        ("gpt-5-mini", "high"),
+        ("gpt-5-pro", "high"),
+        ("gpt-5.1", "high"),
+        ("gpt-5.2", "xhigh"),
+        ("gpt-5.4", "xhigh"),
+        ("gpt-5.4-mini", "xhigh"),
+        ("gpt-5.4-pro", "xhigh"),
+        ("gpt-5.5", "xhigh"),
+        ("gpt-5.5-pro", "xhigh"),
+        ("gpt-5.6", "xhigh"),
+        ("gpt-5.6-sol", "xhigh"),
+        ("gpt-5.6-terra", "xhigh"),
+        ("gpt-5.6-luna", "xhigh"),
+    ],
+)
+def test_openai_gpt5_builds_long_research_request(model, effort):
+    """Supported GPT-5 reasoning models use the long-research request shape."""
+    backend = object.__new__(OpenAIResearchBackend)
+    backend.config = SimpleNamespace(
+        model=model,
+        enable_reasoning_summaries=True,
+    )
+    input_messages = [{"role": "user", "content": "Research test"}]
+
+    # pylint: disable=protected-access
+    tools = backend._build_tools(include_code_interpreter=False)
+    kwargs = backend._build_responses_create_kwargs(input_messages, tools)
+
+    assert tools == [
+        {
+            "type": "web_search",
+            "return_token_budget": "unlimited",
+        }
+    ]
+    assert kwargs == {
+        "model": model,
+        "input": input_messages,
+        "tools": tools,
+        "background": True,
+        "tool_choice": "required",
+        "reasoning": {
+            "effort": effort,
+            "summary": "auto",
+        },
+    }
+
+
+@pytest.mark.parametrize("model", ["gpt-5-pro", "gpt-5.4-pro"])
+def test_openai_pro_model_omits_unsupported_code_interpreter(model):
+    """Legacy Pro models without Code Interpreter still receive web research."""
+    backend = object.__new__(OpenAIResearchBackend)
+    backend.config = SimpleNamespace(model=model)
+
+    # pylint: disable=protected-access
+    tools = backend._build_tools(include_code_interpreter=True)
+
+    assert tools == [
+        {
+            "type": "web_search",
+            "return_token_budget": "unlimited",
+        }
+    ]
+
+
+def test_openai_custom_model_uses_current_web_search_without_gpt5_options():
+    """Unknown model overrides avoid GPT-5-only search and reasoning options."""
+    backend = object.__new__(OpenAIResearchBackend)
+    backend.config = SimpleNamespace(
+        model="custom-research-model",
+        enable_reasoning_summaries=False,
+    )
+    input_messages = [{"role": "user", "content": "Research test"}]
+
+    # pylint: disable=protected-access
+    tools = backend._build_tools(include_code_interpreter=False)
+    kwargs = backend._build_responses_create_kwargs(input_messages, tools)
+
+    assert tools == [{"type": "web_search"}]
+    assert kwargs == {
+        "model": "custom-research-model",
+        "input": input_messages,
+        "tools": tools,
+        "background": True,
+    }
+
+
 def test_render_citations_avoids_duplicating_url_only_titles():
     """Citations without a real title render the URL once, not as [url](url)."""
     from deep_research_mcp.mcp_server import _render_citations

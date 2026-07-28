@@ -32,6 +32,15 @@ from deep_research_mcp.results import (
 
 from .base import ResearchBackend, TaskStartedCallback
 
+GPT_5_RESEARCH_MODEL_PATTERN = re.compile(
+    r"^gpt-5(?:\.(?P<minor>\d+))?"
+    r"(?:-(?:sol|terra|luna|mini|nano|pro))?"
+    r"(?:-\d{4}-\d{2}-\d{2})?$"
+)
+GPT_5_PRO_WITHOUT_CODE_INTERPRETER_PATTERN = re.compile(
+    r"^gpt-5(?:\.4)?-pro(?:-\d{4}-\d{2}-\d{2})?$"
+)
+
 
 class OpenAIResearchBackend(ResearchBackend):
     """OpenAI-backed deep research implementation."""
@@ -123,8 +132,13 @@ class OpenAIResearchBackend(ResearchBackend):
 
     def _build_tools(self, include_code_interpreter: bool) -> list[dict[str, Any]]:
         """Build Responses API tool configuration."""
-        tools: list[dict[str, Any]] = [{"type": "web_search_preview"}]
-        if include_code_interpreter:
+        web_search_tool: dict[str, Any] = {"type": "web_search"}
+        if self._gpt_5_research_effort():
+            web_search_tool["return_token_budget"] = "unlimited"
+        tools: list[dict[str, Any]] = [web_search_tool]
+        if include_code_interpreter and not (
+            GPT_5_PRO_WITHOUT_CODE_INTERPRETER_PATTERN.fullmatch(self.config.model)
+        ):
             tools.append(
                 {
                     "type": "code_interpreter",
@@ -132,6 +146,14 @@ class OpenAIResearchBackend(ResearchBackend):
                 }
             )
         return tools
+
+    def _gpt_5_research_effort(self) -> str | None:
+        """Return the deep-research effort supported by a GPT-5 reasoning model."""
+        match = GPT_5_RESEARCH_MODEL_PATTERN.fullmatch(self.config.model)
+        if not match:
+            return None
+        minor = match.group("minor")
+        return "xhigh" if minor is not None and int(minor) >= 2 else "high"
 
     async def _run_chat_completions_research(
         self,
@@ -260,8 +282,15 @@ class OpenAIResearchBackend(ResearchBackend):
             "tools": tools,
             "background": True,
         }
+        reasoning: dict[str, str] = {}
+        research_effort = self._gpt_5_research_effort()
+        if research_effort:
+            kwargs["tool_choice"] = "required"
+            reasoning["effort"] = research_effort
         if self.config.enable_reasoning_summaries:
-            kwargs["reasoning"] = {"summary": "auto"}
+            reasoning["summary"] = "auto"
+        if reasoning:
+            kwargs["reasoning"] = reasoning
         return kwargs
 
     @retry(
