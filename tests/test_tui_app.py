@@ -46,6 +46,12 @@ async def test_provider_change_updates_model_and_base_url():
             == "https://generativelanguage.googleapis.com"
         )
 
+        app.query_one("#provider", Select).value = "openai-codex"
+        await pilot.pause()
+
+        assert app.query_one("#model", Input).value == "auto"
+        assert app.query_one("#base-url", Input).disabled
+
 
 @pytest.mark.asyncio
 async def test_initial_focus_and_arrow_navigation_work_for_form_controls():

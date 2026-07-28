@@ -11,6 +11,7 @@ requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [{ name = "Deep Research MCP Contributors" }]
 dependencies = [
+    "filelock>=3.20.0,<4",
     "google-genai>=2.2.0",
     "httpx>=0.25.0",
     # Stay on stable v1 until we deliberately migrate across v2's breaking changes.

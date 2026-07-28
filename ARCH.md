@@ -35,6 +35,8 @@ graph TD
         P2[gemini_backend.py]
         P3[dr_tulu_backend.py]
         P4[open_deep_research_backend.py]
+        P5[codex_backend.py]
+        CA[codex_auth.py]
     end
 
     subgraph External Services
@@ -43,6 +45,8 @@ graph TD
         H3[Gemini Interactions API Deep Research]
         H4[DR-Tulu /chat endpoint]
         M[Open Deep Research smolagents + text browser]
+        H5[ChatGPT Codex private Responses endpoint]
+        OA[OpenAI OAuth device flow]
     end
 
     A -- "Makes tool calls deep_research, research_status" --> B
@@ -55,11 +59,15 @@ graph TD
     P --> P2
     P --> P3
     P --> P4
+    P --> P5
     P1 -- "Makes API calls to" --> H
     P1 -- "Makes API calls to" --> H2
     P2 -- "Makes API calls to" --> H3
     P3 -- "Makes API calls to" --> H4
     P4 -- "Orchestrates agents via" --> M
+    P5 -- "Streams research from" --> H5
+    P5 -- "Loads/refreshes credentials with" --> CA
+    CA -- "Authenticates through" --> OA
 ```
 
 ## Component Descriptions
@@ -79,6 +87,8 @@ The project is composed of four main layers:
     *   `backends/gemini_backend.py` implements Gemini Deep Research over the Interactions API, including polling and result normalization.
     *   `backends/dr_tulu_backend.py` implements the DR-Tulu research agent integration via Allen AI's `/chat` endpoint.
     *   `backends/open_deep_research_backend.py` implements the Open Deep Research integration with smolagents and text-browser tooling.
+    *   `backends/codex_backend.py` implements experimental ChatGPT subscription access through the private Codex Responses stream.
+    *   `codex_auth.py` owns the separate device-code session, optional access-token-only Codex import, atomic token rotation, and local logout.
 
 4.  **External Services**: This layer represents the external systems used:
     * Provider `openai` with `api_style = "responses"` (default): OpenAI Responses API with web search and code interpreter tools.
@@ -86,6 +96,7 @@ The project is composed of four main layers:
     * Provider `gemini`: Gemini Deep Research agent over the Interactions API. Background execution and polling are required; built-in Google Search and URL context are provided by Gemini.
     * Provider `dr-tulu`: Allen AI's DR-Tulu research agent accessed via its `/chat` endpoint. A lightweight integration that delegates research to a separately hosted DR-Tulu service.
     * Provider `open-deep-research`: smolagents stack with a text browser and search tools; optional OpenAI-compatible LLM endpoint via LiteLLM.
+    * Provider `openai-codex`: account-scoped model discovery followed by a synchronous SSE Responses request with native web search. Code Interpreter, background polling, cancellation, task recovery, and endpoint overrides are intentionally unsupported.
 
 ## File-by-File Breakdown
 
@@ -124,6 +135,24 @@ The project is composed of four main layers:
     -   `_extract_chat_completions_results()`: Parses Chat Completions response into the standard output dict.
     -   `_extract_chat_completions_citations()`: Multi-layer citation extraction (Perplexity-style, annotation-based, regex fallback).
     -   `get_task_status()`: Returns OpenAI task status or an `unknown` status for Chat Completions mode.
+
+### `src/deep_research_mcp/backends/codex_backend.py`
+
+-   **Purpose**: Isolates the undocumented ChatGPT Codex endpoint from the public OpenAI API backend.
+-   **Key Functionality**:
+    -   Fetches the signed-in account's ordered `/models` catalogue and resolves `model = "auto"`.
+    -   Sends an honestly identified, web-search-enabled `/responses` request and assembles raw SSE deltas, annotations, searches, and terminal status.
+    -   Retries once after a pre-stream `401`, but never retries a partially consumed stream.
+    -   Returns `unknown` for task status because streamed results cannot be recovered.
+
+### `src/deep_research_mcp/codex_auth.py`
+
+-   **Purpose**: Manages the independent OpenAI Codex subscription OAuth session.
+-   **Key Functionality**:
+    -   Runs the Codex device-code flow and refreshes rotating tokens under a cross-process file lock.
+    -   Stores credentials atomically in `~/.deep_research_auth.json` with owner-only permissions.
+    -   Optionally imports only the current access token from `${CODEX_HOME:-~/.codex}/auth.json`, preventing refresh-token conflicts with Codex.
+    -   Provides status and local logout operations used by the unified CLI.
 
 ### `src/deep_research_mcp/backends/gemini_backend.py`
 
@@ -190,12 +219,12 @@ The MCP server exposes two tools to clients like Claude Code. Each tool accepts 
 
 ### `deep_research()`
 
-**Purpose**: Performs autonomous deep research using the configured provider (OpenAI Responses API, Gemini Deep Research, DR-Tulu, or Open Deep Research).
+**Purpose**: Performs autonomous deep research using the configured provider (OpenAI Responses API, experimental OpenAI Codex subscription access, Gemini Deep Research, DR-Tulu, or Open Deep Research).
 
 **Arguments**:
 - `query` (string, required): Complete research question, including any user-provided context needed to answer it
 - `system_instructions` (string, optional): Custom research approach instructions
-- `include_analysis` (boolean, optional, default=True): Enable code execution for data analysis and visualizations  
+- `include_analysis` (boolean, optional, default=True): Enable code execution when the selected provider supports it
 - `callback_url` (string, optional): Webhook URL notified with a completion payload after research finishes
 
 **Returns**: String containing formatted markdown report

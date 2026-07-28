@@ -47,3 +47,21 @@ def test_removed_clarification_flags_are_rejected(arguments: list[str]) -> None:
         parser.parse_args(arguments)
 
     assert error.value.code == 2
+
+
+def test_codex_provider_and_auth_commands_are_exposed() -> None:
+    parser = load_cli_module().build_parser()
+
+    provider_args = parser.parse_args(
+        ["--provider", "openai-codex", "research", "test query"]
+    )
+    login_args = parser.parse_args(["auth", "login", "--import-codex", "--force"])
+    status_args = parser.parse_args(["auth", "status"])
+    logout_args = parser.parse_args(["auth", "logout"])
+
+    assert provider_args.provider == "openai-codex"
+    assert login_args.auth_action == "login"
+    assert login_args.import_codex is True
+    assert login_args.force is True
+    assert status_args.auth_action == "status"
+    assert logout_args.auth_action == "logout"

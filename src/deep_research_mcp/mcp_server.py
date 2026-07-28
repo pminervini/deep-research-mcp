@@ -14,7 +14,7 @@ Transports:
   MCP‑over‑HTTP clients can connect over the network
 
 Features:
-- Deep research with multiple backend providers (OpenAI Responses API, Gemini Deep Research, Open Deep Research)
+- Deep research with multiple backend providers (OpenAI API, experimental OpenAI Codex subscription, Gemini Deep Research, DR-Tulu, Open Deep Research)
 - Task status monitoring for long‑running research
 - Configurable research parameters and system instructions
 - Support for data analysis and visualization capabilities
@@ -86,9 +86,10 @@ mcp = FastMCP(
         "Deep Research MCP Server - Autonomous research agent with web search, "
         "data analysis, and citation capabilities. Supports OpenAI Responses API, "
         "OpenAI Chat Completions API (compatible with Perplexity, Groq, Ollama, "
-        "and other providers), Gemini Deep Research via the Interactions API, "
-        "and Open Deep Research. Use deep_research for comprehensive research "
-        "queries and research_status to monitor long-running tasks."
+        "and other providers), experimental OpenAI Codex subscription access, "
+        "Gemini Deep Research via the Interactions API, DR-Tulu, and Open Deep "
+        "Research. Use deep_research for comprehensive research queries and "
+        "research_status where the provider supports task recovery."
     ),
     website_url="https://github.com/pminervini/deep-research-mcp",
     debug=False,
@@ -209,6 +210,8 @@ def _render_research_markdown(
     execution_time_line = _format_execution_time_line(result).rstrip()
     if execution_time_line:
         metadata_lines.append(execution_time_line)
+    if result.message:
+        metadata_lines.append(f"- **Provider note**: {result.message}")
 
     markdown_lines = [f"# {title}", ""]
 
@@ -356,7 +359,7 @@ async def deep_research(
     **What it does:**
     - Decomposes complex queries into research strategies
     - Conducts real-time web searches for current information
-    - Executes code for data analysis and visualization (when include_analysis=True)
+    - Executes code for data analysis and visualization when the provider supports it
     - Synthesizes findings into comprehensive reports with citations
 
     **Best for:**

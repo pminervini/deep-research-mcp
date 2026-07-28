@@ -12,6 +12,7 @@ import pytest
 
 from deep_research_mcp.agent import DeepResearchAgent
 from deep_research_mcp.backends import (
+    CodexResearchBackend,
     DrTuluResearchBackend,
     GeminiResearchBackend,
     OpenAIResearchBackend,
@@ -94,6 +95,21 @@ def test_gemini_agent_initialization():
             os.environ["RESEARCH_API_KEY"] = old_api_key
         else:
             os.environ.pop("RESEARCH_API_KEY", None)
+
+
+def test_openai_codex_agent_initialization():
+    """Test Codex subscription provider selection without network access."""
+    config = ResearchConfig.from_env(
+        {
+            "RESEARCH_PROVIDER": "openai-codex",
+            "RESEARCH_MODEL": "auto",
+        }
+    )
+
+    agent = DeepResearchAgent(config)
+
+    assert isinstance(agent.backend, CodexResearchBackend)
+    assert agent.config.base_url == "https://chatgpt.com/backend-api/codex"
 
 
 def test_gemini_extract_results_uses_current_steps_schema():
@@ -333,6 +349,21 @@ def test_render_citations_avoids_duplicating_url_only_titles():
         "1. <https://example.com/very-long-redirect>\n"
         "2. [Example](https://example.com)"
     )
+
+
+def test_render_research_markdown_includes_provider_note():
+    """Completed capability warnings remain visible to MCP clients."""
+    from deep_research_mcp.mcp_server import _render_research_markdown
+
+    result = ResearchResult.completed(
+        task_id="task-test",
+        final_report="Report",
+        message="Web search only.",
+    )
+
+    rendered = _render_research_markdown(title="Report", result=result)
+
+    assert "- **Provider note**: Web search only." in rendered
 
 
 def test_dr_tulu_agent_initialization():

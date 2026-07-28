@@ -44,3 +44,12 @@ def test_provider_defaults_for_dr_tulu():
     assert defaults.api_style == "responses"
     assert defaults.model == "dr-tulu"
     assert defaults.base_url == "http://localhost:8080/"
+
+
+def test_provider_defaults_for_openai_codex():
+    defaults = TUI.get_provider_defaults("openai-codex", "responses")
+
+    assert defaults.provider == "openai-codex"
+    assert defaults.api_style == "responses"
+    assert defaults.model == "auto"
+    assert defaults.base_url == "https://chatgpt.com/backend-api/codex"

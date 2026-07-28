@@ -2,6 +2,7 @@
 # This project intentionally tracks minimum versions (>=), not exact pins.
 
 # Core dependencies
+filelock>=3.20.0,<4
 openai>=1.88
 google-genai>=2.2.0
 mcp[cli]>=1.28.1,<2

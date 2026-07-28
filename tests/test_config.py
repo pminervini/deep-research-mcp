@@ -261,6 +261,35 @@ def test_dr_tulu_provider_defaults():
             os.environ.pop("RESEARCH_BASE_URL", None)
 
 
+def test_openai_codex_provider_uses_fixed_defaults():
+    """Test Codex subscription defaults and ignore generic endpoint credentials."""
+    config = ResearchConfig.from_env(
+        {
+            "RESEARCH_PROVIDER": "openai-codex",
+            "RESEARCH_API_KEY": "must-not-be-used",
+            "RESEARCH_BASE_URL": "https://untrusted.example/v1",
+        }
+    )
+
+    assert config.provider == "openai-codex"
+    assert config.model == "auto"
+    assert config.api_key is None
+    assert config.base_url == "https://chatgpt.com/backend-api/codex"
+    assert config.validate() is True
+
+
+def test_openai_codex_rejects_direct_custom_endpoint():
+    """Test direct construction cannot redirect subscription credentials."""
+    config = ResearchConfig(
+        provider="openai-codex",
+        model="auto",
+        base_url="https://untrusted.example/v1",
+    )
+
+    with pytest.raises(ConfigurationError, match="only supports"):
+        config.validate()
+
+
 def test_gemini_api_key_aliases():
     """Test Gemini provider API key aliases."""
     old_provider = os.environ.get("RESEARCH_PROVIDER")

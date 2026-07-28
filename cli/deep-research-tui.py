@@ -119,6 +119,13 @@ def get_provider_defaults(
             model="gpt-5.6-sol",
             base_url="https://api.openai.com/v1",
         )
+    if provider == "openai-codex":
+        return ProviderDefaults(
+            provider=provider,
+            api_style="responses",
+            model="auto",
+            base_url="https://chatgpt.com/backend-api/codex",
+        )
     if provider == "dr-tulu":
         return ProviderDefaults(
             provider="dr-tulu",
@@ -412,6 +419,7 @@ class DeepResearchTUI(App):
         self.query_one("#model", Input).value = state.config.model
         self.query_one("#base-url", Input).value = state.config.base_url
         self.query_one("#api-style", Select).disabled = state.provider != "openai"
+        self.query_one("#base-url", Input).disabled = state.provider == "openai-codex"
         self.query_one("#include-analysis", Switch).value = state.include_analysis
         self.query_one("#json-output", Switch).value = state.json_output
         self.query_one("#query-area", TextArea).text = state.query
@@ -454,6 +462,7 @@ class DeepResearchTUI(App):
                     yield Select(
                         [
                             ("OpenAI", "openai"),
+                            ("OpenAI Codex Subscription", "openai-codex"),
                             ("Dr Tulu", "dr-tulu"),
                             ("Gemini", "gemini"),
                             ("Open Deep Research", "open-deep-research"),
@@ -536,7 +545,9 @@ class DeepResearchTUI(App):
         """Update model and base URL based on provider and api_style."""
         defaults = get_provider_defaults(self.provider, self.api_style)
         self.query_one("#model", Input).value = defaults.model
-        self.query_one("#base-url", Input).value = defaults.base_url
+        base_url_input = self.query_one("#base-url", Input)
+        base_url_input.value = defaults.base_url
+        base_url_input.disabled = self.provider == "openai-codex"
 
         api_style_select = self.query_one("#api-style", Select)
         if self.provider == "openai":
@@ -962,6 +973,8 @@ class DeepResearchTUI(App):
             parts.append(f"Citations: {len(result.citations)}")
         if isinstance(result.execution_time, (int, float)):
             parts.append(f"Execution time: {result.execution_time:.2f}s")
+        if result.message:
+            parts.append(f"Provider note: {result.message}")
 
         parts.append("")
         parts.append(result.final_report)
@@ -1025,7 +1038,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--provider",
-        choices=["openai", "dr-tulu", "gemini", "open-deep-research"],
+        choices=[
+            "openai",
+            "openai-codex",
+            "dr-tulu",
+            "gemini",
+            "open-deep-research",
+        ],
         default="openai",
         help="Research provider (default: openai)",
     )

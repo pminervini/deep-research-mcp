@@ -34,6 +34,7 @@ USAGE EXAMPLES:
 
 import argparse
 import asyncio
+from datetime import datetime, timezone
 import json
 import logging
 import os
@@ -56,6 +57,7 @@ from deep_research_mcp import (
     ResearchError,
     ResearchResult,
 )
+from deep_research_mcp.codex_auth import CodexAuthError, CodexAuthManager
 
 DEFAULT_SYSTEM_PROMPT = """
 You are a professional researcher preparing a structured, data-driven report.
@@ -160,6 +162,8 @@ def format_report(result: ResearchResult) -> str:
         parts.append(f"Citations: {len(result.citations)}")
     if isinstance(result.execution_time, (int, float)):
         parts.append(f"Execution time: {result.execution_time:.2f}s")
+    if result.message:
+        parts.append(f"Provider note: {result.message}")
 
     parts.append("")
     parts.append(result.final_report)
@@ -414,6 +418,82 @@ def cmd_config(args: argparse.Namespace) -> int:
         return 1
 
 
+async def cmd_auth(args: argparse.Namespace) -> int:
+    """Manage the independent OpenAI Codex subscription session."""
+    manager = CodexAuthManager()
+    action = args.auth_action
+
+    try:
+        if action == "login":
+            print(
+                "Warning: openai-codex uses an undocumented ChatGPT consumer "
+                "endpoint and is not an official OpenAI API integration."
+            )
+            if getattr(args, "import_codex", False):
+                codex_home_value = os.environ.get("CODEX_HOME")
+                codex_home = Path(codex_home_value) if codex_home_value else None
+                tokens = await manager.import_codex_auth(
+                    codex_home=codex_home,
+                    force=getattr(args, "force", False),
+                )
+                if tokens.source == "codex_import":
+                    print(
+                        "Imported the current Codex access token. This temporary "
+                        "copy cannot refresh; run `auth login` when it expires."
+                    )
+                else:
+                    print(
+                        "Existing independent OpenAI Codex credentials remain active. "
+                        "Pass --force to replace them with an imported token."
+                    )
+            else:
+
+                def display_code(verification_url: str, user_code: str) -> None:
+                    print(f"Open {verification_url}")
+                    print(f"Enter code: {user_code}")
+
+                tokens = await manager.login_device(
+                    display_code,
+                    force=getattr(args, "force", False),
+                )
+            expires = datetime.fromtimestamp(
+                tokens.expires_at, timezone.utc
+            ).isoformat()
+            print(f"OpenAI Codex authentication is ready until {expires}")
+            return 0
+
+        if action == "status":
+            status = manager.status()
+            if not status.logged_in:
+                print(status.message or "OpenAI Codex is not authenticated")
+                return 1
+            expires = (
+                datetime.fromtimestamp(status.expires_at, timezone.utc).isoformat()
+                if status.expires_at is not None
+                else "unknown"
+            )
+            print("OpenAI Codex authentication is ready")
+            print(f"Source: {status.source}")
+            print(f"Expires: {expires}")
+            if status.message:
+                print(f"Status: {status.message}")
+            return 0
+
+        if action == "logout":
+            removed = await manager.logout()
+            print(
+                "Removed local OpenAI Codex credentials"
+                if removed
+                else "No local OpenAI Codex credentials were stored"
+            )
+            return 0
+    except CodexAuthError as error:
+        print(f"OpenAI Codex authentication error: {error}", file=sys.stderr)
+        return 1
+
+    return 1
+
+
 # ---------------------------------------------------------------------------
 # Argument parser
 # ---------------------------------------------------------------------------
@@ -446,7 +526,13 @@ def build_parser() -> argparse.ArgumentParser:
     cfg.add_argument(
         "--provider",
         default=None,
-        choices=["openai", "dr-tulu", "gemini", "open-deep-research"],
+        choices=[
+            "openai",
+            "openai-codex",
+            "dr-tulu",
+            "gemini",
+            "open-deep-research",
+        ],
         help="Research provider",
     )
     cfg.add_argument("--model", default=None, help="Model or agent ID")
@@ -555,6 +641,33 @@ def build_parser() -> argparse.ArgumentParser:
         help="Skip configuration validation",
     )
 
+    # auth
+    p_auth = subparsers.add_parser(
+        "auth",
+        help="Manage OpenAI Codex subscription authentication",
+    )
+    auth_subparsers = p_auth.add_subparsers(
+        dest="auth_action",
+        required=True,
+        help="authentication action",
+    )
+    p_auth_login = auth_subparsers.add_parser(
+        "login",
+        help="Authenticate with the OpenAI Codex device flow",
+    )
+    p_auth_login.add_argument(
+        "--import-codex",
+        action="store_true",
+        help="Temporarily copy the current access token from CODEX_HOME/auth.json",
+    )
+    p_auth_login.add_argument(
+        "--force",
+        action="store_true",
+        help="Replace currently valid local credentials",
+    )
+    auth_subparsers.add_parser("status", help="Show Codex authentication status")
+    auth_subparsers.add_parser("logout", help="Remove local Codex credentials")
+
     return parser
 
 
@@ -585,6 +698,8 @@ def main() -> None:
         rc = asyncio.run(cmd_status(args))
     elif args.command == "config":
         rc = cmd_config(args)
+    elif args.command == "auth":
+        rc = asyncio.run(cmd_auth(args))
     else:
         parser.print_help()
         rc = 1

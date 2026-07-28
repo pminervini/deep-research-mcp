@@ -42,6 +42,7 @@ class ResearchResult:
         reasoning_steps: int = 0,
         search_queries: list[str] | None = None,
         total_steps: int = 0,
+        message: str | None = None,
         execution_time: float | None = None,
     ) -> "ResearchResult":
         """Build a successful research result."""
@@ -53,6 +54,7 @@ class ResearchResult:
             reasoning_steps=reasoning_steps,
             search_queries=search_queries or [],
             total_steps=total_steps,
+            message=message,
             execution_time=execution_time,
         )
 

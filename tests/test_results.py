@@ -21,6 +21,7 @@ def test_research_result_completed_contract():
         ],
         search_queries=["example query"],
         total_steps=3,
+        message="Provider note",
         execution_time=1.5,
     )
 
@@ -30,6 +31,7 @@ def test_research_result_completed_contract():
     assert result.final_report == "Structured report"
     assert len(result.citations) == 1
     assert result.citations[0].url == "https://example.com"
+    assert result.message == "Provider note"
 
 
 def test_research_task_status_helpers():

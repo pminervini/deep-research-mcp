@@ -19,6 +19,7 @@ from deep_research_mcp.errors import ConfigurationError
 logger = logging.getLogger(__name__)
 
 DEFAULT_CONFIG_PATH = Path.home() / ".deep_research"
+OPENAI_CODEX_BASE_URL = "https://chatgpt.com/backend-api/codex"
 
 # Per-provider (default model, default base URL, extra API-key settings,
 # extra base-URL settings). The openai default model also depends on api_style.
@@ -46,6 +47,12 @@ _PROVIDER_DEFAULTS: dict[str, tuple[str, str, tuple[str, ...], tuple[str, ...]]]
         "http://localhost:1234/v1",
         ("OPENAI_API_KEY",),
         ("OPENAI_BASE_URL",),
+    ),
+    "openai-codex": (
+        "auto",
+        OPENAI_CODEX_BASE_URL,
+        (),
+        (),
     ),
 }
 
@@ -188,10 +195,16 @@ class ResearchConfig:
         )
         if provider == "openai" and api_style == "chat_completions":
             default_model = "gpt-5-mini"
-        api_key = get_setting_first("RESEARCH_API_KEY", *api_key_keys)
-        base_url = get_setting_first(
-            "RESEARCH_BASE_URL", *base_url_keys, default=default_base_url
-        )
+        api_key: str | None
+        base_url: str | None
+        if provider == "openai-codex":
+            api_key = None
+            base_url = default_base_url
+        else:
+            api_key = get_setting_first("RESEARCH_API_KEY", *api_key_keys)
+            base_url = get_setting_first(
+                "RESEARCH_BASE_URL", *base_url_keys, default=default_base_url
+            )
 
         return cls(
             api_key=api_key,
@@ -227,6 +240,13 @@ class ResearchConfig:
 
         if self.poll_interval <= 0:
             raise ConfigurationError("Poll interval must be positive")
+
+        if self.provider == "openai-codex" and self.base_url:
+            if self.base_url.rstrip("/") != OPENAI_CODEX_BASE_URL:
+                raise ConfigurationError(
+                    "The openai-codex provider only supports "
+                    f"{OPENAI_CODEX_BASE_URL}"
+                )
 
         normalized_log_level = self.log_level.upper()
         if not isinstance(logging.getLevelName(normalized_log_level), int):
