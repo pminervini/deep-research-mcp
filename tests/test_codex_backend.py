@@ -11,10 +11,14 @@ import logging
 from pathlib import Path
 import threading
 import time
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from deep_research_mcp.backends.codex_backend import CodexResearchBackend
+from deep_research_mcp.backends.codex_backend import (
+    CODEX_PROTOCOL_VERSION,
+    CodexResearchBackend,
+)
 from deep_research_mcp.codex_auth import (
     CodexAuthEndpoints,
     CodexAuthManager,
@@ -113,6 +117,7 @@ def codex_backend_server():
             {"slug": "gpt-picker", "visibility": "list"},
         ],
         "last_headers": {},
+        "last_model_query": {},
         "last_request": {},
         "response_calls": 0,
         "model_calls": 0,
@@ -125,8 +130,24 @@ def codex_backend_server():
         """Handle real local Codex backend requests for the test fixture."""
 
         def do_GET(self):
-            if self.path != "/models":
+            parsed_url = urlsplit(self.path)
+            if parsed_url.path != "/models":
                 self._json(404, {"error": "not_found"})
+                return
+            model_query = parse_qs(parsed_url.query)
+            state["last_model_query"] = model_query
+            if model_query != {"client_version": [CODEX_PROTOCOL_VERSION]}:
+                self._json(
+                    400,
+                    {
+                        "detail": [
+                            {
+                                "type": "missing",
+                                "loc": ["query", "client_version"],
+                            }
+                        ]
+                    },
+                )
                 return
             state["model_calls"] = int(state["model_calls"]) + 1
             state["last_headers"] = dict(self.headers)
@@ -300,6 +321,7 @@ async def test_codex_backend_discovers_model_and_assembles_sse(
     assert headers["ChatGPT-Account-ID"] == "account-123"
     assert headers["originator"] == "deep_research_mcp"
     assert headers["User-Agent"].startswith("deep-research-mcp/")
+    assert state["last_model_query"] == {"client_version": [CODEX_PROTOCOL_VERSION]}
     assert request["model"] == "gpt-picker"
     assert request["stream"] is True
     assert request["store"] is False

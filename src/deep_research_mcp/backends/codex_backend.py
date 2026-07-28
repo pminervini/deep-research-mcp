@@ -40,6 +40,9 @@ from inference, and produce a structured report with inline source links.
 MARKDOWN_LINK_PATTERN = re.compile(r"\[([^\]]+)\]\((https?://[^)\s]+)\)")
 URL_PATTERN = re.compile(r"https?://[^\s<>()\]]+")
 
+# Version of the official Codex client protocol this backend implements.
+CODEX_PROTOCOL_VERSION = "0.145.0"
+
 try:
     PACKAGE_VERSION = version("deep-research-mcp")
 except PackageNotFoundError:
@@ -205,6 +208,7 @@ class CodexResearchBackend(ResearchBackend):
         for attempt in range(2):
             response = await client.get(
                 f"{self.base_url}/models",
+                params={"client_version": CODEX_PROTOCOL_VERSION},
                 headers=self._headers(current, accept="application/json"),
             )
             if response.status_code == 401 and attempt == 0:

@@ -36,4 +36,5 @@ async def test_openai_codex_subscription_end_to_end():
 
     assert result.status == "completed", result.message
     assert result.final_report
+    assert result.citations
     assert result.task_id
