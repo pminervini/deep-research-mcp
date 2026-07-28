@@ -72,8 +72,8 @@ Requirements:
 # Global agent instance
 research_agent: DeepResearchAgent | None = None
 
-# Config overrides set from command-line arguments, applied on agent creation.
-_config_overrides: dict[str, bool] = {}
+# Command-line override applied when the agent is created lazily.
+_cancel_on_timeout_override: bool | None = None
 
 # Claude Code persists tool results above its default size threshold to disk
 # unless the tool declares a higher limit; research reports are inherently
@@ -112,32 +112,19 @@ def _apply_logging_config(log_level: str) -> None:
     mcp.settings.log_level = typed_log_level
 
 
-def _build_research_agent() -> DeepResearchAgent:
-    """Load configuration, apply logging, and construct a research agent."""
-    config = ResearchConfig.load()
-    if "cancel_on_timeout" in _config_overrides:
-        config.cancel_on_timeout = _config_overrides["cancel_on_timeout"]
-    config.validate()
-    _apply_logging_config(config.log_level)
-    return DeepResearchAgent(config)
-
-
 def _ensure_research_agent() -> DeepResearchAgent:
     """Reuse the shared research agent instance, creating it on demand."""
     global research_agent
 
-    if not research_agent:
-        research_agent = _build_research_agent()
+    if research_agent is None:
+        config = ResearchConfig.load()
+        if _cancel_on_timeout_override is not None:
+            config.cancel_on_timeout = _cancel_on_timeout_override
+        config.validate()
+        _apply_logging_config(config.log_level)
+        research_agent = DeepResearchAgent(config)
 
     return research_agent
-
-
-def _format_execution_time_line(result: ResearchResult) -> str:
-    """Format execution time for markdown output when available."""
-    execution_time = result.execution_time
-    if isinstance(execution_time, (int, float)):
-        return f"- **Execution time**: {execution_time:.2f} seconds\n"
-    return ""
 
 
 async def _progress_heartbeat(
@@ -170,11 +157,6 @@ async def _safe_report_progress(
         await ctx.report_progress(progress=progress, total=total, message=message)
     except Exception:
         logger.debug("Failed to report progress", exc_info=True)
-
-
-def _resolve_system_prompt(system_instructions: str) -> str:
-    """Resolve tool-provided system instructions against the default prompt."""
-    return system_instructions or DEFAULT_RESEARCH_SYSTEM_PROMPT
 
 
 def _render_citations(result: ResearchResult) -> str:
@@ -211,9 +193,10 @@ def _render_research_markdown(
     if extra_metadata_lines:
         metadata_lines.extend(extra_metadata_lines)
 
-    execution_time_line = _format_execution_time_line(result).rstrip()
-    if execution_time_line:
-        metadata_lines.append(execution_time_line)
+    if isinstance(result.execution_time, (int, float)):
+        metadata_lines.append(
+            f"- **Execution time**: {result.execution_time:.2f} seconds"
+        )
     if result.message:
         metadata_lines.append(f"- **Provider note**: {result.message}")
 
@@ -249,17 +232,17 @@ async def _run_research_with_progress(
     include_analysis: bool,
     callback_url: str,
     ctx: Context | None,
-    start_message: str,
-    heartbeat_label: str,
-    provider_error_message: str,
-    unexpected_error_message: str,
 ) -> ResearchResult:
     """Run research while managing progress reporting and heartbeats."""
     heartbeat_task: asyncio.Task[None] | None = None
 
     if ctx:
-        await _safe_report_progress(ctx, progress=0, message=start_message, total=None)
-        heartbeat_task = asyncio.create_task(_progress_heartbeat(ctx, heartbeat_label))
+        await _safe_report_progress(
+            ctx, progress=0, message="Research started...", total=None
+        )
+        heartbeat_task = asyncio.create_task(
+            _progress_heartbeat(ctx, "Research in progress")
+        )
 
     async def report_task_started(task_id: str) -> None:
         if ctx:
@@ -275,7 +258,7 @@ async def _run_research_with_progress(
     try:
         return await agent.research(
             query=query,
-            system_prompt=_resolve_system_prompt(system_instructions),
+            system_prompt=system_instructions or DEFAULT_RESEARCH_SYSTEM_PROMPT,
             include_code_interpreter=include_analysis,
             callback_url=callback_url or None,
             on_task_started=report_task_started,
@@ -283,13 +266,16 @@ async def _run_research_with_progress(
     except ResearchError:
         if ctx:
             await _safe_report_progress(
-                ctx, progress=1, total=1, message=provider_error_message
+                ctx,
+                progress=1,
+                total=1,
+                message="Research ended with provider error",
             )
         raise
     except Exception:
         if ctx:
             await _safe_report_progress(
-                ctx, progress=1, total=1, message=unexpected_error_message
+                ctx, progress=1, total=1, message="Research ended unexpectedly"
             )
         raise
     finally:
@@ -297,40 +283,6 @@ async def _run_research_with_progress(
             heartbeat_task.cancel()
             with suppress(asyncio.CancelledError):
                 await heartbeat_task
-
-
-async def _finalize_research_response(
-    *,
-    result: ResearchResult,
-    ctx: Context | None,
-    success_message: str,
-    progress_failure_template: str,
-    title: str,
-    intro_lines: list[str] | None = None,
-    extra_metadata_lines: list[str] | None = None,
-) -> str:
-    """Convert a completed research run into the tool's final string response."""
-    if result.is_completed:
-        if ctx:
-            await _safe_report_progress(
-                ctx, progress=1, total=1, message=success_message
-            )
-        return _render_research_markdown(
-            title=title,
-            result=result,
-            intro_lines=intro_lines,
-            extra_metadata_lines=extra_metadata_lines,
-        )
-
-    failure_message = result.message or "Unknown error"
-    if ctx:
-        await _safe_report_progress(
-            ctx,
-            progress=1,
-            total=1,
-            message=progress_failure_template.format(failure_message=failure_message),
-        )
-    return f"Research failed: {failure_message}"
 
 
 # Define the actual async functions that will be wrapped by FastMCP
@@ -389,18 +341,29 @@ async def deep_research(
             include_analysis=include_analysis,
             callback_url=callback_url,
             ctx=ctx,
-            start_message="Research started...",
-            heartbeat_label="Research in progress",
-            provider_error_message="Research ended with provider error",
-            unexpected_error_message="Research ended unexpectedly",
         )
-        return await _finalize_research_response(
-            result=result,
-            ctx=ctx,
-            success_message="Research completed successfully",
-            progress_failure_template="Research failed: {failure_message}",
-            title=f"Research Report: {query}",
-        )
+        if result.is_completed:
+            if ctx:
+                await _safe_report_progress(
+                    ctx,
+                    progress=1,
+                    total=1,
+                    message="Research completed successfully",
+                )
+            return _render_research_markdown(
+                title=f"Research Report: {query}",
+                result=result,
+            )
+
+        failure_message = result.message or "Unknown error"
+        if ctx:
+            await _safe_report_progress(
+                ctx,
+                progress=1,
+                total=1,
+                message=f"Research failed: {failure_message}",
+            )
+        return f"Research failed: {failure_message}"
 
     except ResearchError as e:
         logger.error(f"Research error: {e}")
@@ -476,6 +439,8 @@ def main():
     Use ``--transport`` to select between stdio and HTTP streaming modes.
     In HTTP mode you can customize ``--host`` and ``--port``.
     """
+    global _cancel_on_timeout_override
+
     parser = argparse.ArgumentParser(description="Deep Research MCP Server")
     parser.add_argument(
         "--transport",
@@ -508,8 +473,7 @@ def main():
 
     args = parser.parse_args()
 
-    if args.cancel_on_timeout is not None:
-        _config_overrides["cancel_on_timeout"] = args.cancel_on_timeout
+    _cancel_on_timeout_override = args.cancel_on_timeout
 
     logger.info(f"Starting Deep Research MCP server with {args.transport} transport...")
 

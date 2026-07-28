@@ -6,9 +6,10 @@ This script tests the deep research MCP server tools without requiring
 a full Claude Code MCP integration.
 """
 
-import os
-import sys
 import inspect
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -88,6 +89,35 @@ async def test_mcp_tool_schema():
         "callback_url",
     }
     assert set(tools["research_status"].inputSchema["properties"]) == {"task_id"}
+
+
+def test_lazy_agent_applies_cancel_on_timeout_override():
+    """The explicit server override wins over the configured timeout behavior."""
+    server_env = dict(os.environ)
+    server_env.update(
+        {
+            "RESEARCH_PROVIDER": "dr-tulu",
+            "RESEARCH_MODEL": "dr-tulu",
+            "RESEARCH_BASE_URL": "http://127.0.0.1:18080",
+            "RESEARCH_CANCEL_ON_TIMEOUT": "true",
+        }
+    )
+    script = (
+        "import deep_research_mcp.mcp_server as server; "
+        "server._cancel_on_timeout_override = False; "
+        "print(server._ensure_research_agent().config.cancel_on_timeout)"
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=Path(__file__).resolve().parents[1],
+        env=server_env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.stdout.strip() == "False"
 
 
 @pytest.mark.asyncio
