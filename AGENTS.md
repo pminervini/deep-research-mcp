@@ -34,6 +34,14 @@ These guidelines reduce common LLM coding mistakes. They bias toward caution ove
 - For multi-step tasks, state a brief plan with verification checks.
 - Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
+## Collaboration & Authoritative Documentation
+- Codex may review Claude Code's output after it finishes, so keep changes and summaries clear and easy to verify.
+- `README.md` is authoritative for overview, setup, configuration, usage, and development commands.
+- `ARCH.md` is authoritative for architecture and component details.
+- Keep canonical `~/.deep_research` TOML examples and key mappings in `README.md` to avoid documentation drift.
+- For MCP server setup, transports, and current CLI commands, follow the “Claude Code Integration” and “As an MCP Server” sections in `README.md`.
+- The MCP server exposes `deep_research` for autonomous research and `research_status` for task status and completed-report recovery.
+
 ## Project Structure & Module Organization
 - `src/deep_research_mcp/`: core package.
   - `agent.py`: provider-aware research agent (OpenAI, open-deep-research).
@@ -54,6 +62,7 @@ These guidelines reduce common LLM coding mistakes. They bias toward caution ove
 ## Coding Style & Naming Conventions
 - Python 3.11+, 4-space indentation, use type hints in new/changed code.
 - Format with `black` defaults; keep imports and docstrings idiomatic.
+- Do not use emojis in Python or Markdown files.
 - Prefer f-strings over `%s`-style string interpolation, including in logging calls.
 - Naming: snake_case for modules/functions, PascalCase for classes, UPPER_CASE for constants.
 - Keep public tool signatures stable; document changes in `README.md`/`ARCH.md`.
