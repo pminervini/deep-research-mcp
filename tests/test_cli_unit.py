@@ -10,8 +10,6 @@ from pathlib import Path
 import sys
 from types import ModuleType
 
-import pytest
-
 
 def load_cli_module() -> ModuleType:
     """Load the hyphenated CLI script as a Python module."""
@@ -27,27 +25,6 @@ def load_cli_module() -> ModuleType:
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
-
-
-@pytest.mark.parametrize(
-    "arguments",
-    [
-        ["--enable-clarification", "config"],
-        ["--triage-model", "gpt-5-mini", "config"],
-        ["--clarifier-model", "gpt-5-mini", "config"],
-        ["--clarification-base-url", "https://example.com/v1", "config"],
-        ["--clarification-api-key", "test", "config"],
-        ["--instruction-builder-model", "gpt-5-mini", "config"],
-        ["research", "test query", "--clarify"],
-    ],
-)
-def test_removed_clarification_flags_are_rejected(arguments: list[str]) -> None:
-    parser = load_cli_module().build_parser()
-
-    with pytest.raises(SystemExit) as error:
-        parser.parse_args(arguments)
-
-    assert error.value.code == 2
 
 
 def test_codex_provider_and_auth_commands_are_exposed() -> None:

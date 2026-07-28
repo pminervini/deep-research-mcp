@@ -69,14 +69,7 @@ def load_config_file(config_path: Path | str | None = None) -> dict[str, Any]:
 
     logger.info("Loading configuration from %s", resolved_path)
     with resolved_path.open("rb") as config_file:
-        config_data = tomllib.load(config_file)
-
-    if not isinstance(config_data, dict):
-        raise ConfigurationError(
-            f"Configuration file {resolved_path} did not contain a TOML table"
-        )
-
-    return config_data
+        return tomllib.load(config_file)
 
 
 def flatten_config_data(

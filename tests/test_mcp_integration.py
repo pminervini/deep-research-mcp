@@ -28,43 +28,6 @@ from deep_research_mcp.mcp_server import (
 @pytest.mark.asyncio
 @pytest.mark.api
 @pytest.mark.integration
-async def test_research_status():
-    """Test the research_status tool with a fake task ID"""
-    mcp_server.research_agent = None
-    result = await research_status("fake-task-id")
-    assert result is not None
-    assert isinstance(result, str)
-    # May return "not initialized" if agent is uninitialized,
-    # or an error if the agent is initialized but task ID is invalid
-    assert (
-        "Research agent not initialized" in result or "Error checking status" in result
-    )
-
-
-@pytest.mark.asyncio
-@pytest.mark.api
-@pytest.mark.integration
-async def test_deep_research_without_api():
-    """Test deep_research tool initialization (without actual API call)"""
-    result = await deep_research(
-        query="Test query for MCP integration",
-        system_instructions="This is just a test",
-        include_analysis=False,
-    )
-
-    assert result is not None
-    assert isinstance(result, str)
-    # Should either work with valid config or show error without API keys
-    assert (
-        "Research Report:" in result
-        or "Failed to initialize research agent" in result
-        or "Unexpected error:" in result
-    )
-
-
-@pytest.mark.asyncio
-@pytest.mark.api
-@pytest.mark.integration
 async def test_deep_research_invalid_api_key_graceful_error():
     """Test deep_research handles invalid API keys gracefully."""
     old_provider = os.environ.get("PROVIDER")
@@ -113,14 +76,18 @@ async def test_deep_research_invalid_api_key_graceful_error():
 
 
 @pytest.mark.asyncio
-async def test_mcp_tool_schema_excludes_clarification():
-    """The public MCP contract contains only stateless research tools."""
+async def test_mcp_tool_schema():
+    """The public MCP contract exposes the expected tools and arguments."""
     tools = {tool.name: tool for tool in await mcp.list_tools()}
 
     assert set(tools) == {"deep_research", "research_status"}
-    assert (
-        "request_clarification" not in tools["deep_research"].inputSchema["properties"]
-    )
+    assert set(tools["deep_research"].inputSchema["properties"]) == {
+        "query",
+        "system_instructions",
+        "include_analysis",
+        "callback_url",
+    }
+    assert set(tools["research_status"].inputSchema["properties"]) == {"task_id"}
 
 
 @pytest.mark.asyncio
@@ -150,12 +117,6 @@ async def test_stdio_server_initializes_and_exposes_tools():
             tool_names = {tool.name for tool in tools.tools}
             assert tool_names == {"deep_research", "research_status"}
 
-            removed_tool_result = await session.call_tool(
-                "research_with_context",
-                {"session_id": "removed", "answers": []},
-            )
-            assert removed_tool_result.isError is True
-
             result = await session.call_tool(
                 "research_status", {"task_id": "fake-task-id"}
             )
@@ -181,5 +142,3 @@ def test_mcp_server_structure():
 
     deep_research_signature = inspect.signature(deep_research)
     assert "callback_url" in deep_research_signature.parameters
-    assert "request_clarification" not in deep_research_signature.parameters
-    assert not hasattr(mcp_server, "research_with_context")

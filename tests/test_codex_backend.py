@@ -124,6 +124,8 @@ def codex_backend_server():
         "refresh_count": 0,
         "model_401_once": False,
         "response_401_once": False,
+        "model_401_always": False,
+        "response_401_always": False,
     }
 
     class CodexBackendHandler(BaseHTTPRequestHandler):
@@ -151,7 +153,9 @@ def codex_backend_server():
                 return
             state["model_calls"] = int(state["model_calls"]) + 1
             state["last_headers"] = dict(self.headers)
-            if state["model_401_once"] and state["model_calls"] == 1:
+            if state["model_401_always"] or (
+                state["model_401_once"] and state["model_calls"] == 1
+            ):
                 self._json(401, {"error": {"message": "expired"}})
                 return
             self._json(200, {"models": state["models"]})
@@ -180,7 +184,9 @@ def codex_backend_server():
             state["response_calls"] = int(state["response_calls"]) + 1
             state["last_headers"] = dict(self.headers)
             state["last_request"] = json.loads(body)
-            if state["response_401_once"] and state["response_calls"] == 1:
+            if state["response_401_always"] or (
+                state["response_401_once"] and state["response_calls"] == 1
+            ):
                 self._json(401, {"error": {"message": "expired"}})
                 return
             if state["mode"] == "forbidden":
@@ -453,6 +459,24 @@ async def test_codex_backend_refreshes_once_after_response_401(
 
     assert result.status == "completed"
     assert state["response_calls"] == 2
+    assert state["refresh_count"] == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("endpoint", ["model", "response"])
+async def test_codex_backend_stops_after_refreshed_token_is_rejected(
+    tmp_path: Path, codex_backend_server, endpoint: str
+):
+    base_url, state = codex_backend_server
+    state[f"{endpoint}_401_always"] = True
+    endpoints = CodexAuthEndpoints(oauth_token_url=f"{base_url}/oauth-token")
+    backend = _backend(tmp_path, base_url, endpoints=endpoints)
+
+    result = await backend.research("Research this", include_code_interpreter=False)
+
+    assert result.status == "failed"
+    assert result.error_code == "authentication_failed"
+    assert state[f"{endpoint}_calls"] == 2
     assert state["refresh_count"] == 1
 
 

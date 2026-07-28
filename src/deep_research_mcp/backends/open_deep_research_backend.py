@@ -109,8 +109,7 @@ Your request must be a real sentence, not a google search! Like "Find me this in
         self.search_agent.prompt_templates["managed_agent"][
             "task"
         ] += """You can navigate to .txt online files.
-If a non-html page is in another format, especially .pdf or a Youtube video, use tool 'inspect_file_as_text' to inspect it.
-Additionally, if after some searching you find out that you need more information to answer the question, you can use `final_answer` with your request for clarification as argument to request for more information."""
+If a non-html page is in another format, especially .pdf or a Youtube video, use tool 'inspect_file_as_text' to inspect it."""
 
         self.manager_agent = CodeAgent(
             model=self.odr_model,

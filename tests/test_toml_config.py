@@ -34,7 +34,7 @@ def test_load_merges_toml_with_environment_overrides(tmp_path):
     """Test explicit config loading merges TOML values with environment overrides."""
     config_path = tmp_path / ".deep_research"
     config_path.write_text(
-        '[research]\nprovider = "gemini"\nmodel = "file-model"\ntimeout = 45\n[clarification]\nenable = true\ntriage_model = "file-triage"\n',
+        '[research]\nprovider = "gemini"\nmodel = "file-model"\ntimeout = 45\n',
         encoding="utf-8",
     )
 
@@ -43,27 +43,12 @@ def test_load_merges_toml_with_environment_overrides(tmp_path):
         env={
             "RESEARCH_MODEL": "env-model",
             "RESEARCH_TIMEOUT": "90",
-            "CLARIFICATION_CLARIFIER_MODEL": "env-clarifier",
         },
     )
 
     assert config.provider == "gemini"
     assert config.model == "env-model"
     assert config.timeout == 90.0
-    assert not hasattr(config, "enable_clarification")
-    assert not hasattr(config, "triage_model")
-    assert not hasattr(config, "clarifier_model")
-
-
-def test_from_env_only_uses_explicit_environment_values():
-    """Test env-only loading does not require or implicitly read TOML configuration."""
-    config = ResearchConfig.from_env(
-        env={"RESEARCH_MODEL": "env-only-model", "ENABLE_CLARIFICATION": "true"}
-    )
-
-    assert config.provider == "openai"
-    assert config.model == "env-only-model"
-    assert not hasattr(config, "enable_clarification")
 
 
 def test_cancel_on_timeout_parsing():
@@ -96,39 +81,3 @@ def test_cancel_on_timeout_parsing():
             os.environ["RESEARCH_MODEL"] = original_model
         else:
             os.environ.pop("RESEARCH_MODEL", None)
-
-
-def test_config_defaults():
-    """Test configuration defaults are correct"""
-    # Clean environment
-    env_vars = [
-        "RESEARCH_MODEL",
-        "RESEARCH_TIMEOUT",
-        "POLL_INTERVAL",
-        "MAX_RETRIES",
-    ]
-    original_values = {}
-    for var in env_vars:
-        original_values[var] = os.environ.get(var)
-        if var in os.environ:
-            del os.environ[var]
-
-    try:
-        # Set only required value
-        os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
-
-        config = ResearchConfig.from_env()
-
-        # Test defaults
-        assert config.provider == "openai"
-        assert config.timeout == 1800.0  # Default
-        assert config.poll_interval == 30.0  # Default
-        assert config.log_level == "INFO"
-
-    finally:
-        # Restore environment
-        for var, value in original_values.items():
-            if value is not None:
-                os.environ[var] = value
-            elif var in os.environ:
-                del os.environ[var]

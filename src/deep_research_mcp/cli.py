@@ -688,17 +688,15 @@ def main() -> None:
         wrapper_class=structlog.make_filtering_bound_logger(log_level),
     )
 
-    if args.command == "research":
-        rc = asyncio.run(cmd_research(args))
-    elif args.command == "status":
-        rc = asyncio.run(cmd_status(args))
-    elif args.command == "config":
+    if args.command == "config":
         rc = cmd_config(args)
-    elif args.command == "auth":
-        rc = asyncio.run(cmd_auth(args))
     else:
-        parser.print_help()
-        rc = 1
+        async_commands = {
+            "research": cmd_research,
+            "status": cmd_status,
+            "auth": cmd_auth,
+        }
+        rc = asyncio.run(async_commands[args.command](args))
 
     raise SystemExit(rc)
 

@@ -369,22 +369,6 @@ class OpenAIResearchBackend(ResearchBackend):
 
     def _extract_openai_results(self, response) -> ResearchResult:
         """Extract and normalize OpenAI Responses API output."""
-        if response.status == "failed":
-            error_details = getattr(response, "error", None)
-            if error_details:
-                if hasattr(error_details, "get"):
-                    return ResearchResult.failed(
-                        message=error_details.get("message", "Unknown error"),
-                        task_id=response.id,
-                        error_code=error_details.get("code"),
-                    )
-                return ResearchResult.failed(
-                    message=str(error_details), task_id=response.id
-                )
-            return ResearchResult.failed(
-                message=f"Task failed: {response.id}", task_id=response.id
-            )
-
         if not response.output:
             return ResearchResult.error(
                 message="No output received", task_id=response.id

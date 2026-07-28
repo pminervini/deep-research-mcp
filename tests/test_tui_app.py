@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import pytest
 from textual.containers import Container
-from textual.css.query import NoMatches
 from textual.widgets import Input, Markdown, Select, Static, Switch
 
 from tests.tui_test_utils import load_tui_module
@@ -105,16 +104,6 @@ async def test_left_and_right_toggle_switch_values():
 
 
 @pytest.mark.asyncio
-async def test_research_controls_do_not_include_clarification():
-    app = TUI.DeepResearchTUI(build_startup_state())
-
-    async with app.run_test(size=(140, 42)):
-        with pytest.raises(NoMatches):
-            app.query_one("#btn-clarify")
-        assert all(binding.key != "c" for binding in app.BINDINGS)
-
-
-@pytest.mark.asyncio
 async def test_output_panel_toggles_markdown_and_raw_views():
     app = TUI.DeepResearchTUI(build_startup_state())
 
@@ -139,3 +128,25 @@ async def test_output_panel_toggles_markdown_and_raw_views():
         await pilot.pause()
         assert md.display is True
         assert raw.display is False
+
+
+@pytest.mark.asyncio
+async def test_build_config_loads_toml_settings(tmp_path):
+    config_path = tmp_path / "tui-config.toml"
+    config_path.write_text(
+        '[research]\napi_key = "file-api-key"\ntimeout = 1234\n'
+        "poll_interval = 7\ncancel_on_timeout = true\n",
+        encoding="utf-8",
+    )
+    startup_state = build_startup_state()
+    startup_state.config_path = str(config_path)
+    app = TUI.DeepResearchTUI(startup_state)
+
+    async with app.run_test(size=(140, 42)):
+        # pylint: disable=protected-access
+        config = app._build_config()
+
+    assert config.api_key == "file-api-key"
+    assert config.timeout == 1234
+    assert config.poll_interval == 7
+    assert config.cancel_on_timeout is True

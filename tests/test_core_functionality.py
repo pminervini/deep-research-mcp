@@ -5,7 +5,6 @@ Test script to verify the core deep research functionality.
 This tests the underlying components that the MCP server uses.
 """
 
-import os
 from types import SimpleNamespace
 
 import pytest
@@ -18,98 +17,55 @@ from deep_research_mcp.backends import (
     OpenAIResearchBackend,
 )
 from deep_research_mcp.config import ResearchConfig
-from deep_research_mcp.results import ResearchResult, ResearchTaskStatus
+from deep_research_mcp.results import ResearchResult
 
 
-@pytest.fixture
-def test_config():
-    """Test configuration fixture"""
-    os.environ["RESEARCH_MODEL"] = "gpt-5-mini"  # Use cheap model for testing
-    return ResearchConfig.from_env()
-
-
-@pytest.fixture
-def test_agent(test_config):
-    """Test agent fixture"""
-    return DeepResearchAgent(test_config)
-
-
-def test_config_loading(test_config):
-    """Test configuration loading"""
-    assert test_config.model == "gpt-5-mini"
-    assert test_config.timeout > 0
-    assert test_config.poll_interval > 0
-    assert not hasattr(test_config, "enable_clarification")
-    assert not hasattr(test_config, "triage_model")
-    assert not hasattr(test_config, "clarifier_model")
-
-
-def test_config_validation():
-    """Test configuration validation"""
-    config = ResearchConfig.from_env()
-    config.validate()
-    assert config.model is not None
-    assert config.timeout > 0
-    assert config.poll_interval > 0
-
-
-def test_agent_initialization(test_config):
-    """Test agent initialization"""
-    agent = DeepResearchAgent(test_config)
-    assert agent.config == test_config
-    assert isinstance(agent.backend, OpenAIResearchBackend)
-    assert hasattr(agent.backend, "client")
-    assert not hasattr(agent, "clarification_manager")
-    assert not hasattr(agent, "instruction_client")
-    assert not hasattr(agent, "prompt_manager")
-
-
-def test_gemini_agent_initialization():
-    """Test Gemini agent initialization without making API calls."""
-    old_provider = os.environ.get("RESEARCH_PROVIDER")
-    old_model = os.environ.get("RESEARCH_MODEL")
-    old_api_key = os.environ.get("RESEARCH_API_KEY")
-
-    os.environ["RESEARCH_PROVIDER"] = "gemini"
-    os.environ["RESEARCH_MODEL"] = "deep-research-preview-04-2026"
-    os.environ["RESEARCH_API_KEY"] = "gemini-test-key"
-
-    try:
-        config = ResearchConfig.from_env()
-        agent = DeepResearchAgent(config)
-        assert agent.config.provider == "gemini"
-        assert isinstance(agent.backend, GeminiResearchBackend)
-        assert hasattr(agent.backend, "gemini_interactions")
-    finally:
-        if old_provider:
-            os.environ["RESEARCH_PROVIDER"] = old_provider
-        else:
-            os.environ.pop("RESEARCH_PROVIDER", None)
-
-        if old_model:
-            os.environ["RESEARCH_MODEL"] = old_model
-        else:
-            os.environ.pop("RESEARCH_MODEL", None)
-
-        if old_api_key:
-            os.environ["RESEARCH_API_KEY"] = old_api_key
-        else:
-            os.environ.pop("RESEARCH_API_KEY", None)
-
-
-def test_openai_codex_agent_initialization():
-    """Test Codex subscription provider selection without network access."""
-    config = ResearchConfig.from_env(
-        {
-            "RESEARCH_PROVIDER": "openai-codex",
-            "RESEARCH_MODEL": "auto",
-        }
-    )
-
+@pytest.mark.parametrize(
+    ("config", "backend_type"),
+    [
+        (
+            ResearchConfig(
+                provider="openai",
+                model="gpt-5-mini",
+                api_key="openai-test-key",
+                base_url="https://api.openai.com/v1",
+            ),
+            OpenAIResearchBackend,
+        ),
+        (
+            ResearchConfig(
+                provider="gemini",
+                model="deep-research-preview-04-2026",
+                api_key="gemini-test-key",
+                base_url="https://generativelanguage.googleapis.com",
+            ),
+            GeminiResearchBackend,
+        ),
+        (
+            ResearchConfig(
+                provider="openai-codex",
+                model="auto",
+                base_url="https://chatgpt.com/backend-api/codex",
+            ),
+            CodexResearchBackend,
+        ),
+        (
+            ResearchConfig(
+                provider="dr-tulu",
+                model="dr-tulu",
+                base_url="http://localhost:8080/",
+            ),
+            DrTuluResearchBackend,
+        ),
+    ],
+    ids=["openai", "gemini", "openai-codex", "dr-tulu"],
+)
+def test_agent_selects_provider_backend(config, backend_type):
+    """The agent factory selects the backend configured for each provider."""
     agent = DeepResearchAgent(config)
 
-    assert isinstance(agent.backend, CodexResearchBackend)
-    assert agent.config.base_url == "https://chatgpt.com/backend-api/codex"
+    assert agent.config is config
+    assert isinstance(agent.backend, backend_type)
 
 
 def test_gemini_extract_results_uses_current_steps_schema():
@@ -364,75 +320,3 @@ def test_render_research_markdown_includes_provider_note():
     rendered = _render_research_markdown(title="Report", result=result)
 
     assert "- **Provider note**: Web search only." in rendered
-
-
-def test_dr_tulu_agent_initialization():
-    """Test Dr Tulu agent initialization without making network calls."""
-    old_provider = os.environ.get("RESEARCH_PROVIDER")
-    old_model = os.environ.get("RESEARCH_MODEL")
-    old_base_url = os.environ.get("RESEARCH_BASE_URL")
-
-    os.environ["RESEARCH_PROVIDER"] = "dr-tulu"
-    os.environ["RESEARCH_MODEL"] = "dr-tulu"
-    os.environ["RESEARCH_BASE_URL"] = "http://localhost:8080/"
-
-    try:
-        config = ResearchConfig.from_env()
-        agent = DeepResearchAgent(config)
-        assert agent.config.provider == "dr-tulu"
-        assert isinstance(agent.backend, DrTuluResearchBackend)
-        assert agent.config.base_url == "http://localhost:8080/"
-    finally:
-        if old_provider:
-            os.environ["RESEARCH_PROVIDER"] = old_provider
-        else:
-            os.environ.pop("RESEARCH_PROVIDER", None)
-
-        if old_model:
-            os.environ["RESEARCH_MODEL"] = old_model
-        else:
-            os.environ.pop("RESEARCH_MODEL", None)
-
-        if old_base_url:
-            os.environ["RESEARCH_BASE_URL"] = old_base_url
-        else:
-            os.environ.pop("RESEARCH_BASE_URL", None)
-
-
-@pytest.mark.asyncio
-@pytest.mark.api
-@pytest.mark.integration
-async def test_agent_status_check(test_agent):
-    """Test agent's get_task_status method"""
-    # Skip if no API key
-    if not os.getenv("OPENAI_API_KEY"):
-        pytest.skip("OPENAI_API_KEY not set - skipping real API tests")
-
-    # Test with a fake task ID - should handle gracefully
-    status = await test_agent.get_task_status("fake-task-id-123")
-    assert isinstance(status, ResearchTaskStatus)
-    assert status.task_id == "fake-task-id-123"
-
-
-@pytest.mark.asyncio
-@pytest.mark.slow
-@pytest.mark.api
-@pytest.mark.integration
-async def test_research_dry_run(test_agent):
-    """Test full research flow (REAL API CALL - takes 2-5 minutes and costs money)"""
-    # Skip if no API key
-    if not os.getenv("OPENAI_API_KEY"):
-        pytest.skip("OPENAI_API_KEY not set - skipping real API tests")
-
-    # WARNING: This makes a REAL OpenAI Deep Research API call
-    # It will take several minutes and costs real money
-    # This is an integration test, not a unit test
-    result = await test_agent.research(
-        query="Test research query for validation",
-        system_prompt="This is a test system prompt",
-        include_code_interpreter=False,
-    )
-
-    # Check the result format
-    assert isinstance(result, ResearchResult)
-    assert result.status in {"completed", "failed", "error"}

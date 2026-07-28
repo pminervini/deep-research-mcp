@@ -50,7 +50,13 @@ async def run_provider_check(provider, model, api_style="responses"):
         "RESEARCH_API_STYLE": api_style,
     }
 
-    if provider == "gemini":
+    if provider == "openai":
+        openai_key = os.environ.get("OPENAI_API_KEY")
+        if not openai_key:
+            pytest.skip("OPENAI_API_KEY not set; skipping OpenAI provider check")
+        env_overrides["RESEARCH_API_KEY"] = openai_key
+        env_overrides["RESEARCH_BASE_URL"] = "https://api.openai.com/v1"
+    elif provider == "gemini":
         gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get(
             "GOOGLE_API_KEY"
         )
@@ -77,7 +83,7 @@ async def run_provider_check(provider, model, api_style="responses"):
     try:
         # Confirm config resolve reflects our desired provider/model
         logger.info("Loading ResearchConfig from environment...")
-        cfg = ResearchConfig.from_env()
+        cfg = ResearchConfig.load()
         logger.info(
             f"Config loaded: provider={cfg.provider}, model={cfg.model}, api_style={cfg.api_style}"
         )
@@ -107,19 +113,10 @@ async def run_provider_check(provider, model, api_style="responses"):
         )
         logger.info(f"deep_research completed. Result length: {len(result)} chars")
 
-        # Always returns a string: either a report or a clear error
-        logger.info("Validating result type...")
+        # A live provider check is useful only when the request succeeds.
         assert isinstance(result, str)
-
-        # We accept both success or informative failure depending on env/services
-        acceptable_indicators = (
-            "Research Report:",
-            "Research failed:",
-            "Failed to initialize research agent",
-            "Unexpected error:",
-        )
-        logger.info("Checking for acceptable result indicators...")
-        assert any(ind in result for ind in acceptable_indicators)
+        assert result.startswith("# Research Report:"), result
+        assert "## Research Metadata" in result
         logger.info(f"Test PASSED for provider={provider} (api_style={api_style})")
 
     finally:

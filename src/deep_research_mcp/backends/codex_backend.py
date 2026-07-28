@@ -205,14 +205,16 @@ class CodexResearchBackend(ResearchBackend):
         self, client: httpx.AsyncClient, tokens: CodexTokens
     ) -> tuple[dict[str, Any], CodexTokens]:
         current = tokens
-        for attempt in range(2):
+        refreshed = False
+        while True:
             response = await client.get(
                 f"{self.base_url}/models",
                 params={"client_version": CODEX_PROTOCOL_VERSION},
                 headers=self._headers(current, accept="application/json"),
             )
-            if response.status_code == 401 and attempt == 0:
+            if response.status_code == 401 and not refreshed:
                 current = await self.auth_manager.get_valid_tokens(force_refresh=True)
+                refreshed = True
                 continue
             self._raise_http_error(response, "retrieve the Codex model catalogue")
             try:
@@ -228,10 +230,6 @@ class CodexResearchBackend(ResearchBackend):
                     code="invalid_models",
                 )
             return data, current
-        raise CodexBackendError(
-            "OpenAI Codex authentication was rejected after token refresh",
-            code="authentication_failed",
-        )
 
     def _build_request(
         self,
@@ -270,28 +268,25 @@ class CodexResearchBackend(ResearchBackend):
         request_body: dict[str, Any],
     ) -> CodexStreamState:
         current = tokens
-        for attempt in range(2):
+        refreshed = False
+        while True:
             async with client.stream(
                 "POST",
                 f"{self.base_url}/responses",
                 headers=self._headers(current),
                 json=request_body,
             ) as response:
-                if response.status_code == 401 and attempt == 0:
+                if response.status_code == 401 and not refreshed:
                     await response.aread()
                     current = await self.auth_manager.get_valid_tokens(
                         force_refresh=True
                     )
+                    refreshed = True
                     continue
                 if response.is_error:
                     await response.aread()
                     self._raise_http_error(response, "start Codex research")
                 return await self._consume_sse(response)
-
-        raise CodexBackendError(
-            "OpenAI Codex authentication was rejected after token refresh",
-            code="authentication_failed",
-        )
 
     async def _consume_sse(self, response: httpx.Response) -> CodexStreamState:
         state = CodexStreamState()

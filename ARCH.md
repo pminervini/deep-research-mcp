@@ -173,7 +173,7 @@ The project is composed of four main layers:
     -   `_init_gemini()`: Initializes the Gemini `google-genai` client and Interactions resource with beta API settings.
     -   `_run_research()`: Starts a Gemini Deep Research background interaction and normalizes the completed result.
     -   `_wait_for_completion()`: Polls Gemini interaction status until completion, failure, or timeout.
-    -   `_extract_results()`: Parses Gemini interaction outputs into the project's standard report/citation format.
+    -   `extract_results()`: Parses Gemini interaction outputs into the project's standard report/citation format.
     -   `get_task_status()`: Returns Gemini interaction status metadata.
 
 ### `src/deep_research_mcp/backends/dr_tulu_backend.py`
@@ -181,7 +181,7 @@ The project is composed of four main layers:
 -   **Purpose**: Implements the DR-Tulu research agent integration.
 -   **Key Functionality**:
     -   `research()`: Sends research queries to the DR-Tulu `/chat` endpoint and returns normalized results.
-    -   `_normalize_citations()`: Converts DR-Tulu searched links into the standard citation format.
+    -   `_build_citations()`: Converts DR-Tulu searched links into the standard citation format.
     -   `get_task_status()`: Returns an `unknown` status because DR-Tulu does not support persistent task tracking.
 
 ### `src/deep_research_mcp/backends/open_deep_research_backend.py`

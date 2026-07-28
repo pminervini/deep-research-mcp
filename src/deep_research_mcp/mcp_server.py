@@ -49,6 +49,7 @@ from mcp.server.fastmcp import Context, FastMCP
 
 from deep_research_mcp import __version__
 from deep_research_mcp.agent import DeepResearchAgent
+from deep_research_mcp.auth import load_http_auth
 from deep_research_mcp.config import ResearchConfig
 from deep_research_mcp.errors import ResearchError
 from deep_research_mcp.results import ResearchResult
@@ -80,6 +81,7 @@ _config_overrides: dict[str, bool] = {}
 RESEARCH_TOOL_META = {"anthropic/maxResultSizeChars": 500_000}
 
 # Initialize FastMCP server at module level with metadata
+token_verifier, auth_settings = load_http_auth()
 mcp = FastMCP(
     name=f"deep-research (v{__version__})",
     instructions=(
@@ -94,6 +96,8 @@ mcp = FastMCP(
     website_url="https://github.com/pminervini/deep-research-mcp",
     debug=False,
     log_level="INFO",
+    token_verifier=token_verifier,
+    auth=auth_settings,
 )
 
 

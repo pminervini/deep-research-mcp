@@ -634,6 +634,28 @@ Notes:
   `stdio` and let the client spawn the server, make sure the client passes the
   required env vars through.
 
+#### OAuth authentication for HTTP
+
+HTTP OAuth is opt-in. Set both variables below before starting the server:
+
+```bash
+export MCP_AUTH_ISSUER_URL="https://firm-mermaid-02-staging.authkit.app"
+export MCP_AUTH_RESOURCE_URL="http://127.0.0.1:8080/mcp"
+
+uv run deep-research-mcp --transport http --host 127.0.0.1 --port 8080
+```
+
+`MCP_AUTH_RESOURCE_URL` must exactly match the Resource Indicator configured in
+WorkOS, including the `/mcp` path. When enabled, the server verifies each
+AuthKit access token's signature, issuer, expiration, and audience and publishes
+RFC 9728 protected-resource metadata for MCP clients. No WorkOS API key or
+client secret is required by the server. Local `stdio` usage is unchanged.
+
+In WorkOS, enable Client ID Metadata Documents (CIMD), keep Dynamic Client
+Registration (DCR) enabled for older clients, and add the resource URL under
+Connect → Configuration. See the [WorkOS MCP authentication
+guide](https://workos.com/docs/authkit/mcp).
+
 ### Command-Line Interface
 
 The installed `deep-research-cli` command provides direct access to all

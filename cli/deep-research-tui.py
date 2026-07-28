@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -399,7 +400,6 @@ class DeepResearchTUI(App):
         self._startup_state = startup_state or StartupState()
         self._output_text = ""
         self._output_view: str = "markdown"
-        self._status_message = "Ready"
 
     def on_mount(self) -> None:
         self.register_theme(CODEX_THEME)
@@ -557,7 +557,6 @@ class DeepResearchTUI(App):
 
     def _set_status(self, message: str) -> None:
         """Update the status bar message."""
-        self._status_message = message
         self.query_one("#status-bar", Static).update(message)
 
     def _set_output(self, text: str) -> None:
@@ -722,11 +721,22 @@ class DeepResearchTUI(App):
 
     def _build_config(self) -> ResearchConfig:
         """Build a ResearchConfig from current UI state."""
-        return ResearchConfig(
-            provider=self.query_one("#provider", Select).value or "openai",
-            api_style=self.query_one("#api-style", Select).value or "responses",
-            model=self.query_one("#model", Input).value,
-            base_url=self.query_one("#base-url", Input).value or None,
+        env = dict(os.environ)
+        env.update(
+            {
+                "RESEARCH_PROVIDER": str(
+                    self.query_one("#provider", Select).value or "openai"
+                ),
+                "RESEARCH_API_STYLE": str(
+                    self.query_one("#api-style", Select).value or "responses"
+                ),
+                "RESEARCH_MODEL": self.query_one("#model", Input).value,
+                "RESEARCH_BASE_URL": self.query_one("#base-url", Input).value,
+            }
+        )
+        return ResearchConfig.load(
+            config_path=self._startup_state.config_path,
+            env=env,
         )
 
     def _get_query(self) -> str:
@@ -1045,14 +1055,14 @@ def build_parser() -> argparse.ArgumentParser:
             "gemini",
             "open-deep-research",
         ],
-        default="openai",
-        help="Research provider (default: openai)",
+        default=None,
+        help="Override the configured research provider",
     )
     parser.add_argument(
         "--api-style",
         choices=["responses", "chat_completions"],
-        default="responses",
-        help="OpenAI API style (default: responses)",
+        default=None,
+        help="Override the configured OpenAI API style",
     )
     parser.add_argument(
         "--query",
@@ -1071,7 +1081,18 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
 
-    defaults = get_provider_defaults(args.provider, args.api_style)
+    env = dict(os.environ)
+    if args.provider is not None:
+        env["RESEARCH_PROVIDER"] = args.provider
+    if args.api_style is not None:
+        env["RESEARCH_API_STYLE"] = args.api_style
+    config = ResearchConfig.load(config_path=args.config, env=env)
+    defaults = ProviderDefaults(
+        provider=config.provider,
+        api_style=config.api_style,
+        model=config.model,
+        base_url=config.base_url or "",
+    )
 
     startup_state = StartupState(
         config_path=args.config,
@@ -1079,8 +1100,8 @@ def main() -> None:
         server_url=args.server_url,
         query=args.query,
         save_path=args.save_path,
-        provider=args.provider,
-        api_style=args.api_style,
+        provider=config.provider,
+        api_style=config.api_style,
         system_prompt=DEFAULT_SYSTEM_PROMPT,
         include_analysis=True,
         json_output=False,

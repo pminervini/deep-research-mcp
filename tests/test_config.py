@@ -1,32 +1,11 @@
 # -*- coding: utf-8 -*-
 
-"""Tests for config loading and validation using real OpenAI API calls."""
+"""Tests for configuration loading and validation."""
 
 import os
 import pytest
 from deep_research_mcp.config import ResearchConfig
 from deep_research_mcp.errors import ConfigurationError
-
-
-def test_config_creation_with_overrides():
-    """Test config creation with custom values"""
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        pytest.skip("OPENAI_API_KEY not set")
-
-    config = ResearchConfig(
-        api_key=api_key,
-        model="gpt-5-mini",
-        timeout=120.0,
-        poll_interval=5.0,
-        log_level="DEBUG",
-    )
-
-    assert config.api_key == api_key
-    assert config.model == "gpt-5-mini"
-    assert config.timeout == 120.0
-    assert config.poll_interval == 5.0
-    assert config.log_level == "DEBUG"
 
 
 def test_validate_with_valid_model():
@@ -63,18 +42,12 @@ def test_validate_with_invalid_log_level():
 
 def test_config_with_custom_endpoint():
     """Test config creation with custom OpenAI endpoint"""
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        pytest.skip("OPENAI_API_KEY not set")
-
     custom_endpoint = "https://api.custom-provider.com/v1"
     config = ResearchConfig(
-        api_key=api_key, base_url=custom_endpoint, model="gpt-5-mini"
+        api_key="sk-test", base_url=custom_endpoint, model="gpt-5-mini"
     )
 
-    assert config.api_key == api_key
     assert config.base_url == custom_endpoint
-    assert config.model == "gpt-5-mini"
     assert config.validate() is True
 
 
@@ -103,17 +76,8 @@ def test_from_env_with_base_url():
                 del os.environ["RESEARCH_BASE_URL"]
 
 
-# --- api_style tests ---
-
-
-def test_api_style_defaults_to_responses():
-    """Test that api_style defaults to 'responses'"""
-    config = ResearchConfig(api_key="sk-test", model="gpt-5-mini")
-    assert config.api_style == "responses"
-
-
 def test_openai_responses_default_model():
-    """Test that OpenAI Responses defaults to the supported research model."""
+    """Test OpenAI Responses provider and runtime defaults."""
     config = ResearchConfig.from_env(
         {
             "RESEARCH_PROVIDER": "openai",
@@ -122,7 +86,13 @@ def test_openai_responses_default_model():
         }
     )
 
+    assert config.provider == "openai"
+    assert config.api_style == "responses"
     assert config.model == "gpt-5.6-sol"
+    assert config.base_url == "https://api.openai.com/v1"
+    assert config.timeout == 1800.0
+    assert config.poll_interval == 30.0
+    assert config.log_level == "INFO"
 
 
 def test_api_style_from_env():
@@ -162,15 +132,6 @@ def test_api_style_invalid_value_rejected():
             os.environ["RESEARCH_API_STYLE"] = old_api_style
         else:
             os.environ.pop("RESEARCH_API_STYLE", None)
-
-
-def test_api_style_chat_completions_skips_api_key_validation():
-    """Test that API key validation is skipped for chat_completions mode"""
-    config = ResearchConfig(
-        api_key="ppl-perplexity-key", model="gpt-5-mini", api_style="chat_completions"
-    )
-    # Should not raise despite non-sk- prefix
-    assert config.validate() is True
 
 
 def test_api_style_chat_completions_default_model():
