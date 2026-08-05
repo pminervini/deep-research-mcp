@@ -179,6 +179,21 @@ timeout = 1800
 poll_interval = 30
 ```
 
+Available Gemini Deep Research agent IDs:
+
+| Agent ID | Intended use |
+| --- | --- |
+| `deep-research-preview-04-2026` | Faster, more efficient research; this is the project default |
+| `deep-research-max-preview-04-2026` | Maximum comprehensiveness for context gathering and synthesis |
+| `deep-research-pro-preview-12-2025` | Older Gemini 3.1 Pro-based preview for accuracy-focused, long-running research |
+
+Google's current [Gemini Deep Research documentation](https://ai.google.dev/gemini-api/docs/deep-research)
+lists the April 2026 standard and Max agents as the supported versions. The
+December 2025 Pro agent remains present in the Gemini API model catalogue and
+has a separate [model page](https://ai.google.dev/gemini-api/docs/models/deep-research-pro-preview-12-2025),
+but it is no longer listed among the current supported versions. Set any agent
+ID above as `research.model`; all are preview identifiers and may change.
+
 Dr Tulu provider example:
 
 ```toml
