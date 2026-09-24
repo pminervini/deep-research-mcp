@@ -111,13 +111,13 @@ def get_provider_defaults(
             return ProviderDefaults(
                 provider=provider,
                 api_style=api_style,
-                model="gpt-5-mini",
+                model="gpt-6-luna",
                 base_url="https://api.openai.com/v1",
             )
         return ProviderDefaults(
             provider=provider,
             api_style="responses",
-            model="gpt-5.6-sol",
+            model="gpt-6-sol",
             base_url="https://api.openai.com/v1",
         )
     if provider == "openai-codex":
@@ -151,7 +151,7 @@ def get_provider_defaults(
     return ProviderDefaults(
         provider="openai",
         api_style="responses",
-        model="gpt-5-mini",
+        model="gpt-6-luna",
         base_url="https://api.openai.com/v1",
     )
 

@@ -88,7 +88,7 @@ def test_openai_responses_default_model():
 
     assert config.provider == "openai"
     assert config.api_style == "responses"
-    assert config.model == "gpt-5.6-sol"
+    assert config.model == "gpt-6-sol"
     assert config.base_url == "https://api.openai.com/v1"
     assert config.timeout == 1800.0
     assert config.poll_interval == 30.0
@@ -135,7 +135,7 @@ def test_api_style_invalid_value_rejected():
 
 
 def test_api_style_chat_completions_default_model():
-    """Test that chat_completions mode defaults to gpt-5-mini for openai provider"""
+    """Test that chat_completions mode defaults to gpt-6-luna for openai provider"""
     old_api_style = os.environ.get("RESEARCH_API_STYLE")
     old_model = os.environ.get("RESEARCH_MODEL")
 
@@ -145,7 +145,7 @@ def test_api_style_chat_completions_default_model():
     try:
         config = ResearchConfig.from_env()
         assert config.api_style == "chat_completions"
-        assert config.model == "gpt-5-mini"
+        assert config.model == "gpt-6-luna"
     finally:
         if old_api_style:
             os.environ["RESEARCH_API_STYLE"] = old_api_style

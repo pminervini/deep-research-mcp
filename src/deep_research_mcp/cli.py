@@ -29,7 +29,7 @@ USAGE EXAMPLES:
   uv run deep-research-cli config --pretty
 
   # Override config for a single run
-  uv run deep-research-cli --provider openai --model gpt-5-mini --timeout 600 research "Quick query"
+  uv run deep-research-cli --provider openai --model gpt-6-sol --timeout 600 research "Quick query"
 """
 
 import argparse

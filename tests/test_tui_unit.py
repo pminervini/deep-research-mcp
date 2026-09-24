@@ -24,7 +24,7 @@ def test_provider_defaults_for_openai_chat_completions():
 
     assert defaults.provider == "openai"
     assert defaults.api_style == "chat_completions"
-    assert defaults.model == "gpt-5-mini"
+    assert defaults.model == "gpt-6-luna"
     assert defaults.base_url == "https://api.openai.com/v1"
 
 
@@ -33,7 +33,7 @@ def test_provider_defaults_for_openai_responses():
 
     assert defaults.provider == "openai"
     assert defaults.api_style == "responses"
-    assert defaults.model == "gpt-5.6-sol"
+    assert defaults.model == "gpt-6-sol"
     assert defaults.base_url == "https://api.openai.com/v1"
 
 

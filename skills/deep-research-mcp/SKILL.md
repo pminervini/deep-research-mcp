@@ -130,7 +130,7 @@ Safe pattern when switching providers from the command line:
 uv run deep-research-cli \
   --provider openai \
   --api-style responses \
-  --model gpt-5.6-sol \
+  --model gpt-6-sol \
   --api-key "$OPENAI_API_KEY" \
   --base-url https://api.openai.com/v1 \
   research "..."
@@ -144,7 +144,7 @@ uv run deep-research-cli \
 [research]
 provider = "openai"
 api_style = "responses"
-model = "gpt-5.6-sol"
+model = "gpt-6-sol"
 api_key = "YOUR_OPENAI_API_KEY"
 base_url = "https://api.openai.com/v1"
 timeout = 1800
@@ -193,7 +193,7 @@ uv run deep-research-cli research "Your research query"
 uv run deep-research-cli \
   --provider openai \
   --api-style responses \
-  --model gpt-5.6-sol \
+  --model gpt-6-sol \
   --api-key "$OPENAI_API_KEY" \
   --base-url https://api.openai.com/v1 \
   --timeout 900 \
@@ -226,7 +226,7 @@ OPENAI_API_KEY="$OPENAI_API_KEY" \
 uv run deep-research-cli \
   --provider openai \
   --api-style responses \
-  --model gpt-5.6-sol \
+  --model gpt-6-sol \
   --api-key "$OPENAI_API_KEY" \
   --base-url https://api.openai.com/v1 \
   --timeout 900 \
@@ -236,7 +236,7 @@ uv run deep-research-cli \
   --output-file openai-report.md
 ```
 
-Observed output excerpt:
+Illustrative output excerpt from an earlier OpenAI model (not a GPT-6 verification):
 
 ```text
 ============================================================
@@ -736,7 +736,7 @@ OPENAI_API_KEY="$OPENAI_API_KEY" \
 uv run deep-research-cli \
   --provider openai \
   --api-style responses \
-  --model gpt-5.6-sol \
+  --model gpt-6-sol \
   --api-key "$OPENAI_API_KEY" \
   --base-url https://api.openai.com/v1 \
   research "Your query"

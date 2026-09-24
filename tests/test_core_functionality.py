@@ -210,10 +210,13 @@ def test_openai_extract_results_dedupes_citations_and_joins_blocks():
         ("gpt-5.6-sol", "xhigh"),
         ("gpt-5.6-terra", "xhigh"),
         ("gpt-5.6-luna", "xhigh"),
+        ("gpt-6-astra", "xhigh"),
+        ("gpt-6-sol", "xhigh"),
+        ("gpt-6-luna", "xhigh"),
     ],
 )
-def test_openai_gpt5_builds_long_research_request(model, effort):
-    """Supported GPT-5 reasoning models use the long-research request shape."""
+def test_openai_reasoning_models_build_long_research_request(model, effort):
+    """Supported GPT-5/6 reasoning models use the long-research request shape."""
     backend = object.__new__(OpenAIResearchBackend)
     backend.config = SimpleNamespace(
         model=model,

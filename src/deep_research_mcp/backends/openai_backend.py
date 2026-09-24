@@ -41,6 +41,9 @@ GPT_5_RESEARCH_MODEL_PATTERN = re.compile(
 GPT_5_PRO_WITHOUT_CODE_INTERPRETER_PATTERN = re.compile(
     r"^gpt-5(?:\.4)?-pro(?:-\d{4}-\d{2}-\d{2})?$"
 )
+GPT_6_RESEARCH_MODEL_PATTERN = re.compile(
+    r"^gpt-6-(?:astra|sol|luna)(?:-\d{4}-\d{2}-\d{2})?$"
+)
 
 
 class OpenAIResearchBackend(ResearchBackend):
@@ -134,7 +137,7 @@ class OpenAIResearchBackend(ResearchBackend):
     def _build_tools(self, include_code_interpreter: bool) -> list[dict[str, Any]]:
         """Build Responses API tool configuration."""
         web_search_tool: dict[str, Any] = {"type": "web_search"}
-        if self._gpt_5_research_effort():
+        if self._research_effort():
             web_search_tool["return_token_budget"] = "unlimited"
         tools: list[dict[str, Any]] = [web_search_tool]
         if include_code_interpreter and not (
@@ -148,8 +151,10 @@ class OpenAIResearchBackend(ResearchBackend):
             )
         return tools
 
-    def _gpt_5_research_effort(self) -> str | None:
-        """Return the deep-research effort supported by a GPT-5 reasoning model."""
+    def _research_effort(self) -> str | None:
+        """Return the deep-research effort supported by GPT-5/6 reasoning models."""
+        if GPT_6_RESEARCH_MODEL_PATTERN.fullmatch(self.config.model):
+            return "xhigh"
         match = GPT_5_RESEARCH_MODEL_PATTERN.fullmatch(self.config.model)
         if not match:
             return None
@@ -284,7 +289,7 @@ class OpenAIResearchBackend(ResearchBackend):
             "background": True,
         }
         reasoning: dict[str, str] = {}
-        research_effort = self._gpt_5_research_effort()
+        research_effort = self._research_effort()
         if research_effort:
             kwargs["tool_choice"] = "required"
             reasoning["effort"] = research_effort
