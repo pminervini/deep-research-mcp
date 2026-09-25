@@ -152,7 +152,7 @@ The project is composed of four main layers:
 
 -   **Purpose**: Isolates the undocumented ChatGPT Codex endpoint from the public OpenAI API backend.
 -   **Key Functionality**:
-    -   Fetches the signed-in account's ordered `/models` catalogue and resolves `model = "auto"`.
+    -   Fetches the signed-in account's ordered `/models` catalogue with a fallback Codex client version (`0.156.1`), using a newer installed `codex --version` when available, and resolves `model = "auto"`.
     -   Sends an honestly identified, web-search-enabled `/responses` request and assembles raw SSE deltas, annotations, searches, and terminal status.
     -   Retries once after a pre-stream `401`, but never retries a partially consumed stream.
     -   Returns `unknown` for task status because streamed results cannot be recovered.
@@ -205,7 +205,7 @@ The project is composed of four main layers:
 
 -   **Purpose**: Manages the application's configuration.
 -   **Key Functionality**:
-    -   `ResearchConfig` (dataclass): Defines the configuration parameters for the agent, such as API key, model name, base URL, `api_style` (`"responses"` or `"chat_completions"`), timeout, and poll interval.
+    -   `ResearchConfig` (dataclass): Defines the configuration parameters for the agent, such as API key, model name, optional OpenAI reasoning effort, base URL, `api_style` (`"responses"` or `"chat_completions"`), timeout, and poll interval.
     -   `load()`: Explicitly reads `~/.deep_research` (or another provided TOML path), merges it with environment variable overrides, and returns a config object without mutating `os.environ`.
     -   `from_env()`: A class method to load configuration from environment variables only.
     -   `validate()`: A method to validate the configuration to ensure that the provided values are valid.

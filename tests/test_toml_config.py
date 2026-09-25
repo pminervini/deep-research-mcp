@@ -51,6 +51,21 @@ def test_load_merges_toml_with_environment_overrides(tmp_path):
     assert config.timeout == 90.0
 
 
+def test_reasoning_effort_toml_env_precedence(tmp_path):
+    config_path = tmp_path / ".deep_research"
+    config_path.write_text(
+        '[research]\nprovider = "openai"\nreasoning_effort = "high"\n',
+        encoding="utf-8",
+    )
+    assert ResearchConfig.load(config_path, env={}).reasoning_effort == "high"
+    assert (
+        ResearchConfig.load(
+            config_path, env={"RESEARCH_REASONING_EFFORT": "low"}
+        ).reasoning_effort
+        == "low"
+    )
+
+
 def test_cancel_on_timeout_parsing():
     """cancel_on_timeout defaults to False and parses env/TOML booleans."""
     original_val = os.environ.get("RESEARCH_CANCEL_ON_TIMEOUT")

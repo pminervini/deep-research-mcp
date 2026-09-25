@@ -220,6 +220,7 @@ def test_openai_reasoning_models_build_long_research_request(model, effort):
     backend = object.__new__(OpenAIResearchBackend)
     backend.config = SimpleNamespace(
         model=model,
+        reasoning_effort=None,
         enable_reasoning_summaries=True,
     )
     input_messages = [{"role": "user", "content": "Research test"}]
@@ -269,6 +270,7 @@ def test_openai_custom_model_uses_current_web_search_without_gpt5_options():
     backend = object.__new__(OpenAIResearchBackend)
     backend.config = SimpleNamespace(
         model="custom-research-model",
+        reasoning_effort=None,
         enable_reasoning_summaries=False,
     )
     input_messages = [{"role": "user", "content": "Research test"}]
@@ -284,6 +286,17 @@ def test_openai_custom_model_uses_current_web_search_without_gpt5_options():
         "tools": tools,
         "background": True,
     }
+
+
+def test_openai_reasoning_effort_overrides_model_default():
+    backend = object.__new__(OpenAIResearchBackend)
+    backend.config = SimpleNamespace(
+        model="gpt-6-sol", reasoning_effort="low", enable_reasoning_summaries=True
+    )
+    # pylint: disable=protected-access
+    kwargs = backend._build_responses_create_kwargs([], backend._build_tools(False))
+    assert kwargs["reasoning"] == {"effort": "low", "summary": "auto"}
+    assert kwargs["tool_choice"] == "required"
 
 
 def test_render_citations_avoids_duplicating_url_only_titles():

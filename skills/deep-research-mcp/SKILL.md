@@ -602,10 +602,11 @@ Observed output:
 - Uses `client.responses.create(..., background=True)`
 - Polls with `client.responses.retrieve(task_id)`
 - Uses `web_search` for Responses models
-- Uses an unlimited returned-token budget for supported GPT-5 reasoning models
+- Uses an unlimited returned-token budget for supported GPT-5/6 reasoning models
 - Adds `code_interpreter` only when `include_code_interpreter=True`
 - Omits `code_interpreter` for legacy Pro models that do not support it
-- Uses `xhigh` reasoning effort for GPT-5.2+ research models and `high` for earlier GPT-5 models
+- Uses `xhigh` reasoning effort for GPT-5.2+ and GPT-6 research models and `high` for earlier GPT-5 models unless `reasoning_effort` overrides it
+- Set `reasoning_effort` in `[research]`, `RESEARCH_REASONING_EFFORT`, or CLI `--reasoning-effort` for OpenAI Responses, Chat Completions, and Codex subscription (model support varies)
 - `enable_reasoning_summaries=True` adds `summary="auto"` to the reasoning settings
 
 Use this when you want:

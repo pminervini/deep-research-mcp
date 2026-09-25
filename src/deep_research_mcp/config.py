@@ -121,6 +121,7 @@ class ResearchConfig:
     cancel_on_timeout: bool = False
     log_level: str = "INFO"
     enable_reasoning_summaries: bool = False
+    reasoning_effort: str | None = None
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> ResearchConfig:
@@ -224,6 +225,7 @@ class ResearchConfig:
             enable_reasoning_summaries=get_bool_setting(
                 "ENABLE_REASONING_SUMMARIES", default=False
             ),
+            reasoning_effort=get_setting_first("RESEARCH_REASONING_EFFORT") or None,
         )
 
     def validate(self) -> bool:
@@ -233,6 +235,21 @@ class ResearchConfig:
 
         if self.poll_interval <= 0:
             raise ConfigurationError("Poll interval must be positive")
+
+        if self.reasoning_effort is not None:
+            if self.reasoning_effort not in {
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max",
+            }:
+                raise ConfigurationError(
+                    f"Invalid reasoning effort '{self.reasoning_effort}'"
+                )
+            if self.provider not in {"openai", "openai-codex"}:
+                raise ConfigurationError("Reasoning effort requires an OpenAI provider")
 
         if self.provider == "openai-codex" and self.base_url:
             if self.base_url.rstrip("/") != OPENAI_CODEX_BASE_URL:

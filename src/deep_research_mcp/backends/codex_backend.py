@@ -10,6 +10,7 @@ from importlib.metadata import PackageNotFoundError, version
 import json
 import logging
 import re
+import subprocess
 import time
 from typing import Any
 import uuid
@@ -40,8 +41,29 @@ from inference, and produce a structured report with inline source links.
 MARKDOWN_LINK_PATTERN = re.compile(r"\[([^\]]+)\]\((https?://[^)\s]+)\)")
 URL_PATTERN = re.compile(r"https?://[^\s<>()\]]+")
 
-# Version of the official Codex client protocol this backend implements.
-CODEX_PROTOCOL_VERSION = "0.145.0"
+# Fallback when the Codex CLI is unavailable or older.
+CODEX_PROTOCOL_VERSION = "0.156.1"
+
+
+def _codex_protocol_version(codex_command: str = "codex") -> str:
+    """Use the installed Codex CLI version when newer than the fallback."""
+    try:
+        result = subprocess.run(
+            [codex_command, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return CODEX_PROTOCOL_VERSION
+    match = re.fullmatch(r"codex-cli (\d+)\.(\d+)\.(\d+)", result.stdout.strip())
+    if result.returncode != 0 or match is None:
+        return CODEX_PROTOCOL_VERSION
+    installed = tuple(int(part) for part in match.groups())
+    fallback = tuple(int(part) for part in CODEX_PROTOCOL_VERSION.split("."))
+    return ".".join(match.groups()) if installed > fallback else CODEX_PROTOCOL_VERSION
+
 
 try:
     PACKAGE_VERSION = version("deep-research-mcp")
@@ -209,7 +231,7 @@ class CodexResearchBackend(ResearchBackend):
         while True:
             response = await client.get(
                 f"{self.base_url}/models",
-                params={"client_version": CODEX_PROTOCOL_VERSION},
+                params={"client_version": _codex_protocol_version()},
                 headers=self._headers(current, accept="application/json"),
             )
             if response.status_code == 401 and not refreshed:
@@ -257,8 +279,13 @@ class CodexResearchBackend(ResearchBackend):
             "store": False,
             "stream": True,
         }
+        reasoning: dict[str, str] = {}
+        if self.config.reasoning_effort is not None:
+            reasoning["effort"] = self.config.reasoning_effort
         if self.config.enable_reasoning_summaries:
-            request["reasoning"] = {"summary": "auto"}
+            reasoning["summary"] = "auto"
+        if reasoning:
+            request["reasoning"] = reasoning
         return request
 
     async def _stream_response(

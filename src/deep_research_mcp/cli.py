@@ -87,6 +87,7 @@ def build_cli_env(args: argparse.Namespace) -> dict[str, str]:
     mapping: dict[str, str] = {
         "provider": "RESEARCH_PROVIDER",
         "model": "RESEARCH_MODEL",
+        "reasoning_effort": "RESEARCH_REASONING_EFFORT",
         "api_key": "RESEARCH_API_KEY",
         "base_url": "RESEARCH_BASE_URL",
         "api_style": "RESEARCH_API_STYLE",
@@ -532,6 +533,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Research provider",
     )
     cfg.add_argument("--model", default=None, help="Model or agent ID")
+    cfg.add_argument(
+        "--reasoning-effort",
+        default=None,
+        choices=["none", "low", "medium", "high", "xhigh", "max"],
+        help="OpenAI reasoning effort (default: provider/model behavior)",
+    )
     cfg.add_argument("--api-key", default=None, help="Provider API key")
     cfg.add_argument("--base-url", default=None, help="Provider API base URL")
     cfg.add_argument(

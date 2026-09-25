@@ -205,9 +205,10 @@ class OpenAIResearchBackend(ResearchBackend):
         self, messages: list[ChatCompletionMessageParam]
     ):
         """Retry-wrapped Chat Completions API call."""
-        return self.client.chat.completions.create(
-            model=self.config.model, messages=messages
-        )
+        kwargs: dict[str, Any] = {"model": self.config.model, "messages": messages}
+        if self.config.reasoning_effort is not None:
+            kwargs["reasoning_effort"] = self.config.reasoning_effort
+        return self.client.chat.completions.create(**kwargs)
 
     def _extract_chat_completions_results(
         self, response, elapsed_time: float
@@ -292,7 +293,9 @@ class OpenAIResearchBackend(ResearchBackend):
         research_effort = self._research_effort()
         if research_effort:
             kwargs["tool_choice"] = "required"
-            reasoning["effort"] = research_effort
+        effort = self.config.reasoning_effort or research_effort
+        if effort:
+            reasoning["effort"] = effort
         if self.config.enable_reasoning_summaries:
             reasoning["summary"] = "auto"
         if reasoning:

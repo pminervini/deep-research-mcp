@@ -93,6 +93,28 @@ def test_openai_responses_default_model():
     assert config.timeout == 1800.0
     assert config.poll_interval == 30.0
     assert config.log_level == "INFO"
+    assert config.reasoning_effort is None
+
+
+@pytest.mark.parametrize("effort", ["none", "low", "medium", "high", "xhigh", "max"])
+def test_reasoning_effort_from_env(effort: str):
+    config = ResearchConfig.from_env(
+        {"RESEARCH_PROVIDER": "openai-codex", "RESEARCH_REASONING_EFFORT": effort}
+    )
+    assert config.reasoning_effort == effort
+    assert config.validate() is True
+
+
+@pytest.mark.parametrize(
+    ("provider", "effort"),
+    [("openai", "extreme"), ("gemini", "high")],
+)
+def test_invalid_reasoning_effort_rejected(provider: str, effort: str):
+    config = ResearchConfig.from_env(
+        {"RESEARCH_PROVIDER": provider, "RESEARCH_REASONING_EFFORT": effort}
+    )
+    with pytest.raises(ConfigurationError, match="reasoning effort|Reasoning effort"):
+        config.validate()
 
 
 def test_api_style_from_env():

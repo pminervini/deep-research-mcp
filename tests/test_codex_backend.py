@@ -18,6 +18,7 @@ import pytest
 from deep_research_mcp.backends.codex_backend import (
     CODEX_PROTOCOL_VERSION,
     CodexResearchBackend,
+    _codex_protocol_version,
 )
 from deep_research_mcp.codex_auth import (
     CodexAuthEndpoints,
@@ -138,7 +139,7 @@ def codex_backend_server():
                 return
             model_query = parse_qs(parsed_url.query)
             state["last_model_query"] = model_query
-            if model_query != {"client_version": [CODEX_PROTOCOL_VERSION]}:
+            if model_query != {"client_version": [_codex_protocol_version()]}:
                 self._json(
                     400,
                     {
@@ -263,6 +264,41 @@ def _write_auth(
     )
 
 
+@pytest.mark.parametrize(
+    ("output", "expected"),
+    [
+        ("codex-cli 0.156.0", "0.156.1"),
+        ("codex-cli 0.157.0", "0.157.0"),
+        ("unexpected output", "0.156.1"),
+    ],
+)
+def test_codex_protocol_version_uses_newer_installed_cli(
+    tmp_path: Path, output: str, expected: str
+):
+    executable = tmp_path / "codex"
+    executable.write_text(f"#!/bin/sh\nprintf '%s\\n' '{output}'\n", encoding="utf-8")
+    executable.chmod(0o755)
+
+    assert _codex_protocol_version(str(executable)) == expected
+
+
+def test_codex_protocol_version_falls_back_without_cli(tmp_path: Path):
+    assert _codex_protocol_version(str(tmp_path / "missing-codex")) == (
+        CODEX_PROTOCOL_VERSION
+    )
+
+
+def test_codex_request_includes_reasoning_effort_and_summary(tmp_path: Path):
+    backend = _backend(tmp_path, "http://127.0.0.1:1")
+    backend.config.reasoning_effort = "high"
+    backend.config.enable_reasoning_summaries = True
+    # pylint: disable=protected-access
+    request = backend._build_request(
+        model="gpt-6-sol", query="Research", system_prompt=None
+    )
+    assert request["reasoning"] == {"effort": "high", "summary": "auto"}
+
+
 def _backend(
     tmp_path: Path,
     base_url: str,
@@ -327,7 +363,7 @@ async def test_codex_backend_discovers_model_and_assembles_sse(
     assert headers["ChatGPT-Account-ID"] == "account-123"
     assert headers["originator"] == "deep_research_mcp"
     assert headers["User-Agent"].startswith("deep-research-mcp/")
-    assert state["last_model_query"] == {"client_version": [CODEX_PROTOCOL_VERSION]}
+    assert state["last_model_query"] == {"client_version": [_codex_protocol_version()]}
     assert request["model"] == "gpt-picker"
     assert request["stream"] is True
     assert request["store"] is False

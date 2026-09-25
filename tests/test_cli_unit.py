@@ -10,6 +10,8 @@ from pathlib import Path
 import sys
 from types import ModuleType
 
+from deep_research_mcp.cli import load_config
+
 
 def load_cli_module() -> ModuleType:
     """Load the hyphenated CLI script as a Python module."""
@@ -52,3 +54,23 @@ def test_unified_cli_is_exposed_as_an_installed_console_script() -> None:
 
     assert scripts["deep-research-cli"] == "deep_research_mcp.cli:main"
     assert scripts["deep-research-mcp"] == "deep_research_mcp.mcp_server:main"
+
+
+def test_reasoning_effort_cli_overrides_toml(tmp_path: Path) -> None:
+    config_path = tmp_path / ".deep_research"
+    config_path.write_text(
+        '[research]\nprovider = "openai-codex"\nreasoning_effort = "high"\n',
+        encoding="utf-8",
+    )
+    cli = load_cli_module()
+    args = cli.build_parser().parse_args(
+        [
+            "--config",
+            str(config_path),
+            "--reasoning-effort",
+            "low",
+            "research",
+            "test query",
+        ]
+    )
+    assert load_config(args).reasoning_effort == "low"

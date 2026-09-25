@@ -50,6 +50,11 @@ async def test_provider_change_updates_model_and_base_url():
 
         assert app.query_one("#model", Input).value == "auto"
         assert app.query_one("#base-url", Input).disabled
+        assert not app.query_one("#reasoning-effort", Select).disabled
+
+        app.query_one("#provider", Select).value = "gemini"
+        await pilot.pause()
+        assert app.query_one("#reasoning-effort", Select).disabled
 
 
 @pytest.mark.asyncio
@@ -150,3 +155,31 @@ async def test_build_config_loads_toml_settings(tmp_path):
     assert config.timeout == 1234
     assert config.poll_interval == 7
     assert config.cancel_on_timeout is True
+
+
+@pytest.mark.asyncio
+async def test_reasoning_effort_tui_loads_and_overrides_config(tmp_path):
+    config_path = tmp_path / ".deep_research"
+    config_path.write_text(
+        '[research]\nprovider = "openai-codex"\nreasoning_effort = "high"\n',
+        encoding="utf-8",
+    )
+    startup_state = build_startup_state()
+    startup_state.config_path = str(config_path)
+    startup_state.provider = "openai-codex"
+    startup_state.config = TUI.get_provider_defaults("openai-codex")
+    startup_state.reasoning_effort = TUI.ResearchConfig.load(
+        config_path, env={}
+    ).reasoning_effort
+    app = TUI.DeepResearchTUI(startup_state)
+
+    async with app.run_test(size=(140, 42)) as pilot:
+        effort = app.query_one("#reasoning-effort", Select)
+        assert effort.value == "high"
+        assert app._build_config().reasoning_effort == "high"
+        effort.value = "low"
+        await pilot.pause()
+        assert app._build_config().reasoning_effort == "low"
+        effort.value = "default"
+        await pilot.pause()
+        assert app._build_config().reasoning_effort is None

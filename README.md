@@ -100,6 +100,7 @@ Common settings:
 provider = "openai"                         # Available options: "openai", "openai-codex", "dr-tulu", "gemini", "open-deep-research" -- defaults to "openai"
 api_style = "responses"                     # Only applies to provider="openai"; use "chat_completions" for Perplexity, Groq, Ollama, etc.
 model = "gpt-6-sol"                         # OpenAI: model identifier; Codex: "auto" or account model slug; Dr Tulu: logical provider id; Gemini: agent id; ODR: LiteLLM model identifier
+reasoning_effort = "medium"                  # Optional for OpenAI API and Codex subscription; omit to keep provider/model defaults
 api_key = "your-api-key"                    # API key, optional
 base_url = "https://api.openai.com/v1"      # OpenAI: OpenAI-compatible endpoint; Codex uses a fixed endpoint; Dr Tulu: service base URL; Gemini: https://generativelanguage.googleapis.com; ODR: LiteLLM-compatible endpoint
 
@@ -122,6 +123,15 @@ The Responses backend enables web search and optional Code Interpreter.
 Chat Completions defaults to `gpt-6-luna` but does not enable hosted research
 tools. An OpenAI API key is separate from the experimental ChatGPT Codex
 subscription login below. See [OpenAI model guidance](https://developers.openai.com/api/docs/guides/latest-model).
+
+Set `reasoning_effort` to `none`, `low`, `medium`, `high`, `xhigh`, or `max`
+for OpenAI Responses, Chat Completions, or the Codex subscription provider.
+Supported efforts vary by model; OpenAI returns an error for unsupported
+combinations. If omitted, the Responses backend retains its existing GPT-5/6
+research defaults (including `xhigh` for GPT-6), while Codex and Chat
+Completions leave effort to the provider. This is separate from reasoning
+summaries (`enable_reasoning_summaries`). Environment variable:
+`RESEARCH_REASONING_EFFORT`. CLI flags override environment and TOML values.
 
 ```toml
 [research]
@@ -157,7 +167,11 @@ uv run deep-research-cli auth status
 Credentials are stored independently in `~/.deep_research_auth.json` with
 owner-only permissions. `auth logout` removes only this file. Model names are
 loaded from the signed-in account's `/models` catalogue; an explicit model must
-be present in that catalogue.
+be present in that catalogue. The catalogue request uses a fallback Codex client
+version of `0.156.1`; if `codex` is installed on `PATH` and reports a newer
+stable version, that version is used instead. An older, missing, or unparseable
+CLI leaves the fallback in place. `model = "auto"` selects the first
+picker-visible model returned by the catalogue, not necessarily the newest.
 
 This provider uses the undocumented
 `https://chatgpt.com/backend-api/codex` consumer endpoint. It is not an official
@@ -747,6 +761,8 @@ In `agent` mode, the TUI applies provider-aware defaults:
 
 Switching provider or OpenAI API style automatically refreshes the model and
 base URL defaults. You can still override those fields manually afterward.
+The Reasoning Effort selector loads the configured value, or Default when
+unset; it applies to OpenAI and Codex direct-agent mode.
 
 #### Research and Saving Output
 
@@ -882,6 +898,10 @@ uv run deep-research-cli research "Economic impact of AI adoption"
 
 # Override provider and model for a single run
 uv run deep-research-cli --provider gemini research "Climate change policies"
+
+# Override OpenAI reasoning effort for a single run
+uv run deep-research-cli --provider openai-codex --model gpt-6-sol \
+  --reasoning-effort medium research "Climate change policies"
 
 # Use a custom system prompt from a file
 uv run deep-research-cli research "Healthcare trends" --system-prompt-file prompts/health.txt
@@ -1045,6 +1065,7 @@ corresponding `ResearchConfig` field:
 | `--config PATH` | Path to TOML config file (default: `~/.deep_research`) |
 | `--provider {openai,openai-codex,dr-tulu,gemini,open-deep-research}` | Research provider |
 | `--model MODEL` | Model or agent ID |
+| `--reasoning-effort {none,low,medium,high,xhigh,max}` | OpenAI reasoning effort; omit for provider/model default |
 | `--api-key KEY` | Provider API key |
 | `--base-url URL` | Provider API base URL |
 | `--api-style {responses,chat_completions}` | OpenAI API style |
@@ -1122,6 +1143,7 @@ Configuration class for the research agent.
   - Dr Tulu: logical provider id (default: `dr-tulu`)
   - Gemini: Deep Research agent id (for example `deep-research-preview-04-2026`)
   - Open Deep Research: LiteLLM model id (e.g., `openai/qwen/qwen3-coder-30b`)
+- `reasoning_effort`: Optional OpenAI reasoning effort (`none`, `low`, `medium`, `high`, `xhigh`, or `max`); model support varies.
 - `api_key`: API key for the configured endpoint (optional). Defaults to env `OPENAI_API_KEY` for `openai`, `DR_TULU_API_KEY` for `dr-tulu`, `GEMINI_API_KEY` / `GOOGLE_API_KEY` for `gemini`. Ignored for `openai-codex`.
 - `base_url`: Provider API base URL (optional). Defaults to `https://api.openai.com/v1` for `openai`, the fixed `https://chatgpt.com/backend-api/codex` endpoint for `openai-codex`, `http://localhost:8080/` for `dr-tulu`, `https://generativelanguage.googleapis.com` for `gemini`, and `http://localhost:1234/v1` for `open-deep-research`.
 - `timeout`: Maximum time for research in seconds (default: 1800)

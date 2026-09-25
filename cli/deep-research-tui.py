@@ -168,6 +168,7 @@ class StartupState:
     save_path: str = "output.md"
     provider: str = "openai"
     api_style: str = "responses"
+    reasoning_effort: str | None = None
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
     include_analysis: bool = True
     json_output: bool = False
@@ -385,6 +386,7 @@ class DeepResearchTUI(App):
         "#provider",
         "#api-style",
         "#model",
+        "#reasoning-effort",
         "#base-url",
         "#include-analysis",
         "#json-output",
@@ -417,9 +419,16 @@ class DeepResearchTUI(App):
         self.query_one("#provider", Select).value = state.provider
         self.query_one("#api-style", Select).value = state.api_style
         self.query_one("#model", Input).value = state.config.model
+        self.query_one("#reasoning-effort", Select).value = (
+            state.reasoning_effort or "default"
+        )
         self.query_one("#base-url", Input).value = state.config.base_url
         self.query_one("#api-style", Select).disabled = state.provider != "openai"
         self.query_one("#base-url", Input).disabled = state.provider == "openai-codex"
+        self.query_one("#reasoning-effort", Select).disabled = state.provider not in {
+            "openai",
+            "openai-codex",
+        }
         self.query_one("#include-analysis", Switch).value = state.include_analysis
         self.query_one("#json-output", Switch).value = state.json_output
         self.query_one("#query-area", TextArea).text = state.query
@@ -486,6 +495,25 @@ class DeepResearchTUI(App):
                     yield Label("Model", classes="field-label")
                     yield Input(placeholder="model-id", id="model")
 
+                    yield Label("Reasoning Effort", classes="field-label")
+                    yield Select(
+                        [("Default", "default")]
+                        + [
+                            (value, value)
+                            for value in (
+                                "none",
+                                "low",
+                                "medium",
+                                "high",
+                                "xhigh",
+                                "max",
+                            )
+                        ],
+                        value="default",
+                        id="reasoning-effort",
+                        allow_blank=False,
+                    )
+
                     yield Label("Base URL", classes="field-label")
                     yield Input(placeholder="https://api.openai.com/v1", id="base-url")
 
@@ -548,6 +576,10 @@ class DeepResearchTUI(App):
         base_url_input = self.query_one("#base-url", Input)
         base_url_input.value = defaults.base_url
         base_url_input.disabled = self.provider == "openai-codex"
+        effort_select = self.query_one("#reasoning-effort", Select)
+        effort_select.disabled = self.provider not in {"openai", "openai-codex"}
+        if effort_select.disabled:
+            effort_select.value = "default"
 
         api_style_select = self.query_one("#api-style", Select)
         if self.provider == "openai":
@@ -731,13 +763,20 @@ class DeepResearchTUI(App):
                     self.query_one("#api-style", Select).value or "responses"
                 ),
                 "RESEARCH_MODEL": self.query_one("#model", Input).value,
+                "RESEARCH_REASONING_EFFORT": (
+                    ""
+                    if self.query_one("#reasoning-effort", Select).value == "default"
+                    else str(self.query_one("#reasoning-effort", Select).value)
+                ),
                 "RESEARCH_BASE_URL": self.query_one("#base-url", Input).value,
             }
         )
-        return ResearchConfig.load(
+        config = ResearchConfig.load(
             config_path=self._startup_state.config_path,
             env=env,
         )
+        config.validate()
+        return config
 
     def _get_query(self) -> str:
         return self.query_one("#query-area", TextArea).text.strip()
@@ -1103,6 +1142,7 @@ def main() -> None:
         provider=config.provider,
         api_style=config.api_style,
         system_prompt=DEFAULT_SYSTEM_PROMPT,
+        reasoning_effort=config.reasoning_effort,
         include_analysis=True,
         json_output=False,
         config=defaults,
