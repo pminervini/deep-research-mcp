@@ -58,6 +58,7 @@ These guidelines reduce common LLM coding mistakes. They bias toward caution ove
 - Tests: `uv run pytest -v` or `uv run pytest --cov=deep_research_mcp tests/`.
 - Lint/format/type-check: `uv run black .`, `uv run pylint src/deep_research_mcp tests`, `uv run mypy src/deep_research_mcp`.
 - Before committing or opening a PR, run `uv run black --fast --check .` to match the CI formatting check.
+- After every commit and push, inspect the CI run for the pushed commit and every job's conclusion, including optional jobs. Fix failures, commit and push again, and repeat until all jobs pass; workflow-level success alone is not sufficient.
 
 ## Coding Style & Naming Conventions
 - Python 3.11+, 4-space indentation, use type hints in new/changed code.
