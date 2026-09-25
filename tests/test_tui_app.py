@@ -175,6 +175,7 @@ async def test_reasoning_effort_tui_loads_and_overrides_config(tmp_path):
 
     async with app.run_test(size=(140, 42)) as pilot:
         effort = app.query_one("#reasoning-effort", Select)
+        # pylint: disable=protected-access
         assert effort.value == "high"
         assert app._build_config().reasoning_effort == "high"
         effort.value = "low"
