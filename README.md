@@ -200,7 +200,7 @@ timeout = 1800
 poll_interval = 30
 ```
 
-Available Gemini Deep Research agent IDs:
+Gemini Deep Research agent IDs supported by this project:
 
 | Agent ID | Intended use |
 | --- | --- |
@@ -210,10 +210,13 @@ Available Gemini Deep Research agent IDs:
 
 Google's current [Gemini Deep Research documentation](https://ai.google.dev/gemini-api/docs/deep-research)
 lists the April 2026 standard and Max agents as the supported versions. The
-December 2025 Pro agent remains present in the Gemini API model catalogue and
-has a separate [model page](https://ai.google.dev/gemini-api/docs/models/deep-research-pro-preview-12-2025),
-but it is no longer listed among the current supported versions. Set any agent
-ID above as `research.model`; all are preview identifiers and may change.
+December 2025 Pro agent has a separate [model page](https://ai.google.dev/gemini-api/docs/models/deep-research-pro-preview-12-2025),
+and its ID (`deep-research-pro-preview-12-2025`) still appears in the
+[Interactions API reference](https://ai.google.dev/api/interactions-api). It is
+not listed in the current [model catalogue](https://ai.google.dev/gemini-api/docs/models),
+but a live research task completed through this project with that ID on
+September 27, 2026. Set any agent ID above as `research.model`; all are preview
+identifiers and may change.
 
 Dr Tulu provider example:
 
