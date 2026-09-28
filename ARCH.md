@@ -245,7 +245,7 @@ The MCP server exposes two tools to clients like Claude Code. Each tool accepts 
 
 ### `deep_research()`
 
-**Purpose**: Performs autonomous deep research using the configured provider (OpenAI Responses API, experimental OpenAI Codex subscription access, Gemini Deep Research, DR-Tulu, or Open Deep Research).
+**Purpose**: Performs autonomous deep research using the configured provider (OpenAI Responses API, experimental OpenAI Codex subscription access, Gemini Deep Research, Tavily Research, DR-Tulu, or Open Deep Research).
 
 **Arguments**:
 - `query` (string, required): Complete research question, including any user-provided context needed to answer it
@@ -296,7 +296,7 @@ The MCP server exposes two tools to clients like Claude Code. Each tool accepts 
 **Arguments**:
 - `task_id` (string, required): UUID returned by `deep_research()` tool
 
-**Returns**: String containing task status information. When the task is completed and the provider supports result retrieval (OpenAI Responses API, Gemini Interactions API), the full rendered research report is appended.
+**Returns**: String containing task status information. When the task is completed and the provider supports result retrieval (OpenAI Responses API, Gemini Interactions API, Tavily Research API), the full rendered research report is appended.
 
 **Return Structure**:
 ```
