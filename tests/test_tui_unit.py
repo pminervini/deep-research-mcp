@@ -19,6 +19,14 @@ def test_provider_defaults_for_gemini():
     assert defaults.base_url == "https://generativelanguage.googleapis.com"
 
 
+def test_provider_defaults_for_tavily():
+    defaults = TUI.get_provider_defaults("tavily", "responses")
+
+    assert defaults.provider == "tavily"
+    assert defaults.model == "mini"
+    assert defaults.base_url == "https://api.tavily.com"
+
+
 def test_provider_defaults_for_openai_chat_completions():
     defaults = TUI.get_provider_defaults("openai", "chat_completions")
 

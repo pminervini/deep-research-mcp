@@ -56,6 +56,11 @@ async def test_provider_change_updates_model_and_base_url():
         await pilot.pause()
         assert app.query_one("#reasoning-effort", Select).disabled
 
+        app.query_one("#provider", Select).value = "tavily"
+        await pilot.pause()
+        assert app.query_one("#model", Input).value == "mini"
+        assert app.query_one("#base-url", Input).value == "https://api.tavily.com"
+
 
 @pytest.mark.asyncio
 async def test_initial_focus_and_arrow_navigation_work_for_form_controls():

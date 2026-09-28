@@ -74,3 +74,21 @@ def test_reasoning_effort_cli_overrides_toml(tmp_path: Path) -> None:
         ]
     )
     assert load_config(args).reasoning_effort == "low"
+
+
+def test_tavily_cli_api_key_overrides_tavily_env(tmp_path: Path) -> None:
+    config_path = tmp_path / ".deep_research"
+    config_path.write_text('[research]\nprovider = "tavily"\n', encoding="utf-8")
+    cli = load_cli_module()
+    args = cli.build_parser().parse_args(
+        [
+            "--config",
+            str(config_path),
+            "--api-key",
+            "cli-test-key",
+            "research",
+            "test query",
+        ]
+    )
+
+    assert load_config(args).api_key == "cli-test-key"

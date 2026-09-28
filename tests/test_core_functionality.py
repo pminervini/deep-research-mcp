@@ -15,6 +15,7 @@ from deep_research_mcp.backends import (
     DrTuluResearchBackend,
     GeminiResearchBackend,
     OpenAIResearchBackend,
+    TavilyResearchBackend,
 )
 from deep_research_mcp.config import ResearchConfig
 from deep_research_mcp.results import ResearchResult
@@ -57,8 +58,17 @@ from deep_research_mcp.results import ResearchResult
             ),
             DrTuluResearchBackend,
         ),
+        (
+            ResearchConfig(
+                provider="tavily",
+                model="mini",
+                api_key="tavily-test-key",
+                base_url="https://api.tavily.com",
+            ),
+            TavilyResearchBackend,
+        ),
     ],
-    ids=["openai", "gemini", "openai-codex", "dr-tulu"],
+    ids=["openai", "gemini", "openai-codex", "dr-tulu", "tavily"],
 )
 def test_agent_selects_provider_backend(config, backend_type):
     """The agent factory selects the backend configured for each provider."""
@@ -66,6 +76,33 @@ def test_agent_selects_provider_backend(config, backend_type):
 
     assert agent.config is config
     assert isinstance(agent.backend, backend_type)
+
+
+def test_tavily_extract_result_deduplicates_sources():
+    """Tavily reports and source URLs map to the shared result format."""
+    # pylint: disable=protected-access
+    result = TavilyResearchBackend._extract_result(
+        {
+            "request_id": "task-123",
+            "status": "completed",
+            "content": "Research report",
+            "response_time": 12.5,
+            "sources": [
+                {"title": "Example", "url": "https://example.com"},
+                {"title": "Duplicate", "url": "https://example.com"},
+                {"url": "https://other.example.com"},
+            ],
+        }
+    )
+
+    assert result.status == "completed"
+    assert result.task_id == "task-123"
+    assert result.final_report == "Research report"
+    assert result.execution_time == 12.5
+    assert [(citation.title, citation.url) for citation in result.citations] == [
+        ("Example", "https://example.com"),
+        ("https://other.example.com", "https://other.example.com"),
+    ]
 
 
 def test_gemini_extract_results_uses_current_steps_schema():

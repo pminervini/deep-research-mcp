@@ -212,6 +212,22 @@ def test_gemini_provider_defaults():
             os.environ.pop("RESEARCH_BASE_URL", None)
 
 
+def test_tavily_provider_defaults_and_key_precedence():
+    """Tavily's own key must win when another provider's key is in the config."""
+    config = ResearchConfig.from_env(
+        {
+            "RESEARCH_PROVIDER": "tavily",
+            "RESEARCH_API_KEY": "other-provider-key",
+            "TAVILY_API_KEY": "tavily-test-key",
+        }
+    )
+
+    assert config.provider == "tavily"
+    assert config.model == "mini"
+    assert config.base_url == "https://api.tavily.com"
+    assert config.api_key == "tavily-test-key"
+
+
 def test_dr_tulu_provider_defaults():
     """Test Dr Tulu provider default model and endpoint resolution."""
     old_provider = os.environ.get("RESEARCH_PROVIDER")

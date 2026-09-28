@@ -14,7 +14,7 @@ Transports:
   MCP‑over‑HTTP clients can connect over the network
 
 Features:
-- Deep research with multiple backend providers (OpenAI API, experimental OpenAI Codex subscription, Gemini Deep Research, DR-Tulu, Open Deep Research)
+- Deep research with multiple backend providers (OpenAI API, experimental OpenAI Codex subscription, Gemini Deep Research, Tavily Research, DR-Tulu, Open Deep Research)
 - Task status monitoring for long‑running research
 - Configurable research parameters and system instructions
 - Support for data analysis and visualization capabilities
@@ -89,8 +89,9 @@ mcp = FastMCP(
         "data analysis, and citation capabilities. Supports OpenAI Responses API, "
         "OpenAI Chat Completions API (compatible with Perplexity, Groq, Ollama, "
         "and other providers), experimental OpenAI Codex subscription access, "
-        "Gemini Deep Research via the Interactions API, DR-Tulu, and Open Deep "
-        "Research. Use deep_research for comprehensive research queries and "
+        "Gemini Deep Research via the Interactions API, Tavily Research, "
+        "DR-Tulu, and Open Deep Research. Use deep_research for comprehensive "
+        "research queries and "
         "research_status where the provider supports task recovery."
     ),
     website_url="https://github.com/pminervini/deep-research-mcp",

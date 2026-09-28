@@ -113,7 +113,10 @@ def load_config(args: argparse.Namespace) -> ResearchConfig:
     """Load config from file + env, then layer CLI overrides on top."""
     cli_env = build_cli_env(args)
     config_path = getattr(args, "config", None)
-    return ResearchConfig.load(config_path=config_path, env=cli_env)
+    config = ResearchConfig.load(config_path=config_path, env=cli_env)
+    if config.provider == "tavily" and getattr(args, "api_key", None) is not None:
+        config.api_key = args.api_key
+    return config
 
 
 # ---------------------------------------------------------------------------
@@ -528,6 +531,7 @@ def build_parser() -> argparse.ArgumentParser:
             "openai-codex",
             "dr-tulu",
             "gemini",
+            "tavily",
             "open-deep-research",
         ],
         help="Research provider",

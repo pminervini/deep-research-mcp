@@ -36,6 +36,12 @@ _PROVIDER_DEFAULTS: dict[str, tuple[str, str, tuple[str, ...], tuple[str, ...]]]
         ("GEMINI_API_KEY", "GOOGLE_API_KEY"),
         ("GEMINI_BASE_URL",),
     ),
+    "tavily": (
+        "mini",
+        "https://api.tavily.com",
+        ("TAVILY_API_KEY",),
+        ("TAVILY_BASE_URL",),
+    ),
     "dr-tulu": (
         "dr-tulu",
         "http://localhost:8080/",
@@ -195,7 +201,10 @@ class ResearchConfig:
             api_key = None
             base_url = default_base_url
         else:
-            api_key = get_setting_first("RESEARCH_API_KEY", *api_key_keys)
+            if provider == "tavily":
+                api_key = get_setting_first(*api_key_keys, "RESEARCH_API_KEY")
+            else:
+                api_key = get_setting_first("RESEARCH_API_KEY", *api_key_keys)
             base_url = get_setting_first(
                 "RESEARCH_BASE_URL", *base_url_keys, default=default_base_url
             )

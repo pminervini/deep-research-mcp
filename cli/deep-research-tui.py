@@ -141,6 +141,13 @@ def get_provider_defaults(
             model="deep-research-preview-04-2026",
             base_url="https://generativelanguage.googleapis.com",
         )
+    if provider == "tavily":
+        return ProviderDefaults(
+            provider=provider,
+            api_style="responses",
+            model="mini",
+            base_url="https://api.tavily.com",
+        )
     if provider == "open-deep-research":
         return ProviderDefaults(
             provider=provider,
@@ -474,6 +481,7 @@ class DeepResearchTUI(App):
                             ("OpenAI Codex Subscription", "openai-codex"),
                             ("Dr Tulu", "dr-tulu"),
                             ("Gemini", "gemini"),
+                            ("Tavily", "tavily"),
                             ("Open Deep Research", "open-deep-research"),
                         ],
                         value="openai",
@@ -1092,6 +1100,7 @@ def build_parser() -> argparse.ArgumentParser:
             "openai-codex",
             "dr-tulu",
             "gemini",
+            "tavily",
             "open-deep-research",
         ],
         default=None,

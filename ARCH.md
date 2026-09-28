@@ -38,6 +38,7 @@ graph TD
         P3[dr_tulu_backend.py]
         P4[open_deep_research_backend.py]
         P5[codex_backend.py]
+        P6[tavily_backend.py]
         CA[codex_auth.py]
     end
 
@@ -48,6 +49,7 @@ graph TD
         H4[DR-Tulu /chat endpoint]
         M[Open Deep Research smolagents + text browser]
         H5[ChatGPT Codex private Responses endpoint]
+        H6[Tavily Research API]
         OA[OpenAI OAuth device flow]
     end
 
@@ -62,6 +64,7 @@ graph TD
     P --> P3
     P --> P4
     P --> P5
+    P --> P6
     P1 -- "Makes API calls to" --> H
     P1 -- "Makes API calls to" --> H2
     P2 -- "Makes API calls to" --> H3
@@ -69,6 +72,7 @@ graph TD
     P4 -- "Orchestrates agents via" --> M
     P5 -- "Streams research from" --> H5
     P5 -- "Loads/refreshes credentials with" --> CA
+    P6 -- "Creates and polls tasks through" --> H6
     CA -- "Authenticates through" --> OA
 ```
 
@@ -89,6 +93,7 @@ The project is composed of four main layers:
     *   `backends/base.py` defines the backend interface used by `DeepResearchAgent`.
     *   `backends/openai_backend.py` implements the OpenAI Responses API and Chat Completions flows, including citation extraction and background polling.
     *   `backends/gemini_backend.py` implements Gemini Deep Research over the Interactions API, including polling and result normalization.
+    *   `backends/tavily_backend.py` implements Tavily Research task creation, polling, and report recovery.
     *   `backends/dr_tulu_backend.py` implements the DR-Tulu research agent integration via Allen AI's `/chat` endpoint.
     *   `backends/open_deep_research_backend.py` implements the Open Deep Research integration with smolagents and text-browser tooling.
     *   `backends/codex_backend.py` implements experimental ChatGPT subscription access through the private Codex Responses stream.
@@ -98,6 +103,7 @@ The project is composed of four main layers:
     * Provider `openai` with `api_style = "responses"` (default): OpenAI Responses API with web search and code interpreter tools.
     * Provider `openai` with `api_style = "chat_completions"`: OpenAI Chat Completions API -- works with any OpenAI-compatible provider (Perplexity, Groq, Ollama, vLLM, etc.). No built-in tools (`web_search`, `code_interpreter`); no background mode or polling.
     * Provider `gemini`: Gemini Deep Research agent over the Interactions API. Background execution and polling are required; built-in Google Search and URL context are provided by Gemini.
+    * Provider `tavily`: Tavily Research over its asynchronous Research API. Task IDs support polling and completed-report recovery; `mini` is the default model.
     * Provider `dr-tulu`: Allen AI's DR-Tulu research agent accessed via its `/chat` endpoint. A lightweight integration that delegates research to a separately hosted DR-Tulu service.
     * Provider `open-deep-research`: smolagents stack with a text browser and search tools; optional OpenAI-compatible LLM endpoint via LiteLLM.
     * Provider `openai-codex`: account-scoped model discovery followed by a synchronous SSE Responses request with native web search. Code Interpreter, background polling, cancellation, task recovery, and endpoint overrides are intentionally unsupported.
@@ -175,6 +181,14 @@ The project is composed of four main layers:
     -   `_wait_for_completion()`: Polls Gemini interaction status until completion, failure, or timeout.
     -   `extract_results()`: Parses Gemini interaction outputs into the project's standard report/citation format.
     -   `get_task_status()`: Returns Gemini interaction status metadata.
+
+### `src/deep_research_mcp/backends/tavily_backend.py`
+
+-   **Purpose**: Implements Tavily Research over its asynchronous Research API.
+-   **Key Functionality**:
+    -   `research()`: Starts a task with the configured `mini`, `pro`, or `auto` model and polls for its report.
+    -   `get_task_status()` and `get_task_result()`: Retrieve task status and recover completed reports by ID.
+    -   `_extract_result()`: Converts Tavily's report and source list into the shared result format.
 
 ### `src/deep_research_mcp/backends/dr_tulu_backend.py`
 

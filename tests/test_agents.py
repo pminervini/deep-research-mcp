@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Tests that the MCP server entrypoints run for real with both providers.
+Tests that the MCP server entrypoints run for real with API providers.
 For the openai provider, we ONLY use `gpt-5-mini` since it's WAY cheaper
 than the default gpt-6-sol research configuration.
 """
@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
         ("openai", "gpt-5-mini", "responses"),
         ("openai", "gpt-5-mini", "chat_completions"),
         ("gemini", "deep-research-preview-04-2026", "responses"),
+        ("tavily", "mini", "responses"),
     ],
 )
 async def test_mcp_server_with_providers(provider, model, api_style):
@@ -68,6 +69,12 @@ async def run_provider_check(provider, model, api_style="responses"):
         # from ~/.deep_research when running against Gemini.
         env_overrides["RESEARCH_API_KEY"] = gemini_key
         env_overrides["RESEARCH_BASE_URL"] = "https://generativelanguage.googleapis.com"
+    elif provider == "tavily":
+        tavily_key = os.environ.get("TAVILY_API_KEY")
+        if not tavily_key:
+            pytest.skip("TAVILY_API_KEY not set; skipping Tavily provider check")
+        env_overrides["TAVILY_API_KEY"] = tavily_key
+        env_overrides["RESEARCH_BASE_URL"] = "https://api.tavily.com"
 
     old_values: dict[str, str | None] = {
         key: os.environ.get(key) for key in env_overrides
@@ -106,8 +113,13 @@ async def run_provider_check(provider, model, api_style="responses"):
             f"Starting deep_research call for provider: {provider} (api_style={api_style})"
         )
         logger.info("This may take several minutes...")
+        query = (
+            "What year was Python 3.0 released? Cite python.org."
+            if provider == "tavily"
+            else "Sanity check query for provider: " + provider
+        )
         result = await mcp_server.deep_research(
-            query="Sanity check query for provider: " + provider,
+            query=query,
             system_instructions="Keep it brief; this is a test run.",
             include_analysis=False,
         )
