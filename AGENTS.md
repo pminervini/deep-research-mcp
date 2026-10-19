@@ -54,7 +54,7 @@ These guidelines reduce common LLM coding mistakes. They bias toward caution ove
 ## Build, Test, and Development Commands
 - Setup env: `uv sync --upgrade --extra dev` (or compatibility: `python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && pip install -e .`).
 - Run MCP server: `uv run deep-research-mcp`.
-- Try CLI: `uv run python cli/deep-research-cli.py research "What’s new in quantum computing?" --model gpt-5-mini`.
+- Try CLI: `uv run python cli/deep-research-cli.py research "What’s new in quantum computing?" --model gpt-6-sol`.
 - Tests: `uv run pytest -v` or `uv run pytest --cov=deep_research_mcp tests/`.
 - Lint/format/type-check: `uv run black .`, `uv run pylint src/deep_research_mcp tests`, `uv run mypy src/deep_research_mcp`.
 - Before committing or opening a PR, run `uv run black --fast --check .` to match the CI formatting check.
@@ -81,7 +81,7 @@ These guidelines reduce common LLM coding mistakes. They bias toward caution ove
 - Add example commands/logs for new tools or flows; call out config/env impacts.
 
 ## Security & Configuration Tips
-- Do not commit secrets. Configure via `~/.deep_research` (TOML) or env vars (`OPENAI_API_KEY`, `OPENAI_BASE_URL`, `PROVIDER`, `RESEARCH_MODEL`).
+- Do not commit secrets. Configure via `~/.deep_research` (TOML) or env vars (`RESEARCH_PROVIDER`, `RESEARCH_MODEL`, `RESEARCH_API_KEY`, `RESEARCH_BASE_URL`, or provider-specific keys such as `OPENAI_API_KEY`, `GEMINI_API_KEY` and `TAVILY_API_KEY`).
 - Gate network-dependent tests behind markers; avoid requiring keys in CI by default.
 
 ## Updating the TUI Demo GIF

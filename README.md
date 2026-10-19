@@ -134,7 +134,7 @@ provider = "gemini"                         # api_key falls back to GEMINI_API_K
 
 Note on precedence: `[research] api_key` and `base_url` map to the `RESEARCH_API_KEY` and `RESEARCH_BASE_URL` settings, which apply to every provider except `openai-codex`. For Tavily, `TAVILY_API_KEY` takes precedence over `RESEARCH_API_KEY` so a provider switch can use a Tavily-specific key. The Codex subscription provider ignores API keys and endpoint overrides so its bearer token cannot be redirected. If you switch another provider via an environment override (e.g. `RESEARCH_PROVIDER=openai`) while the file is configured for a different provider, also override `RESEARCH_API_KEY` and `RESEARCH_BASE_URL`.
 
-Named backends (`[backends.<name>]`) are isolated from the default: `provider`, `model`, `api_style`, `api_key`, `base_url`, and `reasoning_effort` never leak into them from `[research]` or from `RESEARCH_*` environment variables. When a table omits `api_key` or `base_url`, the provider's own environment variables (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `TAVILY_API_KEY`, `DR_TULU_BASE_URL`, and so on) and provider defaults apply; when the table sets them, the table wins, including over `TAVILY_API_KEY`. Runtime settings (`timeout`, `poll_interval`, `cancel_on_timeout`, `enable_reasoning_summaries`, `[logging] level`) are inherited from `[research]` and the environment unless the table overrides them. Several backends may share a provider, so two Dr Tulu servers or two OpenAI-compatible endpoints are simply two tables. The name `default` is reserved and names must not contain `:`. The server validates every named backend at startup; the CLI and TUI always use the default backend.
+Named backends (`[backends.<name>]`) are isolated from the default: `provider`, `model`, `api_style`, `api_key`, `base_url`, and `reasoning_effort` never leak into them from `[research]` or from `RESEARCH_*` environment variables. When a table omits `api_key` or `base_url`, the provider's own environment variables (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `TAVILY_API_KEY`, `DR_TULU_BASE_URL`, and so on) and provider defaults apply; when the table sets them, the table wins, including over `TAVILY_API_KEY`. Runtime settings (`timeout`, `poll_interval`, `cancel_on_timeout`, `enable_reasoning_summaries`, `[logging] level`) are inherited from `[research]` and the environment unless the table overrides them. Several backends may share a provider, so two Dr Tulu servers or two OpenAI-compatible endpoints are simply two tables. The name `default` is reserved and names must not contain `:`. The server validates every named backend at startup. The CLI and TUI use the default backend unless started with `--backend NAME`.
 
 OpenAI provider example:
 
@@ -966,6 +966,9 @@ uv run deep-research-cli research "Economic impact of AI adoption"
 # Override provider and model for a single run
 uv run deep-research-cli --provider gemini research "Climate change policies"
 
+# Use a named backend declared in ~/.deep_research
+uv run deep-research-cli --backend tavily research "Climate change policies"
+
 # Override OpenAI reasoning effort for a single run
 uv run deep-research-cli --provider openai-codex --model gpt-6-sol \
   --reasoning-effort medium research "Climate change policies"
@@ -1089,6 +1092,10 @@ uv run deep-research-cli status abc123-def456-ghi789
 # MCP client mode
 uv run deep-research-cli status abc123-def456-ghi789 \
   --server-url http://127.0.0.1:8080/mcp
+
+# A task ID copied from MCP output carries a <backend>: prefix that selects
+# the backend; a raw ID uses --backend, or the default without it
+uv run deep-research-cli status openai:resp_0e55abdae3d3ce39
 ```
 
 **`config`** -- display the resolved configuration.

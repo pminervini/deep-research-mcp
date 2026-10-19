@@ -125,8 +125,18 @@ The project is composed of four main layers:
 -   **Key Functionality**:
     -   Runs direct research or connects to a Streamable HTTP MCP server.
     -   `--backend NAME` selects a `[backends.<name>]` table via `ResearchConfig.load(backend=...)`; `check_backend_flags()` rejects it alongside provider-scoped override flags. In MCP client mode the name is forwarded as the `backend` tool argument.
-    -   Displays resolved configuration and checks task status. `status` splits `<backend>:<id>` task IDs with `split_backend_task_id()` so IDs copied from MCP output reach the right backend.
+    -   Displays resolved configuration and checks task status. In direct mode `status` splits `<backend>:<id>` task IDs with `split_backend_task_id()` so IDs copied from MCP output reach the right backend; a prefix that disagrees with an explicit `--backend` is an error. In MCP client mode it applies `prefix_task_id_with_backend()` so a raw ID is sent as `<backend>:<id>`.
     -   Manages the independent OpenAI Codex login, status, and logout flows.
+
+### `cli/deep-research-tui.py`
+
+-   **Purpose**: Full-screen Textual UI over the same two modes as the CLI: direct agent and MCP client.
+-   **Key Functionality**:
+    -   `StartupState` carries the parsed flags, including `backend`, into the app; `main()` loads the chosen backend with `ResearchConfig.load(backend=...)` to pre-fill the form.
+    -   `_build_config()`: Builds the config from the form. With a named backend it loads that table for provider, API style and credentials and only takes model, endpoint and reasoning effort from the form; the provider and API style selects are disabled.
+    -   `_status_config()`: Picks the backend for a direct-mode status check. A recognized `<backend>:` prefix selects that backend; a raw ID uses the backend the TUI was started with.
+    -   `_check_mcp_status()`: Sends an explicit prefix unchanged and prefixes a raw ID with the startup backend via `prefix_task_id_with_backend()`.
+    -   `_run_mcp_research()`: Forwards the startup backend as the `backend` tool argument.
 
 ### `src/deep_research_mcp/backends/__init__.py`
 
@@ -227,6 +237,7 @@ The project is composed of four main layers:
     -   `load()`: Explicitly reads `~/.deep_research` (or another provided TOML path), merges it with environment variable overrides, and returns a config object without mutating `os.environ`. The keyword-only `backend` argument selects a `[backends.<name>]` table: provider-scoped settings (`RESEARCH_PROVIDER`, `RESEARCH_API_KEY`, `RESEARCH_BASE_URL`, `RESEARCH_MODEL`, `RESEARCH_API_STYLE`, `RESEARCH_REASONING_EFFORT`) are dropped, the table's values are applied, and runtime settings are inherited. A table that sets `api_key` or `base_url` also overrides the provider's own env aliases such as `TAVILY_API_KEY`.
     -   `load_backend_names()`: Returns the validated names under `[backends]` (no `default`, no `:` in names, each with a `provider`).
     -   `split_backend_task_id()`: Splits a `<backend>:<id>` task ID into its backend name and raw provider ID. An un-prefixed or unrecognized ID comes back with an empty backend name so each caller can fall back to its own current backend: the MCP server uses `default`, the CLI uses `--backend` if given, and the TUI uses the backend it was started with. Shared by all three.
+    -   `prefix_task_id_with_backend()`: The MCP-client-side counterpart. Before a `research_status` call it adds `<backend>:` to a raw ID, keeps an ID that already carries the same prefix, and raises `ConfigurationError` for a different one. It is pure string logic, so remote backend names need no local configuration.
     -   `from_env()`: A class method to load configuration from environment variables only.
     -   `validate()`: A method to validate the configuration to ensure that the provided values are valid.
 

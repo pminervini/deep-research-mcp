@@ -157,7 +157,7 @@ poll_interval = 30
 ```toml
 [research]
 provider = "gemini"
-model = "deep-research-pro-preview-12-2025"
+model = "deep-research-preview-04-2026"
 api_key = "YOUR_GEMINI_API_KEY"
 base_url = "https://generativelanguage.googleapis.com"
 timeout = 1800
@@ -206,6 +206,10 @@ uv run deep-research-cli \
 
 Key flags:
 
+- `--backend` (a named `[backends.<name>]` table from `~/.deep_research`; it
+  replaces `--provider`, `--model`, `--api-key`, `--base-url` and `--api-style`,
+  which cannot be combined with it. In MCP client mode the name is sent to the
+  server and a raw `status` task ID is sent as `<name>:<id>`)
 - `--provider`
 - `--model`
 - `--api-key`
@@ -270,7 +274,7 @@ Command:
 GEMINI_API_KEY="$GEMINI_API_KEY" \
 uv run deep-research-cli \
   --provider gemini \
-  --model deep-research-pro-preview-12-2025 \
+  --model deep-research-preview-04-2026 \
   --timeout 900 \
   --poll-interval 10 \
   research "What are flow matching models in generative AI, and how do they differ from diffusion models?" \
@@ -384,7 +388,7 @@ async def main() -> None:
     config = ResearchConfig(
         provider="openai",
         api_style="responses",
-        model="gpt-5.6-sol",
+        model="gpt-6-sol",
         api_key="YOUR_OPENAI_API_KEY",
         base_url="https://api.openai.com/v1",
         timeout=900,
@@ -417,7 +421,7 @@ from deep_research_mcp import DeepResearchAgent, ResearchConfig
 async def main() -> None:
     config = ResearchConfig(
         provider="gemini",
-        model="deep-research-pro-preview-12-2025",
+        model="deep-research-preview-04-2026",
         base_url="https://generativelanguage.googleapis.com",
         timeout=900,
         poll_interval=10,
@@ -496,7 +500,7 @@ This pattern avoids accidental reuse of a different provider's saved credentials
 RESEARCH_PROVIDER=gemini \
 RESEARCH_API_KEY="$GEMINI_API_KEY" \
 RESEARCH_BASE_URL=https://generativelanguage.googleapis.com \
-RESEARCH_MODEL=deep-research-pro-preview-12-2025 \
+RESEARCH_MODEL=deep-research-preview-04-2026 \
 RESEARCH_POLL_INTERVAL=10 \
 uv run deep-research-mcp --transport http --host 127.0.0.1 --port 8081
 ```
@@ -762,7 +766,7 @@ uv run deep-research-cli \
 GEMINI_API_KEY="$GEMINI_API_KEY" \
 uv run deep-research-cli \
   --provider gemini \
-  --model deep-research-pro-preview-12-2025 \
+  --model deep-research-preview-04-2026 \
   --api-key "$GEMINI_API_KEY" \
   --base-url https://generativelanguage.googleapis.com \
   research "Your query"
