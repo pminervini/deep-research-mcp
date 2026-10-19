@@ -816,6 +816,24 @@ class DeepResearchTUI(App):
         config.validate()
         return config
 
+    def _status_config(self, task_id: str) -> tuple[ResearchConfig, str]:
+        """Pick the config for a status check and strip any backend prefix.
+
+        IDs copied from MCP output carry a "<backend>:" prefix that selects
+        that backend; un-prefixed IDs use the form's current configuration.
+        """
+        prefix, raw_task_id = split_backend_task_id(
+            task_id, self._startup_state.config_path
+        )
+        current = self._startup_state.backend or DEFAULT_BACKEND_NAME
+        if not prefix or prefix == current:
+            return self._build_config(), raw_task_id
+        config = ResearchConfig.load(
+            config_path=self._startup_state.config_path, backend=prefix
+        )
+        config.validate()
+        return config, raw_task_id
+
     def _get_query(self) -> str:
         return self.query_one("#query-area", TextArea).text.strip()
 
@@ -959,17 +977,7 @@ class DeepResearchTUI(App):
         self._set_status("Checking task status...")
 
         try:
-            # IDs copied from MCP output carry a "<backend>:" prefix.
-            backend, task_id = split_backend_task_id(
-                task_id, self._startup_state.config_path
-            )
-            if backend == (self._startup_state.backend or DEFAULT_BACKEND_NAME):
-                config = self._build_config()
-            else:
-                config = ResearchConfig.load(
-                    config_path=self._startup_state.config_path, backend=backend
-                )
-                config.validate()
+            config, task_id = self._status_config(task_id)
             agent = DeepResearchAgent(config)
             status = await agent.get_task_status(task_id)
 

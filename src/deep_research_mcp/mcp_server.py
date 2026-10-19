@@ -145,7 +145,8 @@ def _tag_task_id(backend: str, task_id: str) -> str:
 
 def _split_task_id(task_id: str) -> tuple[str, str]:
     """Split '<backend>:<id>' into its parts; un-prefixed IDs use the default."""
-    return split_backend_task_id(task_id)
+    backend, raw_task_id = split_backend_task_id(task_id)
+    return backend or DEFAULT_BACKEND_NAME, raw_task_id
 
 
 async def _progress_heartbeat(

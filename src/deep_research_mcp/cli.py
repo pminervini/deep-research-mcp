@@ -55,6 +55,7 @@ from deep_research_mcp import (
 )
 from deep_research_mcp.codex_auth import CodexAuthError, CodexAuthManager
 from deep_research_mcp.config import DEFAULT_BACKEND_NAME, split_backend_task_id
+from deep_research_mcp.errors import ConfigurationError
 
 DEFAULT_SYSTEM_PROMPT = """
 You are a professional researcher preparing a structured, data-driven report.
@@ -118,13 +119,19 @@ def load_config(args: argparse.Namespace) -> ResearchConfig:
     """
     cli_env = build_cli_env(args)
     config_path = getattr(args, "config", None)
-    config = ResearchConfig.load(
-        config_path=config_path,
-        env=cli_env,
-        backend=getattr(args, "backend", None) or None,
-    )
+    backend = getattr(args, "backend", None) or None
+    config = ResearchConfig.load(config_path=config_path, env=cli_env, backend=backend)
     if config.provider == "tavily" and getattr(args, "api_key", None) is not None:
         config.api_key = args.api_key
+    if backend:
+        # The backend table wins over env-style keys, so explicit runtime
+        # flags must be re-applied to keep "CLI flags override TOML".
+        for attr_name in ("timeout", "poll_interval", "log_level"):
+            value = getattr(args, attr_name, None)
+            if value is not None:
+                setattr(config, attr_name, value)
+        if getattr(args, "enable_reasoning_summaries", False):
+            config.enable_reasoning_summaries = True
     return config
 
 
@@ -415,12 +422,15 @@ async def cmd_status(args: argparse.Namespace) -> int:
         return rc
 
     try:
-        if not getattr(args, "backend", None):
-            # IDs copied from MCP output carry a "<backend>:" prefix.
-            backend, task_id = split_backend_task_id(
-                task_id, getattr(args, "config", None)
+        # IDs copied from MCP output carry a "<backend>:" prefix.
+        prefix, task_id = split_backend_task_id(task_id, getattr(args, "config", None))
+        explicit = getattr(args, "backend", None)
+        if prefix and explicit and prefix != explicit:
+            raise ConfigurationError(
+                f"Task ID names backend '{prefix}' but --backend is '{explicit}'"
             )
-            args.backend = None if backend == DEFAULT_BACKEND_NAME else backend
+        if prefix and prefix != DEFAULT_BACKEND_NAME:
+            args.backend = prefix
         config = load_config(args)
         config.validate()
         agent = DeepResearchAgent(config)

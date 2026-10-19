@@ -232,3 +232,53 @@ async def test_named_backend_fixes_provider_and_credentials(tmp_path):
         "table-key",
         "mini",
     )
+
+
+@pytest.mark.asyncio
+async def test_status_config_uses_selected_backend_unless_prefixed(tmp_path):
+    """Raw IDs use the selected backend; a recognized prefix overrides it."""
+    config_path = tmp_path / ".deep_research"
+    config_path.write_text(
+        "[research]\n"
+        'provider = "dr-tulu"\n'
+        'base_url = "http://127.0.0.1:18080"\n'
+        "[backends.lab]\n"
+        'provider = "tavily"\n'
+        'api_key = "table-key"\n'
+        "[backends.tulu-b]\n"
+        'provider = "dr-tulu"\n'
+        'base_url = "http://127.0.0.1:18081"\n',
+        encoding="utf-8",
+    )
+    loaded = TUI.ResearchConfig.load(config_path, env={}, backend="lab")
+    startup_state = build_startup_state()
+    startup_state.config_path = str(config_path)
+    startup_state.backend = "lab"
+    startup_state.provider = loaded.provider
+    startup_state.config = TUI.ProviderDefaults(
+        provider=loaded.provider,
+        api_style=loaded.api_style,
+        model=loaded.model,
+        base_url=loaded.base_url or "",
+    )
+    app = TUI.DeepResearchTUI(startup_state)
+
+    async with app.run_test(size=(140, 42)):
+        # pylint: disable=protected-access
+        raw_config, raw_id = app._status_config("task-42")
+        same_config, same_id = app._status_config("lab:task-42")
+        other_config, other_id = app._status_config("tulu-b:task-42")
+        unknown_config, unknown_id = app._status_config("nope:task-42")
+
+    assert (raw_config.provider, raw_config.api_key, raw_id) == (
+        "tavily",
+        "table-key",
+        "task-42",
+    )
+    assert (same_config.provider, same_id) == ("tavily", "task-42")
+    assert (other_config.provider, other_config.base_url, other_id) == (
+        "dr-tulu",
+        "http://127.0.0.1:18081",
+        "task-42",
+    )
+    assert (unknown_config.provider, unknown_id) == ("tavily", "nope:task-42")

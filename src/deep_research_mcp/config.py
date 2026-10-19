@@ -115,13 +115,17 @@ def load_backend_names(config_path: Path | str | None = None) -> list[str]:
 def split_backend_task_id(
     task_id: str, config_path: Path | str | None = None
 ) -> tuple[str, str]:
-    """Split '<backend>:<id>' into its parts; un-prefixed IDs use the default."""
+    """Split '<backend>:<id>' into its parts.
+
+    Returns ``("", task_id)`` when the ID carries no recognized backend prefix,
+    so callers can fall back to whichever backend they currently use.
+    """
     prefix, separator, raw_task_id = task_id.partition(":")
     if separator and (
         prefix == DEFAULT_BACKEND_NAME or prefix in load_backend_names(config_path)
     ):
         return prefix, raw_task_id
-    return DEFAULT_BACKEND_NAME, task_id
+    return "", task_id
 
 
 def flatten_config_data(

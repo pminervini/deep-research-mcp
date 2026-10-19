@@ -107,6 +107,7 @@ def _write_backends_config(tmp_path: Path) -> Path:
         'provider = "tavily"\n'
         'api_key = "table-key"\n'
         'model = "pro"\n'
+        "timeout = 600\n"
         "[backends.tulu-b]\n"
         'provider = "dr-tulu"\n'
         'base_url = "http://127.0.0.1:18081"\n',
@@ -183,3 +184,43 @@ def test_status_routes_prefixed_task_id_to_named_backend(
     output = capsys.readouterr().out
     assert "Task ID: task-42" in output
     assert "Status: unknown" in output
+
+
+def test_status_strips_prefix_matching_backend_flag(tmp_path: Path, capsys) -> None:
+    """--backend plus a matching prefix sends the raw ID to the provider."""
+    config_path = _write_backends_config(tmp_path)
+    cli = load_cli_module()
+    args = cli.build_parser().parse_args(
+        [
+            "--config",
+            str(config_path),
+            "--backend",
+            "tulu-b",
+            "status",
+            "tulu-b:task-42",
+        ]
+    )
+
+    assert asyncio.run(cmd_status(args)) == 0
+    assert "Task ID: task-42" in capsys.readouterr().out
+
+
+def test_status_rejects_prefix_conflicting_with_backend_flag(tmp_path: Path) -> None:
+    config_path = _write_backends_config(tmp_path)
+    cli = load_cli_module()
+    args = cli.build_parser().parse_args(
+        ["--config", str(config_path), "--backend", "lab", "status", "tulu-b:task-42"]
+    )
+
+    assert asyncio.run(cmd_status(args)) == 1
+
+
+def test_status_raw_id_uses_backend_flag(tmp_path: Path, capsys) -> None:
+    config_path = _write_backends_config(tmp_path)
+    cli = load_cli_module()
+    args = cli.build_parser().parse_args(
+        ["--config", str(config_path), "--backend", "tulu-b", "status", "task-42"]
+    )
+
+    assert asyncio.run(cmd_status(args)) == 0
+    assert "Task ID: task-42" in capsys.readouterr().out

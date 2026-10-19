@@ -275,11 +275,11 @@ def test_load_backend_names_rejects_invalid_entries(tmp_path, body, match):
 @pytest.mark.parametrize(
     "task_id, expected",
     [
-        ("abc", ("default", "abc")),
+        ("abc", ("", "abc")),
         ("default:abc", ("default", "abc")),
         ("g:abc", ("g", "abc")),
         ("g:a:b", ("g", "a:b")),
-        ("unknown:abc", ("default", "unknown:abc")),
+        ("unknown:abc", ("", "unknown:abc")),
     ],
 )
 def test_split_backend_task_id(tmp_path, task_id, expected):
