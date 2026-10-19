@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "deep-research-mcp"
-version = "0.2.0"
+version = "0.3.0"
 description = "MCP server and agent for autonomous deep research workflows"
 readme = "README.md"
 requires-python = ">=3.11"
