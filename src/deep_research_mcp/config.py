@@ -128,6 +128,26 @@ def split_backend_task_id(
     return "", task_id
 
 
+def prefix_task_id_with_backend(task_id: str, backend: str | None) -> str:
+    """Make sure a task ID sent to an MCP server names the selected backend.
+
+    This is pure string logic: the server's backend names need not exist in
+    the local config. An un-prefixed ID gets ``<backend>:`` added; an ID that
+    already carries the same prefix is returned unchanged; a different prefix
+    is a conflict.
+    """
+    if not backend:
+        return task_id
+    prefix, separator, _ = task_id.partition(":")
+    if not separator:
+        return f"{backend}:{task_id}"
+    if prefix != backend:
+        raise ConfigurationError(
+            f"Task ID names backend '{prefix}' but --backend is '{backend}'"
+        )
+    return task_id
+
+
 def flatten_config_data(
     config_data: Mapping[str, Any], prefix: str = ""
 ) -> dict[str, str]:

@@ -54,7 +54,11 @@ from deep_research_mcp import (
     ResearchResult,
 )
 from deep_research_mcp.codex_auth import CodexAuthError, CodexAuthManager
-from deep_research_mcp.config import DEFAULT_BACKEND_NAME, split_backend_task_id
+from deep_research_mcp.config import (
+    DEFAULT_BACKEND_NAME,
+    prefix_task_id_with_backend,
+    split_backend_task_id,
+)
 from deep_research_mcp.errors import ConfigurationError
 
 DEFAULT_SYSTEM_PROMPT = """
@@ -414,6 +418,14 @@ async def cmd_status(args: argparse.Namespace) -> int:
 
     if server_url:
         logger.info(f"Connecting to MCP server at {server_url}")
+        try:
+            # The server routes by prefix, so a raw ID must carry --backend.
+            task_id = prefix_task_id_with_backend(
+                task_id, getattr(args, "backend", None)
+            )
+        except ConfigurationError as e:
+            logger.error(f"Status error: {e}")
+            return 1
         rc, text = await mcp_status(server_url, task_id)
         if rc != 0:
             print(text, file=sys.stderr)

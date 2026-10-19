@@ -797,8 +797,10 @@ uv run python cli/deep-research-tui.py --backend tavily
 With `--backend`, the form is pre-filled from that `[backends.<name>]` table.
 Its provider, API style and credentials are fixed, so those controls are
 disabled; model, endpoint and reasoning effort can still be edited. In MCP
-mode the backend name is sent to the server. Task IDs in the `<backend>:<id>`
-form are routed to the named backend when checking status.
+mode the backend name is sent to the server, and a raw task ID is sent as
+`<backend>:<id>` so the server routes it to that backend. Task IDs that
+already carry a `<backend>:` prefix are routed to that backend when checking
+status in either mode.
 
 #### TUI Workflow
 
@@ -1128,7 +1130,7 @@ corresponding `ResearchConfig` field:
 | Flag | Description |
 |------|-------------|
 | `--config PATH` | Path to TOML config file (default: `~/.deep_research`) |
-| `--backend NAME` | Use a named `[backends.NAME]` table instead of `[research]`. Cannot be combined with `--provider`, `--model`, `--reasoning-effort`, `--api-key`, `--base-url` or `--api-style`; runtime flags such as `--timeout` still apply. In MCP client mode the name is passed to the server. |
+| `--backend NAME` | Use a named `[backends.NAME]` table instead of `[research]`. Cannot be combined with `--provider`, `--model`, `--reasoning-effort`, `--api-key`, `--base-url` or `--api-style`; runtime flags such as `--timeout` still apply. In MCP client mode the name is passed to the server, and `status` sends a raw task ID as `NAME:<id>` so the server routes it to that backend. |
 | `--provider {openai,openai-codex,dr-tulu,gemini,tavily,open-deep-research}` | Research provider |
 | `--model MODEL` | Model or agent ID |
 | `--reasoning-effort {none,low,medium,high,xhigh,max}` | OpenAI reasoning effort; omit for provider/model default |

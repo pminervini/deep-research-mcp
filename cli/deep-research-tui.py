@@ -57,7 +57,11 @@ from deep_research_mcp import (
     ResearchError,
     ResearchResult,
 )
-from deep_research_mcp.config import DEFAULT_BACKEND_NAME, split_backend_task_id
+from deep_research_mcp.config import (
+    DEFAULT_BACKEND_NAME,
+    prefix_task_id_with_backend,
+    split_backend_task_id,
+)
 
 DEFAULT_SYSTEM_PROMPT = """
 You are a professional researcher preparing a structured, data-driven report.
@@ -1021,9 +1025,15 @@ class DeepResearchTUI(App):
                 async with ClientSession(read_stream, write_stream) as session:
                     await session.initialize()
 
+                    # The server routes by prefix, so a raw ID must carry
+                    # the backend this TUI was started with.
                     result = await session.call_tool(
                         "research_status",
-                        {"task_id": task_id},
+                        {
+                            "task_id": prefix_task_id_with_backend(
+                                task_id, self._startup_state.backend
+                            )
+                        },
                     )
 
                     text = self._render_mcp_result(result)
