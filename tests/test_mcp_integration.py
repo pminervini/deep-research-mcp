@@ -195,9 +195,8 @@ def test_agents_are_cached_per_backend(tmp_path):
     ],
 )
 def test_split_task_id_default_backend(task_id, expected):
-    assert (
-        mcp_server._split_task_id(task_id) == expected
-    )  # pylint: disable=protected-access
+    # pylint: disable=protected-access
+    assert mcp_server._split_task_id(task_id) == expected
 
 
 @pytest.mark.asyncio
