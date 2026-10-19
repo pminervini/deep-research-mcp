@@ -44,10 +44,11 @@ The MCP server entrypoint is the console script:
 uv run deep-research-mcp
 ```
 
-It exposes two tools:
+It exposes three tools:
 
 - `deep_research`
 - `research_status`
+- `list_backends`
 
 ## Setup
 
@@ -510,15 +511,27 @@ Use for normal research. Key inputs:
 - `system_instructions`
 - `include_analysis`
 - `callback_url`
+- `backend` (optional name of a `[backends.<name>]` table in `~/.deep_research`;
+  empty uses the default `[research]` backend)
 
 The `query` must contain the complete research question and any user-provided
 context needed to answer it. Use `system_instructions` for research methodology,
 source, scope, and output requirements. Conversational hosts should ask any
 necessary follow-up questions before calling the tool.
 
+The returned task ID has the form `<backend>:<provider task id>`, for example
+`default:resp_abc123`. Pass it back to `research_status` unchanged.
+
 ### `research_status`
 
-Use to poll a known task ID.
+Use to poll a known task ID. An un-prefixed ID is looked up on the default
+backend.
+
+### `list_backends`
+
+Use to see which backends the server operator has declared, with provider,
+model, endpoint, and whether credentials were found. Pass a listed name as
+`backend` to `deep_research`.
 
 ## CLI As MCP Client
 

@@ -62,6 +62,21 @@ _PROVIDER_DEFAULTS: dict[str, tuple[str, str, tuple[str, ...], tuple[str, ...]]]
     ),
 }
 
+# Name of the backend described by the [research] table (and RESEARCH_* env vars).
+DEFAULT_BACKEND_NAME = "default"
+
+# Settings that describe the default backend's provider and must not leak into a
+# named [backends.<name>] configuration.
+_PROVIDER_SCOPED_SETTINGS = (
+    "RESEARCH_PROVIDER",
+    "PROVIDER",
+    "RESEARCH_API_KEY",
+    "RESEARCH_BASE_URL",
+    "RESEARCH_MODEL",
+    "RESEARCH_API_STYLE",
+    "RESEARCH_REASONING_EFFORT",
+)
+
 
 def load_config_file(config_path: Path | str | None = None) -> dict[str, Any]:
     """Load configuration data from a TOML file without mutating process state."""
@@ -76,6 +91,25 @@ def load_config_file(config_path: Path | str | None = None) -> dict[str, Any]:
     logger.info("Loading configuration from %s", resolved_path)
     with resolved_path.open("rb") as config_file:
         return tomllib.load(config_file)
+
+
+def load_backend_names(config_path: Path | str | None = None) -> list[str]:
+    """Return the names declared under [backends] in the config file, validated."""
+    backends = load_config_file(config_path).get("backends", {})
+    if not isinstance(backends, Mapping):
+        raise ConfigurationError("[backends] must be a table of named backends")
+
+    for name, table in backends.items():
+        if name == DEFAULT_BACKEND_NAME:
+            raise ConfigurationError(
+                f"Backend name '{DEFAULT_BACKEND_NAME}' is reserved for [research]"
+            )
+        if ":" in name:
+            raise ConfigurationError(f"Backend name '{name}' must not contain ':'")
+        if not isinstance(table, Mapping) or "provider" not in table:
+            raise ConfigurationError(f"Backend '{name}' must set a provider")
+
+    return list(backends)
 
 
 def flatten_config_data(
@@ -139,11 +173,40 @@ class ResearchConfig:
         cls,
         config_path: Path | str | None = None,
         env: Mapping[str, str] | None = None,
+        *,
+        backend: str | None = None,
     ) -> ResearchConfig:
-        """Create configuration by explicitly loading TOML config plus environment overrides."""
-        return cls._from_settings_map(
-            build_settings_map(config_data=load_config_file(config_path), env=env)
-        )
+        """Create configuration by explicitly loading TOML config plus environment overrides.
+
+        ``backend`` selects a named ``[backends.<name>]`` table. Provider-scoped
+        settings from ``[research]`` and ``RESEARCH_*`` env vars do not apply to
+        a named backend; runtime settings (timeouts, logging) are inherited.
+        """
+        config_data = dict(load_config_file(config_path))
+        backends = config_data.pop("backends", {})
+        settings = build_settings_map(config_data=config_data, env=env)
+
+        if backend and backend != DEFAULT_BACKEND_NAME:
+            table = backends.get(backend) if isinstance(backends, Mapping) else None
+            if not isinstance(table, Mapping) or "provider" not in table:
+                raise ConfigurationError(
+                    f"Backend '{backend}' is not defined in the [backends] table"
+                )
+            for key in _PROVIDER_SCOPED_SETTINGS:
+                settings.pop(key, None)
+            # Values set in the table win over the provider's own env aliases.
+            _, _, api_key_keys, base_url_keys = _PROVIDER_DEFAULTS.get(
+                str(table["provider"]), ("", "", (), ())
+            )
+            if "api_key" in table:
+                for key in api_key_keys:
+                    settings.pop(key, None)
+            if "base_url" in table:
+                for key in base_url_keys:
+                    settings.pop(key, None)
+            settings.update(flatten_config_data({"research": table}))
+
+        return cls._from_settings_map(settings)
 
     @classmethod
     def _from_settings_map(cls, settings: Mapping[str, str]) -> ResearchConfig:

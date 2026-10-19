@@ -40,12 +40,12 @@ These guidelines reduce common LLM coding mistakes. They bias toward caution ove
 - `ARCH.md` is authoritative for architecture and component details.
 - Keep canonical `~/.deep_research` TOML examples and key mappings in `README.md` to avoid documentation drift.
 - For MCP server setup, transports, and current CLI commands, follow the “Claude Code Integration” and “As an MCP Server” sections in `README.md`.
-- The MCP server exposes `deep_research` for autonomous research and `research_status` for task status and completed-report recovery.
+- The MCP server exposes `deep_research` for autonomous research (optionally targeting a named `[backends.<name>]` entry from `~/.deep_research`), `research_status` for task status and completed-report recovery, and `list_backends` to enumerate configured backends.
 
 ## Project Structure & Module Organization
 - `src/deep_research_mcp/`: core package.
   - `agent.py`: provider-aware research agent (OpenAI, open-deep-research).
-  - `mcp_server.py`: MCP server tools (`deep_research`, `research_status`).
+  - `mcp_server.py`: MCP server tools (`deep_research`, `research_status`, `list_backends`).
   - `config.py`, `errors.py`: configuration and shared error types.
 - `cli/`: unified CLI tool (`deep-research-cli.py`) for agent mode, MCP client mode, and config viewing.
 - `tests/`: `pytest` suite (`test_*.py`) with markers configured in `pytest.ini`.

@@ -6,7 +6,14 @@ Tests for TOML configuration loading.
 
 import os
 
-from deep_research_mcp.config import ResearchConfig, load_config_file
+import pytest
+
+from deep_research_mcp.config import (
+    ResearchConfig,
+    load_backend_names,
+    load_config_file,
+)
+from deep_research_mcp.errors import ConfigurationError
 
 
 def test_load_config_file_is_side_effect_free(tmp_path):
@@ -96,3 +103,169 @@ def test_cancel_on_timeout_parsing():
             os.environ["RESEARCH_MODEL"] = original_model
         else:
             os.environ.pop("RESEARCH_MODEL", None)
+
+
+def _write_backends_config(tmp_path, body: str):
+    config_path = tmp_path / ".deep_research"
+    config_path.write_text(body, encoding="utf-8")
+    return config_path
+
+
+def test_named_backend_ignores_default_provider_settings(tmp_path):
+    """A named backend never inherits provider-scoped values from [research]."""
+    config_path = _write_backends_config(
+        tmp_path,
+        "[research]\n"
+        'provider = "openai"\n'
+        'api_key = "openai-key"\n'
+        'base_url = "https://custom/v1"\n'
+        'model = "gpt-x"\n'
+        'reasoning_effort = "high"\n'
+        "[backends.g]\n"
+        'provider = "gemini"\n',
+    )
+
+    config = ResearchConfig.load(
+        config_path, env={"GEMINI_API_KEY": "gem-key"}, backend="g"
+    )
+
+    assert config.provider == "gemini"
+    assert config.api_key == "gem-key"
+    assert config.base_url == "https://generativelanguage.googleapis.com"
+    assert config.model == "deep-research-preview-04-2026"
+    assert config.reasoning_effort is None
+    assert config.validate() is True
+
+
+def test_named_backend_inherits_runtime_settings(tmp_path):
+    """Runtime values come from [research] unless the backend table overrides them."""
+    config_path = _write_backends_config(
+        tmp_path,
+        "[research]\n"
+        'provider = "openai"\n'
+        "timeout = 42\n"
+        "[backends.inherit]\n"
+        'provider = "dr-tulu"\n'
+        "[backends.override]\n"
+        'provider = "dr-tulu"\n'
+        "timeout = 7\n",
+    )
+
+    assert ResearchConfig.load(config_path, env={}, backend="inherit").timeout == 42.0
+    assert ResearchConfig.load(config_path, env={}, backend="override").timeout == 7.0
+
+
+def test_named_backend_ignores_generic_env_overrides(tmp_path):
+    """RESEARCH_* env vars describe the default backend, not named ones."""
+    config_path = _write_backends_config(
+        tmp_path, '[backends.g]\nprovider = "gemini"\n'
+    )
+
+    config = ResearchConfig.load(
+        config_path,
+        env={"RESEARCH_MODEL": "env-model", "RESEARCH_API_KEY": "env-key"},
+        backend="g",
+    )
+
+    assert config.model == "deep-research-preview-04-2026"
+    assert config.api_key is None
+
+
+def test_named_backend_table_beats_provider_env_alias(tmp_path):
+    """An api_key set in the table wins over TAVILY_API_KEY; omitted falls back."""
+    config_path = _write_backends_config(
+        tmp_path,
+        "[backends.with-key]\n"
+        'provider = "tavily"\n'
+        'api_key = "table-key"\n'
+        "[backends.without-key]\n"
+        'provider = "tavily"\n',
+    )
+    env = {"TAVILY_API_KEY": "env-key"}
+
+    assert ResearchConfig.load(config_path, env=env, backend="with-key").api_key == (
+        "table-key"
+    )
+    assert ResearchConfig.load(config_path, env=env, backend="without-key").api_key == (
+        "env-key"
+    )
+
+
+def test_named_backends_same_provider_different_specs(tmp_path):
+    """Two backends may share a provider and differ in endpoint and model."""
+    config_path = _write_backends_config(
+        tmp_path,
+        "[backends.a]\n"
+        'provider = "dr-tulu"\n'
+        'base_url = "http://a:8080/"\n'
+        "[backends.b]\n"
+        'provider = "dr-tulu"\n'
+        'base_url = "http://b:8080/"\n'
+        'model = "tulu-b"\n',
+    )
+
+    config_a = ResearchConfig.load(config_path, env={}, backend="a")
+    config_b = ResearchConfig.load(config_path, env={}, backend="b")
+
+    assert (config_a.base_url, config_a.model) == ("http://a:8080/", "dr-tulu")
+    assert (config_b.base_url, config_b.model) == ("http://b:8080/", "tulu-b")
+
+
+def test_default_backend_name_matches_plain_load(tmp_path):
+    """backend="default" is the same as not naming a backend."""
+    config_path = _write_backends_config(
+        tmp_path,
+        "[research]\n"
+        'provider = "gemini"\n'
+        'model = "file-model"\n'
+        "[backends.g]\n"
+        'provider = "gemini"\n',
+    )
+
+    assert ResearchConfig.load(config_path, env={}, backend="default") == (
+        ResearchConfig.load(config_path, env={})
+    )
+
+
+@pytest.mark.parametrize(
+    "body, backend, match",
+    [
+        ("[research]\n", "nope", "not defined"),
+        ('[backends.bad]\nmodel = "x"\n', "bad", "not defined"),
+        ('[backends.bad]\nprovider = "nope"\n', "bad", "not supported"),
+    ],
+)
+def test_named_backend_errors(tmp_path, body, backend, match):
+    config_path = _write_backends_config(tmp_path, body)
+
+    with pytest.raises(ConfigurationError, match=match):
+        ResearchConfig.load(config_path, env={}, backend=backend)
+
+
+def test_load_backend_names(tmp_path):
+    """Names come back in file order; a missing table yields an empty list."""
+    config_path = _write_backends_config(
+        tmp_path,
+        "[backends.second-first]\n"
+        'provider = "gemini"\n'
+        "[backends.alpha]\n"
+        'provider = "tavily"\n',
+    )
+
+    assert load_backend_names(config_path) == ["second-first", "alpha"]
+    assert not load_backend_names(_write_backends_config(tmp_path, "[research]\n"))
+
+
+@pytest.mark.parametrize(
+    "body, match",
+    [
+        ('[backends.default]\nprovider = "gemini"\n', "reserved"),
+        ('[backends."a:b"]\nprovider = "gemini"\n', "must not contain"),
+        ('[backends.bad]\nmodel = "x"\n', "must set a provider"),
+    ],
+)
+def test_load_backend_names_rejects_invalid_entries(tmp_path, body, match):
+    config_path = _write_backends_config(tmp_path, body)
+
+    with pytest.raises(ConfigurationError, match=match):
+        load_backend_names(config_path)

@@ -112,9 +112,29 @@ cancel_on_timeout = false  # When true, cancel the provider task if it exceeds t
 
 [logging]
 level = "INFO"
+
+# Optional named backends for the MCP server. Each table accepts the same keys
+# as [research]; `provider` is required. MCP clients select one with the
+# `backend` argument of `deep_research`; the [research] table is the "default"
+# backend and is used when no name is given.
+[backends.fast]
+provider = "openai"
+api_style = "chat_completions"
+model = "llama-3.3-70b"
+base_url = "https://api.groq.com/openai/v1"
+api_key = "gsk-..."
+
+[backends.tulu-lab]
+provider = "dr-tulu"
+base_url = "http://lab-box:8080/"
+
+[backends.gemini]
+provider = "gemini"                         # api_key falls back to GEMINI_API_KEY
 ```
 
 Note on precedence: `[research] api_key` and `base_url` map to the `RESEARCH_API_KEY` and `RESEARCH_BASE_URL` settings, which apply to every provider except `openai-codex`. For Tavily, `TAVILY_API_KEY` takes precedence over `RESEARCH_API_KEY` so a provider switch can use a Tavily-specific key. The Codex subscription provider ignores API keys and endpoint overrides so its bearer token cannot be redirected. If you switch another provider via an environment override (e.g. `RESEARCH_PROVIDER=openai`) while the file is configured for a different provider, also override `RESEARCH_API_KEY` and `RESEARCH_BASE_URL`.
+
+Named backends (`[backends.<name>]`) are isolated from the default: `provider`, `model`, `api_style`, `api_key`, `base_url`, and `reasoning_effort` never leak into them from `[research]` or from `RESEARCH_*` environment variables. When a table omits `api_key` or `base_url`, the provider's own environment variables (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `TAVILY_API_KEY`, `DR_TULU_BASE_URL`, and so on) and provider defaults apply; when the table sets them, the table wins, including over `TAVILY_API_KEY`. Runtime settings (`timeout`, `poll_interval`, `cancel_on_timeout`, `enable_reasoning_summaries`, `[logging] level`) are inherited from `[research]` and the environment unless the table overrides them. Several backends may share a provider, so two Dr Tulu servers or two OpenAI-compatible endpoints are simply two tables. The name `default` is reserved and names must not contain `:`. The server validates every named backend at startup; the CLI and TUI always use the default backend.
 
 OpenAI provider example:
 
@@ -518,7 +538,7 @@ export MCP_TOOL_TIMEOUT=14400000  # 4 hours
 claude --mcp-config ./.mcp.json
 ```
 
-Kick off work with `deep_research`, note the returned job ID, and call `research_status` to stream progress without letting any single tool call stagnate.
+Kick off work with `deep_research`, note the returned job ID, and call `research_status` to stream progress without letting any single tool call stagnate. Task IDs are returned as `<backend>:<provider task id>` (for example `default:resp_abc123`) and must be passed back to `research_status` verbatim; an un-prefixed ID is looked up on the default backend. If `~/.deep_research` declares `[backends.<name>]` tables, call `list_backends` to see them and pass `backend="<name>"` to `deep_research` to use one.
 
 Output size: Claude Code limits MCP tool output (about 25,000 tokens by default, configurable via `MAX_MCP_OUTPUT_TOKENS`). The research tools declare the `anthropic/maxResultSizeChars` annotation so recent Claude Code versions accept large reports without extra configuration; on older versions, raise the limit before launching the CLI:
 
@@ -695,6 +715,12 @@ Notes:
   for credentials, export them before launching the server process. If you use
   `stdio` and let the client spawn the server, make sure the client passes the
   required env vars through.
+- The server exposes three tools: `deep_research` (with an optional `backend`
+  argument naming a `[backends.<name>]` table from `~/.deep_research`),
+  `research_status`, and `list_backends`, which reports each backend's
+  provider, model, endpoint, and whether credentials were found. Named
+  backends require the TOML file; an environment-only deployment exposes just
+  the default backend. Task IDs are returned as `<backend>:<id>`.
 
 #### OAuth authentication for HTTP
 
