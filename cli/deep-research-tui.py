@@ -1025,15 +1025,19 @@ class DeepResearchTUI(App):
                 async with ClientSession(read_stream, write_stream) as session:
                     await session.initialize()
 
-                    # The server routes by prefix, so a raw ID must carry
-                    # the backend this TUI was started with.
+                    # The server routes by prefix: an explicit prefix is
+                    # kept as-is, a raw ID gets the TUI's startup backend.
+                    _, has_prefix, _ = task_id.partition(":")
+                    mcp_task_id = (
+                        task_id
+                        if has_prefix
+                        else prefix_task_id_with_backend(
+                            task_id, self._startup_state.backend
+                        )
+                    )
                     result = await session.call_tool(
                         "research_status",
-                        {
-                            "task_id": prefix_task_id_with_backend(
-                                task_id, self._startup_state.backend
-                            )
-                        },
+                        {"task_id": mcp_task_id},
                     )
 
                     text = self._render_mcp_result(result)

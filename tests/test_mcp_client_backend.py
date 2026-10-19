@@ -149,3 +149,36 @@ async def test_tui_mcp_status_raw_id_uses_startup_backend(mcp_server_url):
 
     assert "Task lab:task-42 status: unknown" in output
     assert CODEX_MESSAGE in output
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "task_id, expect_codex",
+    [
+        ("default:task-42", False),
+        ("lab:task-42", True),
+    ],
+)
+async def test_tui_mcp_status_keeps_explicit_prefix(
+    mcp_server_url, task_id, expect_codex
+):
+    """An explicit prefix wins over the TUI's startup backend in MCP mode."""
+    startup_state = TUI.StartupState(
+        config_path=None,
+        backend="lab",
+        mode="mcp",
+        server_url=mcp_server_url,
+        task_id=task_id,
+        config=TUI.get_provider_defaults("openai-codex"),
+        provider="openai-codex",
+    )
+    app = TUI.DeepResearchTUI(startup_state)
+
+    async with app.run_test(size=(140, 42)):
+        # pylint: disable=protected-access
+        app._check_mcp_status(task_id)
+        await app.workers.wait_for_complete()
+        output = app._output_text
+
+    assert f"Task {task_id} status: unknown" in output
+    assert (CODEX_MESSAGE in output) is expect_codex
