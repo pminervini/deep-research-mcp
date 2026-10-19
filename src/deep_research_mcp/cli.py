@@ -610,7 +610,6 @@ def build_parser() -> argparse.ArgumentParser:
             "dr-tulu",
             "gemini",
             "tavily",
-            "open-deep-research",
         ],
         help="Research provider",
     )

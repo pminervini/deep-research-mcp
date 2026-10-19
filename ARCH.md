@@ -36,7 +36,6 @@ graph TD
         P1[openai_backend.py]
         P2[gemini_backend.py]
         P3[dr_tulu_backend.py]
-        P4[open_deep_research_backend.py]
         P5[codex_backend.py]
         P6[tavily_backend.py]
         CA[codex_auth.py]
@@ -47,7 +46,6 @@ graph TD
         H2[OpenAI Chat Completions API]
         H3[Gemini Interactions API Deep Research]
         H4[DR-Tulu /chat endpoint]
-        M[Open Deep Research smolagents + text browser]
         H5[ChatGPT Codex private Responses endpoint]
         H6[Tavily Research API]
         OA[OpenAI OAuth device flow]
@@ -62,14 +60,12 @@ graph TD
     P --> P1
     P --> P2
     P --> P3
-    P --> P4
     P --> P5
     P --> P6
     P1 -- "Makes API calls to" --> H
     P1 -- "Makes API calls to" --> H2
     P2 -- "Makes API calls to" --> H3
     P3 -- "Makes API calls to" --> H4
-    P4 -- "Orchestrates agents via" --> M
     P5 -- "Streams research from" --> H5
     P5 -- "Loads/refreshes credentials with" --> CA
     P6 -- "Creates and polls tasks through" --> H6
@@ -95,7 +91,6 @@ The project is composed of four main layers:
     *   `backends/gemini_backend.py` implements Gemini Deep Research over the Interactions API, including polling and result normalization.
     *   `backends/tavily_backend.py` implements Tavily Research task creation, polling, and report recovery.
     *   `backends/dr_tulu_backend.py` implements the DR-Tulu research agent integration via Allen AI's `/chat` endpoint.
-    *   `backends/open_deep_research_backend.py` implements the Open Deep Research integration with smolagents and text-browser tooling.
     *   `backends/codex_backend.py` implements experimental ChatGPT subscription access through the private Codex Responses stream.
     *   `codex_auth.py` owns the separate device-code session, optional access-token-only Codex import, atomic token rotation, and local logout.
 
@@ -105,7 +100,6 @@ The project is composed of four main layers:
     * Provider `gemini`: Gemini Deep Research agent over the Interactions API. Background execution and polling are required; built-in Google Search and URL context are provided by Gemini.
     * Provider `tavily`: Tavily Research over its asynchronous Research API. Task IDs support polling and completed-report recovery; `mini` is the default model.
     * Provider `dr-tulu`: Allen AI's DR-Tulu research agent accessed via its `/chat` endpoint. A lightweight integration that delegates research to a separately hosted DR-Tulu service.
-    * Provider `open-deep-research`: smolagents stack with a text browser and search tools; optional OpenAI-compatible LLM endpoint via LiteLLM.
     * Provider `openai-codex`: account-scoped model discovery followed by a synchronous SSE Responses request with native web search. Code Interpreter, background polling, cancellation, task recovery, and endpoint overrides are intentionally unsupported.
 
 ## File-by-File Breakdown
@@ -209,15 +203,6 @@ The project is composed of four main layers:
     -   `_build_citations()`: Converts DR-Tulu searched links into the standard citation format.
     -   `get_task_status()`: Returns an `unknown` status because DR-Tulu does not support persistent task tracking.
 
-### `src/deep_research_mcp/backends/open_deep_research_backend.py`
-
--   **Purpose**: Implements the Open Deep Research integration using smolagents and browser tools.
--   **Key Functionality**:
-    -   `_init_open_deep_research()`: Initializes smolagents model, browser, and tools for Open Deep Research.
-    -   `_run_research()`: Executes the ODR manager/search agents and extracts a structured result.
-    -   `_extract_memory_details()`: Collects citations, search queries, and step counts from agent memory.
-    -   `get_task_status()`: Returns an `unknown` status because the provider does not support persistent task tracking.
-
 ### `src/deep_research_mcp/mcp_server.py`
 
 -   **Purpose**: Implements the MCP (Model-Client Protocol) server using the `mcp.server.fastmcp` module from the official MCP Python SDK. Supports both stdio and HTTP (streaming) transports. Exposes the research functionality as tools that can be called by clients like Claude Code or any MCP‑compatible client.
@@ -262,7 +247,7 @@ The MCP server exposes two tools to clients like Claude Code. Each tool accepts 
 
 ### `deep_research()`
 
-**Purpose**: Performs autonomous deep research using the configured provider (OpenAI Responses API, experimental OpenAI Codex subscription access, Gemini Deep Research, Tavily Research, DR-Tulu, or Open Deep Research).
+**Purpose**: Performs autonomous deep research using the configured provider (OpenAI Responses API, experimental OpenAI Codex subscription access, Gemini Deep Research, Tavily Research, or DR-Tulu).
 
 **Arguments**:
 - `query` (string, required): Complete research question, including any user-provided context needed to answer it

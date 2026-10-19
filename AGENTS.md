@@ -44,7 +44,7 @@ These guidelines reduce common LLM coding mistakes. They bias toward caution ove
 
 ## Project Structure & Module Organization
 - `src/deep_research_mcp/`: core package.
-  - `agent.py`: provider-aware research agent (OpenAI, open-deep-research).
+  - `agent.py`: provider-aware research agent that delegates to the configured backend.
   - `mcp_server.py`: MCP server tools (`deep_research`, `research_status`, `list_backends`).
   - `config.py`, `errors.py`: configuration and shared error types.
 - `cli/`: unified CLI tool (`deep-research-cli.py`) for agent mode, MCP client mode, and config viewing.

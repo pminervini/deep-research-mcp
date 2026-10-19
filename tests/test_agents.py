@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 @pytest.mark.slow
 @pytest.mark.api
 @pytest.mark.integration
-# ("open-deep-research", "openai/qwen/qwen3-coder-30b", "responses"),
 @pytest.mark.parametrize(
     "provider,model,api_style",
     [
