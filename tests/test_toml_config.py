@@ -12,6 +12,7 @@ from deep_research_mcp.config import (
     ResearchConfig,
     load_backend_names,
     load_config_file,
+    split_backend_task_id,
 )
 from deep_research_mcp.errors import ConfigurationError
 
@@ -269,3 +270,21 @@ def test_load_backend_names_rejects_invalid_entries(tmp_path, body, match):
 
     with pytest.raises(ConfigurationError, match=match):
         load_backend_names(config_path)
+
+
+@pytest.mark.parametrize(
+    "task_id, expected",
+    [
+        ("abc", ("default", "abc")),
+        ("default:abc", ("default", "abc")),
+        ("g:abc", ("g", "abc")),
+        ("g:a:b", ("g", "a:b")),
+        ("unknown:abc", ("default", "unknown:abc")),
+    ],
+)
+def test_split_backend_task_id(tmp_path, task_id, expected):
+    config_path = _write_backends_config(
+        tmp_path, '[backends.g]\nprovider = "gemini"\n'
+    )
+
+    assert split_backend_task_id(task_id, config_path) == expected

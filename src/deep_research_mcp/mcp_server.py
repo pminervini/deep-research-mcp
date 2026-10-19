@@ -56,6 +56,7 @@ from deep_research_mcp.config import (
     DEFAULT_BACKEND_NAME,
     ResearchConfig,
     load_backend_names,
+    split_backend_task_id,
 )
 from deep_research_mcp.errors import ResearchError
 from deep_research_mcp.results import ResearchResult
@@ -144,10 +145,7 @@ def _tag_task_id(backend: str, task_id: str) -> str:
 
 def _split_task_id(task_id: str) -> tuple[str, str]:
     """Split '<backend>:<id>' into its parts; un-prefixed IDs use the default."""
-    prefix, separator, raw_task_id = task_id.partition(":")
-    if separator and (prefix == DEFAULT_BACKEND_NAME or prefix in load_backend_names()):
-        return prefix, raw_task_id
-    return DEFAULT_BACKEND_NAME, task_id
+    return split_backend_task_id(task_id)
 
 
 async def _progress_heartbeat(

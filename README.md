@@ -755,7 +755,10 @@ client mode** which connects to a running MCP server over HTTP.
 
 Configuration is loaded from `~/.deep_research` by default. Every
 `ResearchConfig` parameter can be overridden via CLI flags, which take
-precedence over both the TOML file and environment variables.
+precedence over both the TOML file and environment variables. Pass
+`--backend NAME` to use a named `[backends.NAME]` table instead. The `status`
+command accepts task IDs in the `<backend>:<id>` form returned by the MCP
+server and routes them to the named backend automatically.
 
 ### Terminal UI
 
@@ -786,7 +789,16 @@ uv run python cli/deep-research-tui.py --mode mcp \
 
 # Start with Gemini selected
 uv run python cli/deep-research-tui.py --provider gemini
+
+# Start on a named backend from ~/.deep_research
+uv run python cli/deep-research-tui.py --backend tavily
 ```
+
+With `--backend`, the form is pre-filled from that `[backends.<name>]` table.
+Its provider, API style and credentials are fixed, so those controls are
+disabled; model, endpoint and reasoning effort can still be edited. In MCP
+mode the backend name is sent to the server. Task IDs in the `<backend>:<id>`
+form are routed to the named backend when checking status.
 
 #### TUI Workflow
 
@@ -1116,6 +1128,7 @@ corresponding `ResearchConfig` field:
 | Flag | Description |
 |------|-------------|
 | `--config PATH` | Path to TOML config file (default: `~/.deep_research`) |
+| `--backend NAME` | Use a named `[backends.NAME]` table instead of `[research]`. Cannot be combined with `--provider`, `--model`, `--reasoning-effort`, `--api-key`, `--base-url` or `--api-style`; runtime flags such as `--timeout` still apply. In MCP client mode the name is passed to the server. |
 | `--provider {openai,openai-codex,dr-tulu,gemini,tavily,open-deep-research}` | Research provider |
 | `--model MODEL` | Model or agent ID |
 | `--reasoning-effort {none,low,medium,high,xhigh,max}` | OpenAI reasoning effort; omit for provider/model default |

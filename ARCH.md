@@ -124,7 +124,8 @@ The project is composed of four main layers:
 -   **Purpose**: Implements the installed `deep-research-cli` console command.
 -   **Key Functionality**:
     -   Runs direct research or connects to a Streamable HTTP MCP server.
-    -   Displays resolved configuration and checks task status.
+    -   `--backend NAME` selects a `[backends.<name>]` table via `ResearchConfig.load(backend=...)`; `check_backend_flags()` rejects it alongside provider-scoped override flags. In MCP client mode the name is forwarded as the `backend` tool argument.
+    -   Displays resolved configuration and checks task status. `status` splits `<backend>:<id>` task IDs with `split_backend_task_id()` so IDs copied from MCP output reach the right backend.
     -   Manages the independent OpenAI Codex login, status, and logout flows.
 
 ### `src/deep_research_mcp/backends/__init__.py`
@@ -225,6 +226,7 @@ The project is composed of four main layers:
     -   `ResearchConfig` (dataclass): Defines the configuration parameters for the agent, such as API key, model name, optional OpenAI reasoning effort, base URL, `api_style` (`"responses"` or `"chat_completions"`), timeout, and poll interval.
     -   `load()`: Explicitly reads `~/.deep_research` (or another provided TOML path), merges it with environment variable overrides, and returns a config object without mutating `os.environ`. The keyword-only `backend` argument selects a `[backends.<name>]` table: provider-scoped settings (`RESEARCH_PROVIDER`, `RESEARCH_API_KEY`, `RESEARCH_BASE_URL`, `RESEARCH_MODEL`, `RESEARCH_API_STYLE`, `RESEARCH_REASONING_EFFORT`) are dropped, the table's values are applied, and runtime settings are inherited. A table that sets `api_key` or `base_url` also overrides the provider's own env aliases such as `TAVILY_API_KEY`.
     -   `load_backend_names()`: Returns the validated names under `[backends]` (no `default`, no `:` in names, each with a `provider`).
+    -   `split_backend_task_id()`: Splits a `<backend>:<id>` task ID into its backend name and raw provider ID; un-prefixed or unknown prefixes resolve to the default backend. Shared by the MCP server, the CLI and the TUI.
     -   `from_env()`: A class method to load configuration from environment variables only.
     -   `validate()`: A method to validate the configuration to ensure that the provided values are valid.
 

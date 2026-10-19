@@ -189,3 +189,46 @@ async def test_reasoning_effort_tui_loads_and_overrides_config(tmp_path):
         effort.value = "default"
         await pilot.pause()
         assert app._build_config().reasoning_effort is None
+
+
+@pytest.mark.asyncio
+async def test_named_backend_fixes_provider_and_credentials(tmp_path):
+    """--backend pre-fills the form and keeps the table's provider and key."""
+    config_path = tmp_path / ".deep_research"
+    config_path.write_text(
+        "[research]\n"
+        'provider = "openai"\n'
+        'api_key = "default-key"\n'
+        "[backends.lab]\n"
+        'provider = "tavily"\n'
+        'api_key = "table-key"\n'
+        'model = "pro"\n',
+        encoding="utf-8",
+    )
+    loaded = TUI.ResearchConfig.load(config_path, env={}, backend="lab")
+    startup_state = build_startup_state()
+    startup_state.config_path = str(config_path)
+    startup_state.backend = "lab"
+    startup_state.provider = loaded.provider
+    startup_state.config = TUI.ProviderDefaults(
+        provider=loaded.provider,
+        api_style=loaded.api_style,
+        model=loaded.model,
+        base_url=loaded.base_url or "",
+    )
+    app = TUI.DeepResearchTUI(startup_state)
+
+    async with app.run_test(size=(140, 42)) as pilot:
+        assert app.query_one("#provider", Select).disabled
+        assert app.query_one("#model", Input).value == "pro"
+
+        app.query_one("#model", Input).value = "mini"
+        await pilot.pause()
+        # pylint: disable=protected-access
+        config = app._build_config()
+
+    assert (config.provider, config.api_key, config.model) == (
+        "tavily",
+        "table-key",
+        "mini",
+    )
