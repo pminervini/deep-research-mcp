@@ -80,11 +80,11 @@ graph TD
 
 The project is composed of four main layers:
 
-1.  **MCP Server (`mcp_server.py`)**: This is the entry point for external clients like Claude Code. It uses the `mcp.server.fastmcp` module from the official MCP Python SDK to expose the core research functionality as tools. It handles incoming requests, initializes the `DeepResearchAgent`, and formats the results for the client. It includes two tools: `deep_research()` and `research_status()`.
+1.  **MCP Server (`mcp_server.py`)**: This is the entry point for external clients like Claude Code. It uses the `mcp.server.fastmcp` module from the official MCP Python SDK to expose the core research functionality as tools. It handles incoming requests, initializes one `DeepResearchAgent` per configured backend, and formats the results for the client. It includes three tools: `deep_research()`, `research_status()`, and `list_backends()`.
 
 2.  **Orchestration (`agent.py`, `config.py`, `errors.py`)**: This layer contains the application-facing orchestration logic.
     *   `agent.py` owns the top-level research flow, completion callbacks, status lookup, and delegation to the configured backend. It does not embed provider-specific execution logic directly.
-    *   `config.py` handles loading and validating configuration from environment variables, including provider selection.
+    *   `config.py` handles loading and validating configuration from `~/.deep_research` and environment variables, including provider selection and named `[backends.<name>]` tables.
     *   `errors.py` defines custom exception classes for better error handling.
     *   `cli.py` provides the installed direct-agent, MCP-client, configuration,
         and Codex authentication commands.
@@ -211,16 +211,20 @@ The project is composed of four main layers:
 
 -   **Purpose**: Implements the MCP (Model-Client Protocol) server using the `mcp.server.fastmcp` module from the official MCP Python SDK. Supports both stdio and HTTP (streaming) transports. Exposes the research functionality as tools that can be called by clients like Claude Code or any MCP‑compatible client.
 -   **Key Functionality**:
-    -   `@mcp.tool() deep_research()`: The main tool that performs research. It initializes the `DeepResearchAgent`, calls its `research()` method, and formats the output for the client.
-    -   `@mcp.tool() research_status()`: A tool to check the status of a research task.
-    -   `main()`: The entry point for running the MCP server. It loads the configuration and starts the server. Transport is selectable via `--transport {stdio,http}` with `--host`/`--port` for HTTP.
+    -   `_ensure_research_agent(backend)`: Lazily builds and caches one `DeepResearchAgent` per backend name in the module-level `_agents` dict. `"default"` (or an empty name) is the `[research]` table; other names resolve to `[backends.<name>]` via `ResearchConfig.load(backend=...)`. The `--cancel-on-timeout` override and log level are applied per build and are server-wide.
+    -   `_tag_task_id()` / `_split_task_id()`: Task IDs returned to clients are `<backend>:<provider task id>` so `research_status` can route them to the backend that owns them without server-side state; un-prefixed IDs go to the default backend. The webhook callback payload sent by `DeepResearchAgent` still carries the raw provider ID.
+    -   `@mcp.tool() deep_research()`: The main tool that performs research. It picks the agent for the optional `backend` argument, calls its `research()` method, and formats the output for the client.
+    -   `@mcp.tool() research_status()`: A tool to check the status of a research task on whichever backend its ID names.
+    -   `@mcp.tool() list_backends()`: Lists the default and named backends with provider, model, endpoint, and whether an API key (or the Codex OAuth file) is present. It reports without validating.
+    -   `main()`: The entry point for running the MCP server. It loads and validates the default configuration and every named backend, then starts the server. Transport is selectable via `--transport {stdio,http}` with `--host`/`--port` for HTTP.
 
 ### `src/deep_research_mcp/config.py`
 
 -   **Purpose**: Manages the application's configuration.
 -   **Key Functionality**:
     -   `ResearchConfig` (dataclass): Defines the configuration parameters for the agent, such as API key, model name, optional OpenAI reasoning effort, base URL, `api_style` (`"responses"` or `"chat_completions"`), timeout, and poll interval.
-    -   `load()`: Explicitly reads `~/.deep_research` (or another provided TOML path), merges it with environment variable overrides, and returns a config object without mutating `os.environ`.
+    -   `load()`: Explicitly reads `~/.deep_research` (or another provided TOML path), merges it with environment variable overrides, and returns a config object without mutating `os.environ`. The keyword-only `backend` argument selects a `[backends.<name>]` table: provider-scoped settings (`RESEARCH_PROVIDER`, `RESEARCH_API_KEY`, `RESEARCH_BASE_URL`, `RESEARCH_MODEL`, `RESEARCH_API_STYLE`, `RESEARCH_REASONING_EFFORT`) are dropped, the table's values are applied, and runtime settings are inherited. A table that sets `api_key` or `base_url` also overrides the provider's own env aliases such as `TAVILY_API_KEY`.
+    -   `load_backend_names()`: Returns the validated names under `[backends]` (no `default`, no `:` in names, each with a `provider`).
     -   `from_env()`: A class method to load configuration from environment variables only.
     -   `validate()`: A method to validate the configuration to ensure that the provided values are valid.
 
@@ -252,8 +256,9 @@ The MCP server exposes two tools to clients like Claude Code. Each tool accepts 
 - `system_instructions` (string, optional): Custom research approach instructions
 - `include_analysis` (boolean, optional, default=True): Enable code execution when the selected provider supports it
 - `callback_url` (string, optional): Webhook URL notified with a completion payload after research finishes
+- `backend` (string, optional): Name of a `[backends.<name>]` table from `~/.deep_research`; empty selects the default `[research]` backend
 
-**Returns**: String containing formatted markdown report
+**Returns**: String containing formatted markdown report. The `Task ID` line has the form `<backend>:<provider task id>`.
 
 **Return Structure**:
 ```
@@ -294,7 +299,7 @@ The MCP server exposes two tools to clients like Claude Code. Each tool accepts 
 **Purpose**: Check the status of a running research task and recover the report of a completed one.
 
 **Arguments**:
-- `task_id` (string, required): UUID returned by `deep_research()` tool
+- `task_id` (string, required): Task ID returned by `deep_research()`, in the form `<backend>:<provider task id>`; an un-prefixed ID is looked up on the default backend
 
 **Returns**: String containing task status information. When the task is completed and the provider supports result retrieval (OpenAI Responses API, Gemini Interactions API, Tavily Research API), the full rendered research report is appended.
 
@@ -317,3 +322,17 @@ Completed at: [timestamp]  # Only if completed
     "completed_at": "2025-01-15T10:35:00Z"
 }
 ```
+
+### `list_backends()`
+
+**Purpose**: Report the backends a client may pass as `backend` to `deep_research()`.
+
+**Arguments**: none
+
+**Returns**: One line per backend, starting with `default`:
+```
+- default: provider=openai, model=gpt-6-sol, base_url=https://api.openai.com/v1, api_key: set
+- tulu-lab: provider=dr-tulu, model=dr-tulu, base_url=http://lab-box:8080/, api_key: not set
+- codex: provider=openai-codex, model=auto, base_url=https://chatgpt.com/backend-api/codex, oauth: present
+```
+A backend whose table fails to load is listed with `configuration error: ...` instead.

@@ -20,8 +20,9 @@ Features:
 - Support for data analysis and visualization capabilities
 
 Exposed tools:
-- deep_research: Main research tool
+- deep_research: Main research tool (optionally targeting a named backend)
 - research_status: Monitor task progress
+- list_backends: List the default and named backends declared in the config
 
 Quick start:
     # stdio (default)
@@ -50,7 +51,12 @@ from mcp.server.fastmcp import Context, FastMCP
 from deep_research_mcp import __version__
 from deep_research_mcp.agent import DeepResearchAgent
 from deep_research_mcp.auth import load_http_auth
-from deep_research_mcp.config import ResearchConfig
+from deep_research_mcp.codex_auth import DEFAULT_CODEX_AUTH_PATH
+from deep_research_mcp.config import (
+    DEFAULT_BACKEND_NAME,
+    ResearchConfig,
+    load_backend_names,
+)
 from deep_research_mcp.errors import ResearchError
 from deep_research_mcp.results import ResearchResult
 
@@ -69,8 +75,8 @@ Requirements:
 - Be analytical and avoid generalities
 """
 
-# Global agent instance
-research_agent: DeepResearchAgent | None = None
+# Lazily built agents keyed by backend name ("default" for the [research] table).
+_agents: dict[str, DeepResearchAgent] = {}
 
 # Command-line override applied when the agent is created lazily.
 _cancel_on_timeout_override: bool | None = None
@@ -91,7 +97,8 @@ mcp = FastMCP(
         "and other providers), experimental OpenAI Codex subscription access, "
         "Gemini Deep Research via the Interactions API, Tavily Research, "
         "DR-Tulu, and Open Deep Research. Use deep_research for comprehensive "
-        "research queries and "
+        "research queries, list_backends to see the named backends the server "
+        "operator has configured (pass one as the backend argument), and "
         "research_status where the provider supports task recovery."
     ),
     website_url="https://github.com/pminervini/deep-research-mcp",
@@ -113,19 +120,34 @@ def _apply_logging_config(log_level: str) -> None:
     mcp.settings.log_level = typed_log_level
 
 
-def _ensure_research_agent() -> DeepResearchAgent:
-    """Reuse the shared research agent instance, creating it on demand."""
-    global research_agent
+def _ensure_research_agent(backend: str = "") -> DeepResearchAgent:
+    """Reuse the agent for a backend name, creating it on demand."""
+    name = backend or DEFAULT_BACKEND_NAME
+    agent = _agents.get(name)
 
-    if research_agent is None:
-        config = ResearchConfig.load()
+    if agent is None:
+        config = ResearchConfig.load(backend=name)
         if _cancel_on_timeout_override is not None:
             config.cancel_on_timeout = _cancel_on_timeout_override
         config.validate()
         _apply_logging_config(config.log_level)
-        research_agent = DeepResearchAgent(config)
+        agent = DeepResearchAgent(config)
+        _agents[name] = agent
 
-    return research_agent
+    return agent
+
+
+def _tag_task_id(backend: str, task_id: str) -> str:
+    """Prefix a provider task ID with the backend name so it can be routed back."""
+    return f"{backend}:{task_id}"
+
+
+def _split_task_id(task_id: str) -> tuple[str, str]:
+    """Split '<backend>:<id>' into its parts; un-prefixed IDs use the default."""
+    prefix, separator, raw_task_id = task_id.partition(":")
+    if separator and (prefix == DEFAULT_BACKEND_NAME or prefix in load_backend_names()):
+        return prefix, raw_task_id
+    return DEFAULT_BACKEND_NAME, task_id
 
 
 async def _progress_heartbeat(
@@ -228,14 +250,19 @@ def _render_research_markdown(
 async def _run_research_with_progress(
     *,
     agent: DeepResearchAgent,
+    backend: str,
     query: str,
     system_instructions: str,
     include_analysis: bool,
     callback_url: str,
     ctx: Context | None,
 ) -> ResearchResult:
-    """Run research while managing progress reporting and heartbeats."""
+    """Run research while managing progress reporting and heartbeats.
+
+    The returned result carries a backend-tagged task ID (see _tag_task_id).
+    """
     heartbeat_task: asyncio.Task[None] | None = None
+    started_task_id: str | None = None
 
     if ctx:
         await _safe_report_progress(
@@ -246,24 +273,32 @@ async def _run_research_with_progress(
         )
 
     async def report_task_started(task_id: str) -> None:
+        nonlocal started_task_id
+        started_task_id = task_id
         if ctx:
             await _safe_report_progress(
                 ctx,
                 progress=0,
                 message=(
-                    f"Research task started (task ID: {task_id}). If this call "
-                    "is lost, recover the result with research_status."
+                    f"Research task started (task ID: {_tag_task_id(backend, task_id)}). "
+                    "If this call is lost, recover the result with research_status."
                 ),
             )
 
     try:
-        return await agent.research(
+        result = await agent.research(
             query=query,
             system_prompt=system_instructions or DEFAULT_RESEARCH_SYSTEM_PROMPT,
             include_code_interpreter=include_analysis,
             callback_url=callback_url or None,
             on_task_started=report_task_started,
         )
+        # Timeout paths may return a failed result without the provider task ID.
+        if result.task_id is None and started_task_id is not None:
+            result.task_id = started_task_id
+        if result.task_id is not None:
+            result.task_id = _tag_task_id(backend, result.task_id)
+        return result
     except ResearchError:
         if ctx:
             await _safe_report_progress(
@@ -308,6 +343,10 @@ async def deep_research(
         str,
         "Optional webhook URL notified with a completion payload when the research finishes. Leave empty to disable callbacks.",
     ] = "",
+    backend: Annotated[
+        str,
+        "Name of a backend declared in the server's [backends] config table. Leave empty for the default backend. Use list_backends to see what is available.",
+    ] = "",
     ctx: Context | None = None,
 ) -> str:
     """
@@ -330,13 +369,14 @@ async def deep_research(
     **Note:** Uses provider-native research backends - monitor costs as research can generate substantial tokens.
     """
     try:
-        agent = _ensure_research_agent()
+        agent = _ensure_research_agent(backend)
     except Exception as e:
         return f"Failed to initialize research agent: {str(e)}"
 
     try:
         result = await _run_research_with_progress(
             agent=agent,
+            backend=backend or DEFAULT_BACKEND_NAME,
             query=query,
             system_instructions=system_instructions,
             include_analysis=include_analysis,
@@ -357,6 +397,8 @@ async def deep_research(
             )
 
         failure_message = result.message or "Unknown error"
+        if result.task_id:
+            failure_message = f"{failure_message} (task ID: {result.task_id})"
         if ctx:
             await _safe_report_progress(
                 ctx,
@@ -378,7 +420,7 @@ async def deep_research(
 async def research_status(
     task_id: Annotated[
         str,
-        "Research task ID returned by deep_research tool. Format: UUID string like 'abc123-def456-ghi789'",
+        "Research task ID returned by deep_research tool, passed back verbatim. Format: '<backend>:<provider task id>' like 'default:abc123-def456-ghi789'; an un-prefixed ID is looked up on the default backend.",
     ],
 ) -> str:
     """
@@ -393,12 +435,13 @@ async def research_status(
     When the task is completed, the full research report is also returned.
     """
     try:
-        agent = _ensure_research_agent()
+        backend, raw_task_id = _split_task_id(task_id)
+        agent = _ensure_research_agent(backend)
     except Exception as e:
         return f"Failed to initialize research agent: {str(e)}"
 
     try:
-        status = await agent.get_task_status(task_id)
+        status = await agent.get_task_status(raw_task_id)
 
         if status.status == "error":
             return f"Error checking status: {status.error or 'Unknown error'}"
@@ -416,11 +459,16 @@ async def research_status(
 
         if status.status == "completed":
             try:
-                task_result = await agent.get_task_result(task_id)
+                task_result = await agent.get_task_result(raw_task_id)
             except Exception as error:
                 logger.error(f"Error fetching result for task {task_id}: {error}")
                 task_result = None
             if task_result and task_result.is_completed:
+                # Backends return the raw provider ID; restore the backend
+                # prefix so the recovered report's ID routes back correctly.
+                task_result.task_id = _tag_task_id(
+                    backend, task_result.task_id or raw_task_id
+                )
                 report = _render_research_markdown(
                     title=f"Research Report (recovered): {task_id}",
                     result=task_result,
@@ -432,6 +480,42 @@ async def research_status(
     except Exception as e:
         logger.error(f"Error checking status: {e}")
         return f"Error checking status: {str(e)}"
+
+
+@mcp.tool()
+def list_backends() -> str:
+    """
+    List the research backends this server can use with the deep_research tool.
+
+    **Returns:** One line per backend with its provider, model, endpoint, and
+    whether credentials were found. 'default' is the server's [research]
+    configuration; the others are named [backends.<name>] tables. Local
+    providers (dr-tulu, open-deep-research, local OpenAI-compatible servers)
+    do not need an API key.
+    """
+    try:
+        names = [DEFAULT_BACKEND_NAME, *load_backend_names()]
+    except Exception as e:
+        return f"Failed to load configuration: {str(e)}"
+
+    lines = []
+    for name in names:
+        try:
+            config = ResearchConfig.load(backend=name)
+        except Exception as error:
+            lines.append(f"- {name}: configuration error: {error}")
+            continue
+        if config.provider == "openai-codex":
+            credential = (
+                f"oauth: {'present' if DEFAULT_CODEX_AUTH_PATH.exists() else 'missing'}"
+            )
+        else:
+            credential = f"api_key: {'set' if config.api_key else 'not set'}"
+        lines.append(
+            f"- {name}: provider={config.provider}, model={config.model}, "
+            f"base_url={config.base_url}, {credential}"
+        )
+    return "\n".join(lines)
 
 
 def main():
@@ -484,6 +568,13 @@ def main():
         config.validate()
         _apply_logging_config(config.log_level)
         logger.info(f"Configuration loaded successfully. Model: {config.model}")
+        for name in load_backend_names():
+            backend_config = ResearchConfig.load(backend=name)
+            backend_config.validate()
+            logger.info(
+                f"Backend '{name}' configured. Provider: {backend_config.provider}, "
+                f"Model: {backend_config.model}"
+            )
     except Exception as e:
         logger.error(f"Configuration error: {e}")
         logger.error(

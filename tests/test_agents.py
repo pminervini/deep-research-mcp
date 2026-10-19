@@ -106,7 +106,7 @@ async def run_provider_check(provider, model, api_style="responses"):
         logger.info("Importing mcp_server and resetting agent...")
         import deep_research_mcp.mcp_server as mcp_server
 
-        mcp_server.research_agent = None
+        mcp_server._agents.clear()  # pylint: disable=protected-access
 
         # Run deep research for real (no mocks/mocks)
         logger.info(
