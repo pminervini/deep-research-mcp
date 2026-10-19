@@ -6,10 +6,13 @@ This script tests the deep research MCP server tools without requiring
 a full Claude Code MCP integration.
 """
 
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import inspect
+import json
 import os
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import pytest
@@ -272,3 +275,86 @@ def test_mcp_server_structure():
 
     deep_research_signature = inspect.signature(deep_research)
     assert "callback_url" in deep_research_signature.parameters
+
+
+@pytest.mark.asyncio
+async def test_research_status_recovered_report_keeps_backend_prefix(tmp_path):
+    """A report recovered from a named backend renders the prefixed task ID.
+
+    Uses a real local HTTP endpoint that speaks the Tavily task API, so the
+    recovery path runs through the real agent and backend.
+    """
+
+    class TavilyTaskHandler(BaseHTTPRequestHandler):
+        """Serve one completed Tavily research task for any task ID."""
+
+        def do_GET(self):  # pylint: disable=invalid-name
+            task_id = self.path.rsplit("/", 1)[-1]
+            payload = json.dumps(
+                {
+                    "request_id": task_id,
+                    "status": "completed",
+                    "created_at": "2026-10-19T06:00:00Z",
+                    "completed_at": "2026-10-19T06:05:00Z",
+                    "content": "Recovered report body.",
+                    "sources": [{"url": "https://example.com/a", "title": "Example"}],
+                }
+            ).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def log_message(self, *args):
+            del args
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), TavilyTaskHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        host, port = server.server_address
+        (tmp_path / ".deep_research").write_text(
+            "[backends.lab]\n"
+            'provider = "tavily"\n'
+            f'base_url = "http://{host}:{port}"\n'
+            'api_key = "test-key"\n',
+            encoding="utf-8",
+        )
+        server_env = dict(os.environ)
+        server_env.update(
+            {
+                "HOME": str(tmp_path),
+                "RESEARCH_PROVIDER": "dr-tulu",
+                "RESEARCH_BASE_URL": "http://127.0.0.1:18080",
+            }
+        )
+        mcp_server_params = StdioServerParameters(
+            command=sys.executable,
+            args=["-m", "deep_research_mcp.mcp_server"],
+            env=server_env,
+            cwd=Path(__file__).resolve().parents[1],
+        )
+
+        async with stdio_client(mcp_server_params) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                result = await session.call_tool(
+                    "research_status", {"task_id": "lab:task-123"}
+                )
+                assert result.isError is False
+                text = "\n".join(
+                    item.text
+                    for item in (result.content or [])
+                    if hasattr(item, "text")
+                )
+
+        assert "Task lab:task-123 status: completed" in text
+        assert "Recovered report body." in text
+        assert "- **Task ID**: lab:task-123" in text
+        assert "- **Task ID**: task-123" not in text
+    finally:
+        server.shutdown()
+        thread.join()
+        server.server_close()

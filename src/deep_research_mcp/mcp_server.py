@@ -464,6 +464,11 @@ async def research_status(
                 logger.error(f"Error fetching result for task {task_id}: {error}")
                 task_result = None
             if task_result and task_result.is_completed:
+                # Backends return the raw provider ID; restore the backend
+                # prefix so the recovered report's ID routes back correctly.
+                task_result.task_id = _tag_task_id(
+                    backend, task_result.task_id or raw_task_id
+                )
                 report = _render_research_markdown(
                     title=f"Research Report (recovered): {task_id}",
                     result=task_result,
