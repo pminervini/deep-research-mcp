@@ -16,7 +16,7 @@ Repository: `https://github.com/pminervini/deep-research-mcp`
 - You need to call `DeepResearchAgent` and `ResearchConfig` from Python.
 - You need to expose the `deep-research-mcp` project as an MCP server with `deep-research-mcp`.
 - You need to connect to the MCP server from another client over HTTP.
-- You need to understand which backend is used for OpenAI, Gemini, DR-Tulu, or Open Deep Research.
+- You need to understand which backend is used for OpenAI, Gemini, Tavily, or DR-Tulu.
 - You need to troubleshoot provider mix-ups caused by values already stored in `~/.deep_research`.
 
 ## Do Not Use When
@@ -69,12 +69,6 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-### Optional Open Deep Research extras
-
-```bash
-uv sync --upgrade --extra dev --extra open-deep-research
-```
-
 ### Environment variables by provider
 
 OpenAI:
@@ -102,7 +96,6 @@ DR-Tulu:
 | `openai` + `api_style=chat_completions` | `openai_backend.py` | One-shot Chat Completions call | No persistent status | Useful for OpenAI-compatible providers like Perplexity, Groq, Ollama, vLLM |
 | `gemini` | `gemini_backend.py` | Gemini Interactions API with `background=True` | Yes | Uses `google-genai`; `include_analysis` is ignored by the backend |
 | `dr-tulu` | `dr_tulu_backend.py` | `POST {base_url}/chat` | No | Requires a separately running DR-Tulu service |
-| `open-deep-research` | `open_deep_research_backend.py` | Local Open Deep Research stack via `smolagents` | No | Needs extra optional dependencies |
 
 ## Config Precedence And The Most Important Pitfall
 
@@ -728,7 +721,7 @@ Fix:
 
 Cause:
 
-- you are using `chat_completions`, `dr-tulu`, or `open-deep-research`
+- you are using `chat_completions` or `dr-tulu`
 
 Fix:
 

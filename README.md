@@ -8,7 +8,7 @@
 [![OpenAI](https://img.shields.io/badge/OpenAI-compatible-10a37f)](https://platform.openai.com/)
 [![Gemini](https://img.shields.io/badge/Gemini-supported-4285F4)](https://ai.google.dev/)
 
-A Python-based agent that integrates research providers with Claude Code through the Model Context Protocol (MCP). It supports OpenAI (Responses API with web search and code interpreter, Chat Completions API for broad provider compatibility, or experimental ChatGPT subscription access through Codex OAuth), Gemini Deep Research via the Interactions API, Tavily Research, Allen AI's DR-Tulu research agent, and the open-source Open Deep Research stack (based on smolagents).
+A Python-based agent that integrates research providers with Claude Code through the Model Context Protocol (MCP). It supports OpenAI (Responses API with web search and code interpreter, Chat Completions API for broad provider compatibility, or experimental ChatGPT subscription access through Codex OAuth), Gemini Deep Research via the Interactions API, Tavily Research, and Allen AI's DR-Tulu research agent.
 
 ## Prerequisites
 
@@ -20,7 +20,6 @@ A Python-based agent that integrates research providers with Claude Code through
   - Gemini API access with the Interactions API / Deep Research agent enabled
   - Tavily API access for Tavily Research
   - DR-Tulu service running locally or remotely (see [DR-Tulu setup](#dr-tulu-provider-example))
-  - Open Deep Research dependencies (installed via `uv sync --extra open-deep-research`)
 - Claude Code, or any other assistant supporting MCP integration
 
 ## Installation
@@ -63,8 +62,6 @@ uv run pre-commit install
 # Optional docs tooling
 uv sync --upgrade --extra docs
 
-# Optional Open Deep Research provider dependencies
-uv sync --upgrade --extra open-deep-research
 ```
 
 Compatibility setup (pip-based):
@@ -79,7 +76,7 @@ pip install -e .
 ## Code Layout
 
 - `src/deep_research_mcp/agent.py`: orchestration layer; owns callbacks and delegates provider work to backends
-- `src/deep_research_mcp/backends/`: provider-specific implementations for OpenAI, OpenAI Codex subscription, Gemini, Tavily, DR-Tulu, and Open Deep Research
+- `src/deep_research_mcp/backends/`: provider-specific implementations for OpenAI, OpenAI Codex subscription, Gemini, Tavily, and DR-Tulu
 - `src/deep_research_mcp/cli.py`: installed `deep-research-cli` implementation
 - `src/deep_research_mcp/mcp_server.py`: FastMCP server and tool entrypoints
 - `cli/deep-research-cli.py`: compatibility wrapper for source-checkout usage
@@ -98,12 +95,12 @@ Common settings:
 
 ```toml
 [research]                                  # Core Deep Research functionality
-provider = "openai"                         # Available options: "openai", "openai-codex", "dr-tulu", "gemini", "tavily", "open-deep-research" -- defaults to "openai"
+provider = "openai"                         # Available options: "openai", "openai-codex", "dr-tulu", "gemini", "tavily" -- defaults to "openai"
 api_style = "responses"                     # Only applies to provider="openai"; use "chat_completions" for Perplexity, Groq, Ollama, etc.
-model = "gpt-6-sol"                         # OpenAI: model identifier; Codex: "auto" or account model slug; Dr Tulu: logical provider id; Gemini: agent id; Tavily: "mini", "pro", or "auto"; ODR: LiteLLM model identifier
+model = "gpt-6-sol"                         # OpenAI: model identifier; Codex: "auto" or account model slug; Dr Tulu: logical provider id; Gemini: agent id; Tavily: "mini", "pro", or "auto"
 reasoning_effort = "medium"                  # Optional for OpenAI API and Codex subscription; omit to keep provider/model defaults
 api_key = "your-api-key"                    # API key, optional
-base_url = "https://api.openai.com/v1"      # OpenAI: OpenAI-compatible endpoint; Codex uses a fixed endpoint; Dr Tulu: service base URL; Gemini: https://generativelanguage.googleapis.com; Tavily: https://api.tavily.com; ODR: LiteLLM-compatible endpoint
+base_url = "https://api.openai.com/v1"      # OpenAI: OpenAI-compatible endpoint; Codex uses a fixed endpoint; Dr Tulu: service base URL; Gemini: https://generativelanguage.googleapis.com; Tavily: https://api.tavily.com
 
 # Task behavior
 timeout = 1800
@@ -335,17 +332,6 @@ base_url = "https://api.perplexity.ai"      # Perplexity's OpenAI-compatible end
 timeout = 1800
 ```
 
-Open Deep Research provider example:
-
-```toml
-[research]
-provider = "open-deep-research"
-model = "openai/qwen/qwen3-coder-30b"  # LiteLLM-compatible model id
-base_url = "http://localhost:1234/v1"  # LiteLLM-compatible endpoint (local or remote)
-api_key = ""                           # Optional if endpoint requires it
-timeout = 1800
-```
-
 Ollama (local) provider example:
 
 ```toml
@@ -381,11 +367,6 @@ api_key = "your-api-key"
 base_url = "https://api.your-provider.com/v1"
 timeout = 600
 ```
-
-Optional env variables for Open Deep Research tools:
-
-- `SERPAPI_API_KEY` or `SERPER_API_KEY`: enable Google-style search
-- `HF_TOKEN`: optional, logs into Hugging Face Hub for gated models
 
 ### Install The Included Skill In Claude Code Or Codex
 
@@ -824,7 +805,6 @@ In `agent` mode, the TUI applies provider-aware defaults:
 - `dr-tulu`: model `dr-tulu`, base URL `http://localhost:8080/`
 - `gemini`: model `deep-research-preview-04-2026`, base URL `https://generativelanguage.googleapis.com`
 - `tavily`: model `mini`, base URL `https://api.tavily.com`
-- `open-deep-research`: model `openai/qwen/qwen3-coder-30b`, base URL `http://localhost:1234/v1`
 
 Switching provider or OpenAI API style automatically refreshes the model and
 base URL defaults. You can still override those fields manually afterward.
@@ -1138,7 +1118,7 @@ corresponding `ResearchConfig` field:
 |------|-------------|
 | `--config PATH` | Path to TOML config file (default: `~/.deep_research`) |
 | `--backend NAME` | Use a named `[backends.NAME]` table instead of `[research]`. Cannot be combined with `--provider`, `--model`, `--reasoning-effort`, `--api-key`, `--base-url` or `--api-style`; runtime flags such as `--timeout` still apply. In MCP client mode the name is passed to the server, and `status` sends a raw task ID as `NAME:<id>` so the server routes it to that backend. |
-| `--provider {openai,openai-codex,dr-tulu,gemini,tavily,open-deep-research}` | Research provider |
+| `--provider {openai,openai-codex,dr-tulu,gemini,tavily}` | Research provider |
 | `--model MODEL` | Model or agent ID |
 | `--reasoning-effort {none,low,medium,high,xhigh,max}` | OpenAI reasoning effort; omit for provider/model default |
 | `--api-key KEY` | Provider API key |
@@ -1210,18 +1190,17 @@ Configuration class for the research agent.
 
 #### Parameters
 
-- `provider`: Research provider (`openai`, `openai-codex`, `dr-tulu`, `gemini`, `tavily`, or `open-deep-research`; default: `openai`)
-- `api_style`: API style for the `openai` provider (`responses` or `chat_completions`; default: `responses`). Ignored for `openai-codex`, `dr-tulu`, `gemini`, `tavily`, and `open-deep-research`.
+- `provider`: Research provider (`openai`, `openai-codex`, `dr-tulu`, `gemini`, or `tavily`; default: `openai`)
+- `api_style`: API style for the `openai` provider (`responses` or `chat_completions`; default: `responses`). Ignored for `openai-codex`, `dr-tulu`, `gemini`, and `tavily`.
 - `model`: Model identifier
   - OpenAI: Responses model (e.g., `gpt-6-sol`)
   - OpenAI Codex subscription: `auto` (default) or an account catalogue slug
   - Dr Tulu: logical provider id (default: `dr-tulu`)
   - Gemini: Deep Research agent id (for example `deep-research-preview-04-2026`)
   - Tavily: Research model (`mini`, `pro`, or `auto`; default: `mini`)
-  - Open Deep Research: LiteLLM model id (e.g., `openai/qwen/qwen3-coder-30b`)
 - `reasoning_effort`: Optional OpenAI reasoning effort (`none`, `low`, `medium`, `high`, `xhigh`, or `max`); model support varies.
 - `api_key`: API key for the configured endpoint (optional). Defaults to env `OPENAI_API_KEY` for `openai`, `DR_TULU_API_KEY` for `dr-tulu`, `GEMINI_API_KEY` / `GOOGLE_API_KEY` for `gemini`, and `TAVILY_API_KEY` for `tavily`. Ignored for `openai-codex`.
-- `base_url`: Provider API base URL (optional). Defaults to `https://api.openai.com/v1` for `openai`, the fixed `https://chatgpt.com/backend-api/codex` endpoint for `openai-codex`, `http://localhost:8080/` for `dr-tulu`, `https://generativelanguage.googleapis.com` for `gemini`, `https://api.tavily.com` for `tavily`, and `http://localhost:1234/v1` for `open-deep-research`.
+- `base_url`: Provider API base URL (optional). Defaults to `https://api.openai.com/v1` for `openai`, the fixed `https://chatgpt.com/backend-api/codex` endpoint for `openai-codex`, `http://localhost:8080/` for `dr-tulu`, `https://generativelanguage.googleapis.com` for `gemini`, and `https://api.tavily.com` for `tavily`.
 - `timeout`: Maximum time for research in seconds (default: 1800)
 - `poll_interval`: Polling interval in seconds (default: 30)
 

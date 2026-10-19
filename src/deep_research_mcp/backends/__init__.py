@@ -13,7 +13,6 @@ from .base import ResearchBackend
 from .codex_backend import CodexResearchBackend
 from .dr_tulu_backend import DrTuluResearchBackend
 from .gemini_backend import GeminiResearchBackend
-from .open_deep_research_backend import OpenDeepResearchBackend
 from .openai_backend import OpenAIResearchBackend
 from .tavily_backend import TavilyResearchBackend
 
@@ -23,7 +22,6 @@ _BACKENDS: dict[str, type[ResearchBackend]] = {
     "dr-tulu": DrTuluResearchBackend,
     "gemini": GeminiResearchBackend,
     "tavily": TavilyResearchBackend,
-    "open-deep-research": OpenDeepResearchBackend,
 }
 
 
@@ -44,6 +42,5 @@ __all__ = [
     "DrTuluResearchBackend",
     "GeminiResearchBackend",
     "TavilyResearchBackend",
-    "OpenDeepResearchBackend",
     "build_research_backend",
 ]

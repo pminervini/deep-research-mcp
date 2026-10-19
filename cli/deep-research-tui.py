@@ -153,13 +153,6 @@ def get_provider_defaults(
             model="mini",
             base_url="https://api.tavily.com",
         )
-    if provider == "open-deep-research":
-        return ProviderDefaults(
-            provider=provider,
-            api_style="responses",
-            model="openai/qwen/qwen3-coder-30b",
-            base_url="http://localhost:1234/v1",
-        )
     return ProviderDefaults(
         provider="openai",
         api_style="responses",
@@ -492,7 +485,6 @@ class DeepResearchTUI(App):
                             ("Dr Tulu", "dr-tulu"),
                             ("Gemini", "gemini"),
                             ("Tavily", "tavily"),
-                            ("Open Deep Research", "open-deep-research"),
                         ],
                         value="openai",
                         id="provider",
@@ -1173,7 +1165,6 @@ def build_parser() -> argparse.ArgumentParser:
             "dr-tulu",
             "gemini",
             "tavily",
-            "open-deep-research",
         ],
         default=None,
         help="Override the configured research provider",

@@ -14,7 +14,7 @@ Transports:
   MCP‑over‑HTTP clients can connect over the network
 
 Features:
-- Deep research with multiple backend providers (OpenAI API, experimental OpenAI Codex subscription, Gemini Deep Research, Tavily Research, DR-Tulu, Open Deep Research)
+- Deep research with multiple backend providers (OpenAI API, experimental OpenAI Codex subscription, Gemini Deep Research, Tavily Research, DR-Tulu)
 - Task status monitoring for long‑running research
 - Configurable research parameters and system instructions
 - Support for data analysis and visualization capabilities
@@ -97,7 +97,7 @@ mcp = FastMCP(
         "OpenAI Chat Completions API (compatible with Perplexity, Groq, Ollama, "
         "and other providers), experimental OpenAI Codex subscription access, "
         "Gemini Deep Research via the Interactions API, Tavily Research, "
-        "DR-Tulu, and Open Deep Research. Use deep_research for comprehensive "
+        "and DR-Tulu. Use deep_research for comprehensive "
         "research queries, list_backends to see the named backends the server "
         "operator has configured (pass one as the backend argument), and "
         "research_status where the provider supports task recovery."
@@ -489,7 +489,7 @@ def list_backends() -> str:
     **Returns:** One line per backend with its provider, model, endpoint, and
     whether credentials were found. 'default' is the server's [research]
     configuration; the others are named [backends.<name>] tables. Local
-    providers (dr-tulu, open-deep-research, local OpenAI-compatible servers)
+    providers (dr-tulu, local OpenAI-compatible servers)
     do not need an API key.
     """
     try:

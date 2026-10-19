@@ -48,12 +48,6 @@ _PROVIDER_DEFAULTS: dict[str, tuple[str, str, tuple[str, ...], tuple[str, ...]]]
         ("DR_TULU_API_KEY",),
         ("DR_TULU_BASE_URL",),
     ),
-    "open-deep-research": (
-        "openai/qwen/qwen3-coder-30b",
-        "http://localhost:1234/v1",
-        ("OPENAI_API_KEY",),
-        ("OPENAI_BASE_URL",),
-    ),
     "openai-codex": (
         "auto",
         OPENAI_CODEX_BASE_URL,
