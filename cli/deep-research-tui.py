@@ -57,6 +57,11 @@ from deep_research_mcp import (
     ResearchError,
     ResearchResult,
 )
+from deep_research_mcp.config import (
+    DEFAULT_BACKEND_NAME,
+    prefix_task_id_with_backend,
+    split_backend_task_id,
+)
 
 DEFAULT_SYSTEM_PROMPT = """
 You are a professional researcher preparing a structured, data-driven report.
@@ -168,6 +173,7 @@ class StartupState:
     """Initial state passed to the TUI at startup."""
 
     config_path: str | None = None
+    backend: str = ""
     mode: str = "agent"
     server_url: str = "http://127.0.0.1:8080/mcp"
     query: str = ""
@@ -432,6 +438,10 @@ class DeepResearchTUI(App):
         self.query_one("#base-url", Input).value = state.config.base_url
         self.query_one("#api-style", Select).disabled = state.provider != "openai"
         self.query_one("#base-url", Input).disabled = state.provider == "openai-codex"
+        if state.backend:
+            # A named backend fixes its provider, API style and credentials.
+            self.query_one("#provider", Select).disabled = True
+            self.query_one("#api-style", Select).disabled = True
         self.query_one("#reasoning-effort", Select).disabled = state.provider not in {
             "openai",
             "openai-codex",
@@ -738,13 +748,15 @@ class DeepResearchTUI(App):
     def handle_provider_change(self, event: Select.Changed) -> None:
         if event.value is not None:
             self.provider = str(event.value)
-            self._update_provider_defaults()
+            # A named backend fixes the provider; keep its model and endpoint.
+            if not self._startup_state.backend:
+                self._update_provider_defaults()
 
     @on(Select.Changed, "#api-style")
     def handle_api_style_change(self, event: Select.Changed) -> None:
         if event.value is not None:
             self.api_style = str(event.value)
-            if self.provider == "openai":
+            if self.provider == "openai" and not self._startup_state.backend:
                 self._update_provider_defaults()
 
     @on(Button.Pressed, "#btn-research")
@@ -760,7 +772,29 @@ class DeepResearchTUI(App):
         self.action_save_output()
 
     def _build_config(self) -> ResearchConfig:
-        """Build a ResearchConfig from current UI state."""
+        """Build a ResearchConfig from current UI state.
+
+        With a named backend, the backend table supplies the provider, API
+        style and credentials; the form only adjusts model, endpoint and
+        reasoning effort.
+        """
+        backend = self._startup_state.backend
+        if backend:
+            config = ResearchConfig.load(
+                config_path=self._startup_state.config_path, backend=backend
+            )
+            config.model = self.query_one("#model", Input).value or config.model
+            if config.provider != "openai-codex":
+                config.base_url = (
+                    self.query_one("#base-url", Input).value or config.base_url
+                )
+            effort = self.query_one("#reasoning-effort", Select).value
+            config.reasoning_effort = (
+                None if effort in {"default", None, ""} else str(effort)
+            )
+            config.validate()
+            return config
+
         env = dict(os.environ)
         env.update(
             {
@@ -785,6 +819,24 @@ class DeepResearchTUI(App):
         )
         config.validate()
         return config
+
+    def _status_config(self, task_id: str) -> tuple[ResearchConfig, str]:
+        """Pick the config for a status check and strip any backend prefix.
+
+        IDs copied from MCP output carry a "<backend>:" prefix that selects
+        that backend; un-prefixed IDs use the form's current configuration.
+        """
+        prefix, raw_task_id = split_backend_task_id(
+            task_id, self._startup_state.config_path
+        )
+        current = self._startup_state.backend or DEFAULT_BACKEND_NAME
+        if not prefix or prefix == current:
+            return self._build_config(), raw_task_id
+        config = ResearchConfig.load(
+            config_path=self._startup_state.config_path, backend=prefix
+        )
+        config.validate()
+        return config, raw_task_id
 
     def _get_query(self) -> str:
         return self.query_one("#query-area", TextArea).text.strip()
@@ -891,6 +943,7 @@ class DeepResearchTUI(App):
                             "system_instructions": system_prompt,
                             "include_analysis": include_analysis,
                             "callback_url": "",
+                            "backend": self._startup_state.backend,
                         },
                     )
 
@@ -928,7 +981,7 @@ class DeepResearchTUI(App):
         self._set_status("Checking task status...")
 
         try:
-            config = self._build_config()
+            config, task_id = self._status_config(task_id)
             agent = DeepResearchAgent(config)
             status = await agent.get_task_status(task_id)
 
@@ -972,9 +1025,19 @@ class DeepResearchTUI(App):
                 async with ClientSession(read_stream, write_stream) as session:
                     await session.initialize()
 
+                    # The server routes by prefix: an explicit prefix is
+                    # kept as-is, a raw ID gets the TUI's startup backend.
+                    _, has_prefix, _ = task_id.partition(":")
+                    mcp_task_id = (
+                        task_id
+                        if has_prefix
+                        else prefix_task_id_with_backend(
+                            task_id, self._startup_state.backend
+                        )
+                    )
                     result = await session.call_tool(
                         "research_status",
-                        {"task_id": task_id},
+                        {"task_id": mcp_task_id},
                     )
 
                     text = self._render_mcp_result(result)
@@ -1083,6 +1146,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to TOML config file (default: ~/.deep_research)",
     )
     parser.add_argument(
+        "--backend",
+        default="",
+        metavar="NAME",
+        help=(
+            "Use a named [backends.NAME] table from the config file; the form is "
+            "pre-filled from it and its provider and credentials are fixed"
+        ),
+    )
+    parser.add_argument(
         "--mode",
         choices=["agent", "mcp"],
         default="agent",
@@ -1134,7 +1206,9 @@ def main() -> None:
         env["RESEARCH_PROVIDER"] = args.provider
     if args.api_style is not None:
         env["RESEARCH_API_STYLE"] = args.api_style
-    config = ResearchConfig.load(config_path=args.config, env=env)
+    config = ResearchConfig.load(
+        config_path=args.config, env=env, backend=args.backend or None
+    )
     defaults = ProviderDefaults(
         provider=config.provider,
         api_style=config.api_style,
@@ -1144,6 +1218,7 @@ def main() -> None:
 
     startup_state = StartupState(
         config_path=args.config,
+        backend=args.backend,
         mode=args.mode,
         server_url=args.server_url,
         query=args.query,

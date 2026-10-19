@@ -4,13 +4,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 from importlib.metadata import entry_points
 from pathlib import Path
 import sys
 from types import ModuleType
 
-from deep_research_mcp.cli import load_config
+import pytest
+
+from deep_research_mcp.cli import check_backend_flags, cmd_status, load_config
 
 
 def load_cli_module() -> ModuleType:
@@ -92,3 +95,132 @@ def test_tavily_cli_api_key_overrides_tavily_env(tmp_path: Path) -> None:
     )
 
     assert load_config(args).api_key == "cli-test-key"
+
+
+def _write_backends_config(tmp_path: Path) -> Path:
+    config_path = tmp_path / ".deep_research"
+    config_path.write_text(
+        "[research]\n"
+        'provider = "dr-tulu"\n'
+        'base_url = "http://127.0.0.1:18080"\n'
+        "[backends.lab]\n"
+        'provider = "tavily"\n'
+        'api_key = "table-key"\n'
+        'model = "pro"\n'
+        "timeout = 600\n"
+        "[backends.tulu-b]\n"
+        'provider = "dr-tulu"\n'
+        'base_url = "http://127.0.0.1:18081"\n',
+        encoding="utf-8",
+    )
+    return config_path
+
+
+def test_backend_flag_loads_named_backend(tmp_path: Path) -> None:
+    config_path = _write_backends_config(tmp_path)
+    cli = load_cli_module()
+    args = cli.build_parser().parse_args(
+        ["--config", str(config_path), "--backend", "lab", "research", "q"]
+    )
+
+    config = load_config(args)
+
+    assert (config.provider, config.model, config.api_key) == (
+        "tavily",
+        "pro",
+        "table-key",
+    )
+
+
+def test_backend_flag_rejects_provider_scoped_overrides(tmp_path: Path) -> None:
+    config_path = _write_backends_config(tmp_path)
+    cli = load_cli_module()
+    parser = cli.build_parser()
+    args = parser.parse_args(
+        [
+            "--config",
+            str(config_path),
+            "--backend",
+            "lab",
+            "--model",
+            "mini",
+            "research",
+            "q",
+        ]
+    )
+
+    with pytest.raises(SystemExit):
+        check_backend_flags(parser, args)
+
+    # Runtime flags are still allowed alongside --backend.
+    args = parser.parse_args(
+        [
+            "--config",
+            str(config_path),
+            "--backend",
+            "lab",
+            "--timeout",
+            "5",
+            "research",
+            "q",
+        ]
+    )
+    check_backend_flags(parser, args)
+    assert load_config(args).timeout == 5.0
+
+
+def test_status_routes_prefixed_task_id_to_named_backend(
+    tmp_path: Path, capsys
+) -> None:
+    """A '<backend>:<id>' task ID from MCP output selects that backend."""
+    config_path = _write_backends_config(tmp_path)
+    cli = load_cli_module()
+    args = cli.build_parser().parse_args(
+        ["--config", str(config_path), "status", "tulu-b:task-42"]
+    )
+
+    assert asyncio.run(cmd_status(args)) == 0
+
+    output = capsys.readouterr().out
+    assert "Task ID: task-42" in output
+    assert "Status: unknown" in output
+
+
+def test_status_strips_prefix_matching_backend_flag(tmp_path: Path, capsys) -> None:
+    """--backend plus a matching prefix sends the raw ID to the provider."""
+    config_path = _write_backends_config(tmp_path)
+    cli = load_cli_module()
+    args = cli.build_parser().parse_args(
+        [
+            "--config",
+            str(config_path),
+            "--backend",
+            "tulu-b",
+            "status",
+            "tulu-b:task-42",
+        ]
+    )
+
+    assert asyncio.run(cmd_status(args)) == 0
+    assert "Task ID: task-42" in capsys.readouterr().out
+
+
+def test_status_rejects_prefix_conflicting_with_backend_flag(tmp_path: Path) -> None:
+    config_path = _write_backends_config(tmp_path)
+    cli = load_cli_module()
+    args = cli.build_parser().parse_args(
+        ["--config", str(config_path), "--backend", "lab", "status", "tulu-b:task-42"]
+    )
+
+    assert asyncio.run(cmd_status(args)) == 1
+
+
+def test_status_raw_id_uses_backend_flag(tmp_path: Path, capsys) -> None:
+    config_path = _write_backends_config(tmp_path)
+    cli = load_cli_module()
+    args = cli.build_parser().parse_args(
+        ["--config", str(config_path), "--backend", "tulu-b", "status", "task-42"]
+    )
+
+    assert asyncio.run(cmd_status(args)) == 0
+    assert "Task ID: task-42" in capsys.readouterr().out

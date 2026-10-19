@@ -54,6 +54,12 @@ from deep_research_mcp import (
     ResearchResult,
 )
 from deep_research_mcp.codex_auth import CodexAuthError, CodexAuthManager
+from deep_research_mcp.config import (
+    DEFAULT_BACKEND_NAME,
+    prefix_task_id_with_backend,
+    split_backend_task_id,
+)
+from deep_research_mcp.errors import ConfigurationError
 
 DEFAULT_SYSTEM_PROMPT = """
 You are a professional researcher preparing a structured, data-driven report.
@@ -110,13 +116,55 @@ def build_cli_env(args: argparse.Namespace) -> dict[str, str]:
 
 
 def load_config(args: argparse.Namespace) -> ResearchConfig:
-    """Load config from file + env, then layer CLI overrides on top."""
+    """Load config from file + env, then layer CLI overrides on top.
+
+    ``--backend`` selects a named ``[backends.<name>]`` table; its provider,
+    model, endpoint and credentials come from that table.
+    """
     cli_env = build_cli_env(args)
     config_path = getattr(args, "config", None)
-    config = ResearchConfig.load(config_path=config_path, env=cli_env)
+    backend = getattr(args, "backend", None) or None
+    config = ResearchConfig.load(config_path=config_path, env=cli_env, backend=backend)
     if config.provider == "tavily" and getattr(args, "api_key", None) is not None:
         config.api_key = args.api_key
+    if backend:
+        # The backend table wins over env-style keys, so explicit runtime
+        # flags must be re-applied to keep "CLI flags override TOML".
+        for attr_name in ("timeout", "poll_interval", "log_level"):
+            value = getattr(args, attr_name, None)
+            if value is not None:
+                setattr(config, attr_name, value)
+        if getattr(args, "enable_reasoning_summaries", False):
+            config.enable_reasoning_summaries = True
     return config
+
+
+# CLI flags that describe the default backend's provider; they cannot be
+# combined with --backend, which takes those values from the named table.
+_BACKEND_EXCLUSIVE_FLAGS = (
+    "provider",
+    "model",
+    "reasoning_effort",
+    "api_key",
+    "base_url",
+    "api_style",
+)
+
+
+def check_backend_flags(parser: argparse.ArgumentParser, args: argparse.Namespace):
+    """Reject --backend combined with provider-scoped override flags."""
+    if not getattr(args, "backend", None):
+        return
+    clashing = [
+        f"--{name.replace('_', '-')}"
+        for name in _BACKEND_EXCLUSIVE_FLAGS
+        if getattr(args, name, None) is not None
+    ]
+    if clashing:
+        parser.error(
+            f"--backend cannot be combined with {', '.join(clashing)}; "
+            "set those values in the [backends.<name>] table instead"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -238,6 +286,7 @@ async def mcp_research(
     system_instructions: str,
     include_analysis: bool,
     callback_url: str,
+    backend: str = "",
 ) -> tuple[int, str]:
     """Call the deep_research MCP tool. Returns (exit_code, output_text)."""
     async with _mcp_connect(url) as session:
@@ -248,6 +297,7 @@ async def mcp_research(
                 "system_instructions": system_instructions,
                 "include_analysis": include_analysis,
                 "callback_url": callback_url,
+                "backend": backend,
             },
             progress_callback=_mcp_progress_callback,
         )
@@ -303,6 +353,7 @@ async def cmd_research(args: argparse.Namespace) -> int:
             system_instructions=system_prompt,
             include_analysis=include_analysis,
             callback_url=callback_url,
+            backend=getattr(args, "backend", None) or "",
         )
 
         if rc != 0:
@@ -367,6 +418,14 @@ async def cmd_status(args: argparse.Namespace) -> int:
 
     if server_url:
         logger.info(f"Connecting to MCP server at {server_url}")
+        try:
+            # The server routes by prefix, so a raw ID must carry --backend.
+            task_id = prefix_task_id_with_backend(
+                task_id, getattr(args, "backend", None)
+            )
+        except ConfigurationError as e:
+            logger.error(f"Status error: {e}")
+            return 1
         rc, text = await mcp_status(server_url, task_id)
         if rc != 0:
             print(text, file=sys.stderr)
@@ -375,6 +434,15 @@ async def cmd_status(args: argparse.Namespace) -> int:
         return rc
 
     try:
+        # IDs copied from MCP output carry a "<backend>:" prefix.
+        prefix, task_id = split_backend_task_id(task_id, getattr(args, "config", None))
+        explicit = getattr(args, "backend", None)
+        if prefix and explicit and prefix != explicit:
+            raise ConfigurationError(
+                f"Task ID names backend '{prefix}' but --backend is '{explicit}'"
+            )
+        if prefix and prefix != DEFAULT_BACKEND_NAME:
+            args.backend = prefix
         config = load_config(args)
         config.validate()
         agent = DeepResearchAgent(config)
@@ -522,6 +590,16 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="PATH",
         help="Path to TOML config file (default: ~/.deep_research)",
+    )
+    cfg.add_argument(
+        "--backend",
+        default=None,
+        metavar="NAME",
+        help=(
+            "Use a named [backends.NAME] table from the config file instead of "
+            "[research]; cannot be combined with --provider, --model, "
+            "--reasoning-effort, --api-key, --base-url or --api-style"
+        ),
     )
     cfg.add_argument(
         "--provider",
@@ -686,6 +764,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
+    check_backend_flags(parser, args)
 
     if not args.command:
         parser.print_help()

@@ -12,6 +12,8 @@ from deep_research_mcp.config import (
     ResearchConfig,
     load_backend_names,
     load_config_file,
+    prefix_task_id_with_backend,
+    split_backend_task_id,
 )
 from deep_research_mcp.errors import ConfigurationError
 
@@ -269,3 +271,40 @@ def test_load_backend_names_rejects_invalid_entries(tmp_path, body, match):
 
     with pytest.raises(ConfigurationError, match=match):
         load_backend_names(config_path)
+
+
+@pytest.mark.parametrize(
+    "task_id, expected",
+    [
+        ("abc", ("", "abc")),
+        ("default:abc", ("default", "abc")),
+        ("g:abc", ("g", "abc")),
+        ("g:a:b", ("g", "a:b")),
+        ("unknown:abc", ("", "unknown:abc")),
+    ],
+)
+def test_split_backend_task_id(tmp_path, task_id, expected):
+    config_path = _write_backends_config(
+        tmp_path, '[backends.g]\nprovider = "gemini"\n'
+    )
+
+    assert split_backend_task_id(task_id, config_path) == expected
+
+
+@pytest.mark.parametrize(
+    "task_id, backend, expected",
+    [
+        ("abc", "", "abc"),
+        ("abc", "lab", "lab:abc"),
+        ("lab:abc", "lab", "lab:abc"),
+        ("lab:a:b", "lab", "lab:a:b"),
+        ("other:abc", "", "other:abc"),
+    ],
+)
+def test_prefix_task_id_with_backend(task_id, backend, expected):
+    assert prefix_task_id_with_backend(task_id, backend) == expected
+
+
+def test_prefix_task_id_with_backend_rejects_conflict():
+    with pytest.raises(ConfigurationError, match="names backend 'other'"):
+        prefix_task_id_with_backend("other:abc", "lab")
