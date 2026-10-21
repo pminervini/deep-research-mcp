@@ -1,6 +1,6 @@
 ---
 name: deep-research-mcp
-description: Use this guide only for the `deep-research-mcp` repository/project when you need to run, integrate, or debug its CLI, Python API, or MCP server. It covers this repo's direct agent execution, provider/backend selection, OpenAI Responses with GPT-5.6 Sol, Gemini Deep Research, DR-Tulu integration requirements, status polling, and HTTP or stdio MCP usage. Do not use it for Deep Research systems in general, for unrelated MCP servers, or for the Textual TUI.
+description: Use this guide only for the `deep-research-mcp` repository/project when you need to run, integrate, or debug its CLI, Python API, or MCP server. It covers direct agent execution, named-backend selection, OpenAI Responses with GPT-6 Sol, experimental Codex subscription access, Gemini Deep Research, Tavily Research, DR-Tulu integration requirements, task recovery, and HTTP or stdio MCP usage. Do not use it for Deep Research systems in general, for unrelated MCP servers, or for the Textual TUI.
 ---
 
 # Deep Research MCP
@@ -16,7 +16,7 @@ Repository: `https://github.com/pminervini/deep-research-mcp`
 - You need to call `DeepResearchAgent` and `ResearchConfig` from Python.
 - You need to expose the `deep-research-mcp` project as an MCP server with `deep-research-mcp`.
 - You need to connect to the MCP server from another client over HTTP.
-- You need to understand which backend is used for OpenAI, Gemini, Tavily, or DR-Tulu.
+- You need to understand which backend is used for OpenAI, Codex subscription access, Gemini, Tavily, or DR-Tulu.
 - You need to troubleshoot provider mix-ups caused by values already stored in `~/.deep_research`.
 
 ## Do Not Use When
@@ -92,19 +92,21 @@ DR-Tulu:
 
 | Provider | Backend module | How research is executed | Status polling | Notes |
 | --- | --- | --- | --- | --- |
-| `openai` + `api_style=responses` | `openai_backend.py` | OpenAI Responses API in background mode with GPT-5.6 Sol, `web_search`, and optionally `code_interpreter` | Yes | Default deep-research path |
+| `openai` + `api_style=responses` | `openai_backend.py` | OpenAI Responses API in background mode with GPT-6 Sol, `web_search`, and optionally `code_interpreter` | Yes, with report recovery | Default deep-research path |
 | `openai` + `api_style=chat_completions` | `openai_backend.py` | One-shot Chat Completions call | No persistent status | Useful for OpenAI-compatible providers like Perplexity, Groq, Ollama, vLLM |
-| `gemini` | `gemini_backend.py` | Gemini Interactions API with `background=True` | Yes | Uses `google-genai`; `include_analysis` is ignored by the backend |
+| `openai-codex` | `codex_backend.py` | Synchronous Responses SSE stream with native web search | No | Experimental subscription OAuth route; no Code Interpreter or report recovery |
+| `gemini` | `gemini_backend.py` | Gemini Interactions API with `background=True` | Yes, with report recovery | Uses `google-genai`; `include_analysis` is ignored by the backend |
+| `tavily` | `tavily_backend.py` | Asynchronous Tavily Research API | Yes, with report recovery | Models `mini` (default), `pro`, or `auto`; uses `TAVILY_API_KEY` |
 | `dr-tulu` | `dr_tulu_backend.py` | `POST {base_url}/chat` | No | Requires a separately running DR-Tulu service |
 
 ## Config Precedence And The Most Important Pitfall
 
-`ResearchConfig.load()` merges:
+For the default backend, `ResearchConfig.load()` merges:
 
 1. Built-in defaults
 2. `~/.deep_research`
 3. Environment variables
-4. CLI flags, which are injected as environment variables
+4. CLI flags, which the CLI layers into an environment mapping without changing `os.environ`
 
 This matters because the TOML file is flattened into keys like `RESEARCH_API_KEY` and `RESEARCH_BASE_URL`. If your saved config is pinned to Gemini and you run:
 
@@ -129,6 +131,46 @@ uv run deep-research-cli \
   --base-url https://api.openai.com/v1 \
   research "..."
 ```
+
+For repeated provider switching, prefer named backends to manual overrides.
+See [Configuration in README](../../README.md#configuration) for canonical TOML
+examples and environment-key mappings.
+
+## Named backend selection
+
+`[research]` defines the `default` backend. Each `[backends.<name>]` table
+requires `provider`; `default` is reserved and names cannot contain `:`.
+
+- Named tables do not inherit provider, model, API style, credentials, endpoint,
+  or reasoning effort from `[research]` or provider-scoped `RESEARCH_*` settings.
+- If a named table omits its key or endpoint, provider-specific environment
+  variables and defaults apply. Explicit table values win over those aliases.
+- Runtime settings are inherited unless the table overrides them. Explicit CLI
+  runtime flags, such as `--timeout` and `--poll-interval`, still win.
+- `--backend NAME` cannot be combined with `--provider`, `--model`,
+  `--reasoning-effort`, `--api-key`, `--base-url`, or `--api-style`.
+- MCP client mode resolves backend names on the server; they need not exist in
+  the client's local configuration. The server validates every table at startup.
+
+For a declared backend named `gemini`:
+
+```bash
+uv run deep-research-cli --backend gemini research "Your research query"
+uv run deep-research-cli --backend gemini status YOUR_PROVIDER_TASK_ID
+uv run deep-research-cli status gemini:YOUR_PROVIDER_TASK_ID
+uv run deep-research-cli --backend gemini research "Your research query" \
+  --server-url http://127.0.0.1:8080/mcp
+uv run deep-research-cli --backend gemini status YOUR_PROVIDER_TASK_ID \
+  --server-url http://127.0.0.1:8080/mcp
+```
+
+Direct CLI/Python research returns raw provider IDs. MCP research returns
+`<backend>:<provider task id>`; preserve that prefix for status and recovery.
+A raw CLI status ID uses `--backend` when supplied, otherwise the default.
+A recognized prefix selects its backend; a prefix conflicting with an explicit
+CLI `--backend` is an error. MCP-client CLI status prefixes raw IDs with the
+selected backend. The TUI has different conflict handling; use README's TUI
+section when checking that interface.
 
 ## Recommended Minimal Config Files
 
@@ -200,11 +242,11 @@ uv run deep-research-cli \
 Key flags:
 
 - `--backend` (a named `[backends.<name>]` table from `~/.deep_research`; it
-  replaces `--provider`, `--model`, `--api-key`, `--base-url` and `--api-style`,
-  which cannot be combined with it. In MCP client mode the name is sent to the
-  server and a raw `status` task ID is sent as `<name>:<id>`)
+  replaces the provider-scoped flags listed above. In MCP client mode the name
+  is sent to the server and a raw `status` task ID is sent as `<name>:<id>`)
 - `--provider`
 - `--model`
+- `--reasoning-effort`
 - `--api-key`
 - `--base-url`
 - `--api-style`
@@ -507,7 +549,8 @@ Use for normal research. Key inputs:
 - `query`
 - `system_instructions`
 - `include_analysis`
-- `callback_url`
+- `callback_url` (leave empty unless the user explicitly authorizes sending the
+  completion payload to that destination)
 - `backend` (optional name of a `[backends.<name>]` table in `~/.deep_research`;
   empty uses the default `[research]` backend)
 
@@ -521,14 +564,27 @@ The returned task ID has the form `<backend>:<provider task id>`, for example
 
 ### `research_status`
 
-Use to poll a known task ID. An un-prefixed ID is looked up on the default
-backend.
+Use to poll a known task ID and recover a completed report for OpenAI Responses,
+Gemini, or Tavily. An un-prefixed MCP ID is looked up on the default backend.
+Recovered reports retain the backend-prefixed task ID.
+
+Capture the tagged ID from MCP progress notifications as soon as the task
+starts. If the original call times out, recover with that ID before launching
+duplicate research. `cancel_on_timeout` defaults to `false`; when enabled, the
+provider task may be cancelled instead. Match the provider timeout, MCP client
+read timeout, and host agent's outer tool deadlines. Progress heartbeats alone
+do not prove that research completed.
 
 ### `list_backends`
 
 Use to see which backends the server operator has declared, with provider,
 model, endpoint, and whether credentials were found. Pass a listed name as
 `backend` to `deep_research`.
+
+Credential presence in `list_backends` is a configuration check, not proof of
+valid authentication, model access, or service health. Backend names, model
+choice, and reasoning effort come from server configuration; `deep_research`
+has no per-call provider, model, or reasoning-effort override.
 
 ## CLI As MCP Client
 
@@ -605,6 +661,29 @@ Observed output:
 ```
 
 ## Backend-Specific Notes
+
+### Codex subscription backend
+
+- Uses provider `openai-codex` and a separate OAuth session; it ignores API keys
+  and endpoint overrides. Confirm the intended account before authentication.
+- Use `deep-research-cli auth login` for an independent device-code session.
+  `auth login --import-codex` imports only the existing access token and cannot
+  refresh it. Keep credentials private; never print the auth file.
+- `model="auto"` selects the first picker-visible account model, not necessarily
+  the newest. Explicit model IDs must appear in that account's catalogue.
+- Native web search is available, but Code Interpreter, background polling,
+  cancellation, and completed-report recovery are unsupported. Save the original
+  result; a synthetic task ID does not make a failed stream recoverable.
+- This is an experimental integration with an undocumented consumer endpoint.
+  See README's Codex subscription example for setup and limitations.
+
+### Tavily backend
+
+- Uses provider `tavily`, models `mini`, `pro`, or `auto`, and `TAVILY_API_KEY`.
+- Supports asynchronous task polling and completed-report recovery.
+- `TAVILY_API_KEY` takes precedence over the default `RESEARCH_API_KEY`; an
+  explicit named-table key or CLI `--api-key` takes precedence over that alias.
+- See README's Tavily provider example for canonical configuration.
 
 ### OpenAI Responses Backend
 
@@ -721,11 +800,11 @@ Fix:
 
 Cause:
 
-- you are using `chat_completions` or `dr-tulu`
+- you are using `chat_completions`, `openai-codex`, or `dr-tulu`
 
 Fix:
 
-- use `openai` + `responses` or `gemini` if you need task polling
+- use `openai` + `responses`, `gemini`, or `tavily` if you need task polling and report recovery
 
 ### Symptom: Gemini report has sources in text but `citations` is empty
 
