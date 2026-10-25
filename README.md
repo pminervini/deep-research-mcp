@@ -9,7 +9,7 @@
 [![Gemini](https://img.shields.io/badge/Gemini-supported-4285F4)](https://ai.google.dev/)
 [![openJiuwen](https://img.shields.io/badge/openJiuwen-supported-2563eb.svg)](#gnosis-provider-example)
 
-A Python-based agent that integrates research providers with Claude Code through the Model Context Protocol (MCP). It supports OpenAI (Responses API with web search and code interpreter, Chat Completions API for broad provider compatibility, or experimental ChatGPT subscription access through Codex OAuth), Gemini Deep Research via the Interactions API, Tavily Research, Allen AI's DR-Tulu research agent, and self-hosted Gnosis search through openJiuwen DeepSearch.
+A Python-based agent that integrates research providers with Claude Code through the Model Context Protocol (MCP). It supports OpenAI (Responses API with web search and code interpreter, Chat Completions API for broad provider compatibility, or experimental ChatGPT subscription access through Codex OAuth), Gemini Deep Research via the Interactions API, Tavily Research, and self-hosted deployments of Allen AI's DR-Tulu and openJiuwen DeepSearch (Gnosis).
 
 ## Prerequisites
 
