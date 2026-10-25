@@ -153,6 +153,13 @@ def get_provider_defaults(
             model="mini",
             base_url="https://api.tavily.com",
         )
+    if provider == "gnosis":
+        return ProviderDefaults(
+            provider=provider,
+            api_style="responses",
+            model="gnosis",
+            base_url="http://127.0.0.1:8089",
+        )
     return ProviderDefaults(
         provider="openai",
         api_style="responses",
@@ -485,6 +492,7 @@ class DeepResearchTUI(App):
                             ("Dr Tulu", "dr-tulu"),
                             ("Gemini", "gemini"),
                             ("Tavily", "tavily"),
+                            ("Gnosis", "gnosis"),
                         ],
                         value="openai",
                         id="provider",
@@ -1165,6 +1173,7 @@ def build_parser() -> argparse.ArgumentParser:
             "dr-tulu",
             "gemini",
             "tavily",
+            "gnosis",
         ],
         default=None,
         help="Override the configured research provider",

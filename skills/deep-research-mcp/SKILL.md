@@ -1,6 +1,6 @@
 ---
 name: deep-research-mcp
-description: Use this guide only for the `deep-research-mcp` repository/project when you need to run, integrate, or debug its CLI, Python API, or MCP server. It covers direct agent execution, named-backend selection, OpenAI Responses with GPT-6 Sol, experimental Codex subscription access, Gemini Deep Research, Tavily Research, DR-Tulu integration requirements, task recovery, and HTTP or stdio MCP usage. Do not use it for Deep Research systems in general, for unrelated MCP servers, or for the Textual TUI.
+description: Use this guide only for the `deep-research-mcp` repository/project when you need to run, integrate, or debug its CLI, Python API, or MCP server. It covers direct agent execution, named-backend selection, OpenAI Responses with GPT-6 Sol, experimental Codex subscription access, Gemini Deep Research, Tavily Research, DR-Tulu, self-hosted Gnosis search, task recovery, and HTTP or stdio MCP usage. Do not use it for Deep Research systems in general, for unrelated MCP servers, or for the Textual TUI.
 ---
 
 # Deep Research MCP
@@ -16,7 +16,7 @@ Repository: `https://github.com/pminervini/deep-research-mcp`
 - You need to call `DeepResearchAgent` and `ResearchConfig` from Python.
 - You need to expose the `deep-research-mcp` project as an MCP server with `deep-research-mcp`.
 - You need to connect to the MCP server from another client over HTTP.
-- You need to understand which backend is used for OpenAI, Codex subscription access, Gemini, Tavily, or DR-Tulu.
+- You need to understand which backend is used for OpenAI, Codex subscription access, Gemini, Tavily, DR-Tulu, or Gnosis.
 - You need to troubleshoot provider mix-ups caused by values already stored in `~/.deep_research`.
 
 ## Do Not Use When
@@ -98,6 +98,7 @@ DR-Tulu:
 | `gemini` | `gemini_backend.py` | Gemini Interactions API with `background=True` | Yes, with report recovery | Uses `google-genai`; `include_analysis` is ignored by the backend |
 | `tavily` | `tavily_backend.py` | Asynchronous Tavily Research API | Yes, with report recovery | Models `mini` (default), `pro`, or `auto`; uses `TAVILY_API_KEY` |
 | `dr-tulu` | `dr_tulu_backend.py` | `POST {base_url}/chat` | No | Requires a separately running DR-Tulu service |
+| `gnosis` | `gnosis_backend.py` | openJiuwen `POST /runs` plus shared output files | Completed-answer recovery; live task liveness unavailable | Requires native request-options JSON and shared output mount; no Code Interpreter |
 
 ## Config Precedence And The Most Important Pitfall
 
@@ -565,7 +566,7 @@ The returned task ID has the form `<backend>:<provider task id>`, for example
 ### `research_status`
 
 Use to poll a known task ID and recover a completed report for OpenAI Responses,
-Gemini, or Tavily. An un-prefixed MCP ID is looked up on the default backend.
+Gemini, Tavily, or Gnosis with its shared output mount. An un-prefixed MCP ID is looked up on the default backend.
 Recovered reports retain the backend-prefixed task ID.
 
 Capture the tagged ID from MCP progress notifications as soon as the task
@@ -684,6 +685,24 @@ Observed output:
 - `TAVILY_API_KEY` takes precedence over the default `RESEARCH_API_KEY`; an
   explicit named-table key or CLI `--api-key` takes precedence over that alias.
 - See README's Tavily provider example for canonical configuration.
+
+### Gnosis backend
+
+- Use `provider="gnosis"` with the run/telemetry service on port 8089, not the
+  report API on 8000. Follow README's Gnosis example for canonical configuration.
+- `gnosis_config_path` points to private native `/runs` options, including LLM
+  and search/fetch credentials. `gnosis_output_dir` must share the service's
+  output files with the MCP process. Do not put credentials in task queries.
+- The adapter forces state-space search and disables the question router.
+  A completion event or action preview is not a full result: recovery reads
+  the selected prediction in `final_result.json`, using the internal ID from
+  `run_started`, and rejects guesses or empty answers.
+- Nonterminal telemetry is `unknown`, not proof of live work after a restart.
+  Server restarts do not resume searches. Recover a known ID before submitting
+  another run. Cancellation on timeout is opt-in; graph caps are not hard budgets.
+- Actual LLM model/reasoning settings belong in the native JSON. Codex OAuth
+  needs a separately authorised compatible bridge; do not send OAuth tokens
+  as ordinary API keys or silently fall back to another account/provider.
 
 ### OpenAI Responses Backend
 

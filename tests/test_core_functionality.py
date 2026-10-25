@@ -14,6 +14,7 @@ from deep_research_mcp.backends import (
     CodexResearchBackend,
     DrTuluResearchBackend,
     GeminiResearchBackend,
+    GnosisResearchBackend,
     OpenAIResearchBackend,
     TavilyResearchBackend,
 )
@@ -67,8 +68,12 @@ from deep_research_mcp.results import ResearchResult
             ),
             TavilyResearchBackend,
         ),
+        (
+            ResearchConfig(provider="gnosis", model="gnosis"),
+            GnosisResearchBackend,
+        ),
     ],
-    ids=["openai", "gemini", "openai-codex", "dr-tulu", "tavily"],
+    ids=["openai", "gemini", "openai-codex", "dr-tulu", "tavily", "gnosis"],
 )
 def test_agent_selects_provider_backend(config, backend_type):
     """The agent factory selects the backend configured for each provider."""

@@ -14,7 +14,7 @@ Transports:
   MCP‑over‑HTTP clients can connect over the network
 
 Features:
-- Deep research with multiple backend providers (OpenAI API, experimental OpenAI Codex subscription, Gemini Deep Research, Tavily Research, DR-Tulu)
+- Deep research with multiple backend providers (OpenAI API, experimental OpenAI Codex subscription, Gemini Deep Research, Tavily Research, DR-Tulu, Gnosis)
 - Task status monitoring for long‑running research
 - Configurable research parameters and system instructions
 - Support for data analysis and visualization capabilities
@@ -44,6 +44,7 @@ import argparse
 import asyncio
 import logging
 from contextlib import suppress
+from pathlib import Path
 from typing import Annotated, Literal, cast
 
 from mcp.server.fastmcp import Context, FastMCP
@@ -489,8 +490,9 @@ def list_backends() -> str:
     **Returns:** One line per backend with its provider, model, endpoint, and
     whether credentials were found. 'default' is the server's [research]
     configuration; the others are named [backends.<name>] tables. Local
-    providers (dr-tulu, local OpenAI-compatible servers)
-    do not need an API key.
+    providers (dr-tulu, Gnosis, local OpenAI-compatible servers) may not need a
+    service API key. For Gnosis, file presence is reported separately; it does
+    not establish working LLM or search credentials.
     """
     try:
         names = [DEFAULT_BACKEND_NAME, *load_backend_names()]
@@ -507,6 +509,19 @@ def list_backends() -> str:
         if config.provider == "openai-codex":
             credential = (
                 f"oauth: {'present' if DEFAULT_CODEX_AUTH_PATH.exists() else 'missing'}"
+            )
+        elif config.provider == "gnosis":
+            options_present = bool(
+                config.gnosis_config_path
+                and Path(config.gnosis_config_path).expanduser().is_file()
+            )
+            output_present = bool(
+                config.gnosis_output_dir
+                and Path(config.gnosis_output_dir).expanduser().is_dir()
+            )
+            credential = (
+                f"run_options: {'present' if options_present else 'missing'}, "
+                f"shared_output: {'present' if output_present else 'missing'}"
             )
         else:
             credential = f"api_key: {'set' if config.api_key else 'not set'}"

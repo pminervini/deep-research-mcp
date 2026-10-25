@@ -7,8 +7,9 @@
 [![Claude Code](https://img.shields.io/badge/Claude_Code-ready-cc785c)](https://github.com/pminervini/deep-research-mcp#claude-code-integration)
 [![OpenAI](https://img.shields.io/badge/OpenAI-compatible-10a37f)](https://platform.openai.com/)
 [![Gemini](https://img.shields.io/badge/Gemini-supported-4285F4)](https://ai.google.dev/)
+[![openJiuwen](https://img.shields.io/badge/openJiuwen-supported-2563eb.svg)](#gnosis-provider-example)
 
-A Python-based agent that integrates research providers with Claude Code through the Model Context Protocol (MCP). It supports OpenAI (Responses API with web search and code interpreter, Chat Completions API for broad provider compatibility, or experimental ChatGPT subscription access through Codex OAuth), Gemini Deep Research via the Interactions API, Tavily Research, and Allen AI's DR-Tulu research agent.
+A Python-based agent that integrates research providers with Claude Code through the Model Context Protocol (MCP). It supports OpenAI (Responses API with web search and code interpreter, Chat Completions API for broad provider compatibility, or experimental ChatGPT subscription access through Codex OAuth), Gemini Deep Research via the Interactions API, Tavily Research, Allen AI's DR-Tulu research agent, and self-hosted Gnosis search through openJiuwen DeepSearch.
 
 ## Prerequisites
 
@@ -20,6 +21,7 @@ A Python-based agent that integrates research providers with Claude Code through
   - Gemini API access with the Interactions API / Deep Research agent enabled
   - Tavily API access for Tavily Research
   - DR-Tulu service running locally or remotely (see [DR-Tulu setup](#dr-tulu-provider-example))
+  - Gnosis/openJiuwen DeepSearch run service and a shared output directory (see [Gnosis setup](#gnosis-provider-example))
 - Claude Code, or any other assistant supporting MCP integration
 
 ## Installation
@@ -76,7 +78,7 @@ pip install -e .
 ## Code Layout
 
 - `src/deep_research_mcp/agent.py`: orchestration layer; owns callbacks and delegates provider work to backends
-- `src/deep_research_mcp/backends/`: provider-specific implementations for OpenAI, OpenAI Codex subscription, Gemini, Tavily, and DR-Tulu
+- `src/deep_research_mcp/backends/`: provider-specific implementations for OpenAI, OpenAI Codex subscription, Gemini, Tavily, DR-Tulu, and Gnosis
 - `src/deep_research_mcp/cli.py`: installed `deep-research-cli` implementation
 - `src/deep_research_mcp/mcp_server.py`: FastMCP server and tool entrypoints
 - `cli/deep-research-cli.py`: compatibility wrapper for source-checkout usage
@@ -95,7 +97,7 @@ Common settings:
 
 ```toml
 [research]                                  # Core Deep Research functionality
-provider = "openai"                         # Available options: "openai", "openai-codex", "dr-tulu", "gemini", "tavily" -- defaults to "openai"
+provider = "openai"                         # Available options: "openai", "openai-codex", "dr-tulu", "gemini", "tavily", "gnosis" -- defaults to "openai"
 api_style = "responses"                     # Only applies to provider="openai"; use "chat_completions" for Perplexity, Groq, Ollama, etc.
 model = "gpt-6-sol"                         # OpenAI: model identifier; Codex: "auto" or account model slug; Dr Tulu: logical provider id; Gemini: agent id; Tavily: "mini", "pro", or "auto"
 reasoning_effort = "medium"                  # Optional for OpenAI API and Codex subscription; omit to keep provider/model defaults
@@ -257,6 +259,92 @@ and [credit costs](https://docs.tavily.com/documentation/api-credits).
 ```bash
 uv run deep-research-cli research "What changed in Python 3.0?"
 ```
+
+### Gnosis provider example
+
+Gnosis uses the state-space `search` workflow in
+[openJiuwen DeepSearch](https://github.com/openJiuwen-ai/deepsearch), not its
+separate report-generation API. Deploy that service independently and publish
+its run/telemetry port (8089). The adapter adds no openJiuwen SDK dependency.
+
+```toml
+[backends.gnosis]
+provider = "gnosis"
+base_url = "http://127.0.0.1:8089"
+gnosis_config_path = "/absolute/path/to/gnosis-options.json"
+gnosis_output_dir = "/absolute/path/to/shared/output"
+timeout = 240
+poll_interval = 2
+cancel_on_timeout = true
+```
+
+`gnosis_config_path` points to a private JSON file containing the native
+`POST /runs` request options: `llm`, `tool_map`, search/fetch provider settings,
+and optional `search_workflow_per_question_params`. Use the deployed service's
+`/docs` for its schema. Do not put `query`, `run_id`, or `conversation_id` in this
+file; the adapter owns them. It sets `search_mode="search"` and disables question
+routing so a run cannot silently switch to the differently bounded ReAct mode.
+For example, a stock service using Tavily and Jina accepts:
+
+```json
+{
+  "llm": {
+    "model_name": "YOUR_CHAT_MODEL",
+    "base_url": "https://api.openai.com/v1",
+    "api_key": "YOUR_LLM_API_KEY"
+  },
+  "tool_map": "search_fetch",
+  "web_search_engine_config": {
+    "search_engine_name": "tavily",
+    "search_api_key": "YOUR_TAVILY_API_KEY"
+  },
+  "web_fetch_provider_config": {
+    "provider_name": "jina",
+    "api_key": "YOUR_JINA_API_KEY"
+  },
+  "search_workflow_per_question_params": {
+    "max_workers": 2,
+    "time_limit": 180,
+    "actions_explored_limit": 10,
+    "fail_limit": 2
+  }
+}
+```
+
+Protect that file (`chmod 600`) and keep it outside the repository. The model
+and its reasoning options belong inside `llm`; the top-level `model="gnosis"`
+is only a logical provider label. Codex OAuth cannot be passed directly as a
+Chat Completions API key; subscription use requires a separately configured
+compatible bridge. Search/fetch tools remain a separate service configuration.
+
+The run API exposes completion metadata, not the full answer. The adapter reads
+`logs/result_<internal-conversation-id>/final_result.json` under
+`gnosis_output_dir`; mount the same output directory into the MCP process if
+it runs in another container. HTTP access alone is insufficient for recovery.
+Fresh clients can recover completed answers without loading the credential file.
+Unknown or nonterminal telemetry is reported as `unknown`, because the service
+does not expose live run status after a restart. Server restarts do not resume
+in-flight searches. `cancel_on_timeout` requests cancellation; otherwise the
+task ID is retained for later recovery. Graph action/time limits are not hard
+request/token budgets.
+
+Only confirmed, nonempty predictions count as completed answers. Guesses and
+limit exits without a confirmed answer are failures. Citations are extracted
+only from links in the selected answer, not inferred from visited pages. Code
+Interpreter is unsupported. This mode may return a short answer rather than
+a long research report.
+
+```bash
+uv run deep-research-cli --backend gnosis research "When was Python 3.0 released?"
+uv run deep-research-cli --backend gnosis status RUN_ID
+```
+
+Equivalent default-provider flags are `--provider gnosis`,
+`--gnosis-config-path PATH`, and `--gnosis-output-dir PATH`. Environment aliases:
+`GNOSIS_BASE_URL`, `GNOSIS_CONFIG_PATH`, `GNOSIS_OUTPUT_DIR`; optional
+`GNOSIS_API_KEY` authenticates the run service, not its LLM. Generic aliases
+`RESEARCH_GNOSIS_CONFIG_PATH` and `RESEARCH_GNOSIS_OUTPUT_DIR` apply only to the
+default backend; named tables remain isolated.
 
 Dr Tulu provider example:
 
@@ -805,6 +893,7 @@ In `agent` mode, the TUI applies provider-aware defaults:
 - `dr-tulu`: model `dr-tulu`, base URL `http://localhost:8080/`
 - `gemini`: model `deep-research-preview-04-2026`, base URL `https://generativelanguage.googleapis.com`
 - `tavily`: model `mini`, base URL `https://api.tavily.com`
+- `gnosis`: logical model `gnosis`, base URL `http://127.0.0.1:8089`; native LLM/search settings and shared output paths come from configuration
 
 Switching provider or OpenAI API style automatically refreshes the model and
 base URL defaults. You can still override those fields manually afterward.
@@ -1118,11 +1207,13 @@ corresponding `ResearchConfig` field:
 |------|-------------|
 | `--config PATH` | Path to TOML config file (default: `~/.deep_research`) |
 | `--backend NAME` | Use a named `[backends.NAME]` table instead of `[research]`. Cannot be combined with `--provider`, `--model`, `--reasoning-effort`, `--api-key`, `--base-url` or `--api-style`; runtime flags such as `--timeout` still apply. In MCP client mode the name is passed to the server, and `status` sends a raw task ID as `NAME:<id>` so the server routes it to that backend. |
-| `--provider {openai,openai-codex,dr-tulu,gemini,tavily}` | Research provider |
+| `--provider {openai,openai-codex,dr-tulu,gemini,tavily,gnosis}` | Research provider |
 | `--model MODEL` | Model or agent ID |
 | `--reasoning-effort {none,low,medium,high,xhigh,max}` | OpenAI reasoning effort; omit for provider/model default |
 | `--api-key KEY` | Provider API key |
 | `--base-url URL` | Provider API base URL |
+| `--gnosis-config-path PATH` | Native Gnosis request-options JSON; cannot be combined with `--backend` |
+| `--gnosis-output-dir PATH` | Shared Gnosis output directory; cannot be combined with `--backend` |
 | `--api-style {responses,chat_completions}` | OpenAI API style |
 | `--timeout SECONDS` | Max research timeout |
 | `--poll-interval SECONDS` | Task poll interval |
@@ -1190,19 +1281,22 @@ Configuration class for the research agent.
 
 #### Parameters
 
-- `provider`: Research provider (`openai`, `openai-codex`, `dr-tulu`, `gemini`, or `tavily`; default: `openai`)
-- `api_style`: API style for the `openai` provider (`responses` or `chat_completions`; default: `responses`). Ignored for `openai-codex`, `dr-tulu`, `gemini`, and `tavily`.
+- `provider`: Research provider (`openai`, `openai-codex`, `dr-tulu`, `gemini`, `tavily`, or `gnosis`; default: `openai`)
+- `api_style`: API style for the `openai` provider (`responses` or `chat_completions`; default: `responses`). Ignored for other providers.
 - `model`: Model identifier
   - OpenAI: Responses model (e.g., `gpt-6-sol`)
   - OpenAI Codex subscription: `auto` (default) or an account catalogue slug
   - Dr Tulu: logical provider id (default: `dr-tulu`)
   - Gemini: Deep Research agent id (for example `deep-research-preview-04-2026`)
   - Tavily: Research model (`mini`, `pro`, or `auto`; default: `mini`)
+  - Gnosis: logical provider label (default: `gnosis`); the actual LLM model is set in the native request-options JSON
 - `reasoning_effort`: Optional OpenAI reasoning effort (`none`, `low`, `medium`, `high`, `xhigh`, or `max`); model support varies.
-- `api_key`: API key for the configured endpoint (optional). Defaults to env `OPENAI_API_KEY` for `openai`, `DR_TULU_API_KEY` for `dr-tulu`, `GEMINI_API_KEY` / `GOOGLE_API_KEY` for `gemini`, and `TAVILY_API_KEY` for `tavily`. Ignored for `openai-codex`.
-- `base_url`: Provider API base URL (optional). Defaults to `https://api.openai.com/v1` for `openai`, the fixed `https://chatgpt.com/backend-api/codex` endpoint for `openai-codex`, `http://localhost:8080/` for `dr-tulu`, `https://generativelanguage.googleapis.com` for `gemini`, and `https://api.tavily.com` for `tavily`.
+- `api_key`: API key for the configured endpoint (optional). Defaults to env `OPENAI_API_KEY` for `openai`, `DR_TULU_API_KEY` for `dr-tulu`, `GEMINI_API_KEY` / `GOOGLE_API_KEY` for `gemini`, `TAVILY_API_KEY` for `tavily`, and `GNOSIS_API_KEY` for Gnosis service authentication. Ignored for `openai-codex`.
+- `base_url`: Provider API base URL (optional). Defaults to `https://api.openai.com/v1` for `openai`, the fixed `https://chatgpt.com/backend-api/codex` endpoint for `openai-codex`, `http://localhost:8080/` for `dr-tulu`, `https://generativelanguage.googleapis.com` for `gemini`, `https://api.tavily.com` for `tavily`, and `http://127.0.0.1:8089` for `gnosis`.
 - `timeout`: Maximum time for research in seconds (default: 1800)
 - `poll_interval`: Polling interval in seconds (default: 30)
+- `gnosis_config_path`: Path to private native Gnosis `/runs` JSON options; required for new Gnosis research
+- `gnosis_output_dir`: Shared Gnosis output directory; required to recover full Gnosis answers
 
 ## Development
 
@@ -1227,6 +1321,13 @@ When `~/.deep_research_auth.json` contains a current or refreshable
 executes the live Codex end-to-end test and consumes subscription allowance.
 Without that session, the test is skipped. Use `-m "not api"` to exclude all
 live provider tests explicitly.
+
+The Gnosis live test is separately opt-in: set `GNOSIS_TEST_CONFIG_PATH` to the
+private native options file and `GNOSIS_TEST_OUTPUT_DIR` to the shared output
+directory, then run `uv run pytest tests/test_gnosis_backend.py -m api`. It
+starts real research and consumes the configured LLM/search allowance. Set
+`GNOSIS_TEST_BASE_URL` to override the default run endpoint; with `-m "not api"`
+that variable enables only the read-only unknown-run service check.
 
 ### Lint, Format, Type Check
 

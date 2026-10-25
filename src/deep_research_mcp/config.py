@@ -48,6 +48,12 @@ _PROVIDER_DEFAULTS: dict[str, tuple[str, str, tuple[str, ...], tuple[str, ...]]]
         ("DR_TULU_API_KEY",),
         ("DR_TULU_BASE_URL",),
     ),
+    "gnosis": (
+        "gnosis",
+        "http://127.0.0.1:8089",
+        ("GNOSIS_API_KEY",),
+        ("GNOSIS_BASE_URL",),
+    ),
     "openai-codex": (
         "auto",
         OPENAI_CODEX_BASE_URL,
@@ -69,6 +75,8 @@ _PROVIDER_SCOPED_SETTINGS = (
     "RESEARCH_MODEL",
     "RESEARCH_API_STYLE",
     "RESEARCH_REASONING_EFFORT",
+    "RESEARCH_GNOSIS_CONFIG_PATH",
+    "RESEARCH_GNOSIS_OUTPUT_DIR",
 )
 
 
@@ -192,6 +200,8 @@ class ResearchConfig:
     log_level: str = "INFO"
     enable_reasoning_summaries: bool = False
     reasoning_effort: str | None = None
+    gnosis_config_path: str | None = None
+    gnosis_output_dir: str | None = None
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> ResearchConfig:
@@ -328,6 +338,14 @@ class ResearchConfig:
                 "ENABLE_REASONING_SUMMARIES", default=False
             ),
             reasoning_effort=get_setting_first("RESEARCH_REASONING_EFFORT") or None,
+            gnosis_config_path=get_setting_first(
+                "RESEARCH_GNOSIS_CONFIG_PATH", "GNOSIS_CONFIG_PATH"
+            )
+            or None,
+            gnosis_output_dir=get_setting_first(
+                "RESEARCH_GNOSIS_OUTPUT_DIR", "GNOSIS_OUTPUT_DIR"
+            )
+            or None,
         )
 
     def validate(self) -> bool:

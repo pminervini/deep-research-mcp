@@ -97,6 +97,8 @@ def build_cli_env(args: argparse.Namespace) -> dict[str, str]:
         "api_key": "RESEARCH_API_KEY",
         "base_url": "RESEARCH_BASE_URL",
         "api_style": "RESEARCH_API_STYLE",
+        "gnosis_config_path": "RESEARCH_GNOSIS_CONFIG_PATH",
+        "gnosis_output_dir": "RESEARCH_GNOSIS_OUTPUT_DIR",
         "timeout": "RESEARCH_TIMEOUT",
         "poll_interval": "RESEARCH_POLL_INTERVAL",
         "log_level": "LOGGING_LEVEL",
@@ -148,6 +150,8 @@ _BACKEND_EXCLUSIVE_FLAGS = (
     "api_key",
     "base_url",
     "api_style",
+    "gnosis_config_path",
+    "gnosis_output_dir",
 )
 
 
@@ -598,7 +602,7 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Use a named [backends.NAME] table from the config file instead of "
             "[research]; cannot be combined with --provider, --model, "
-            "--reasoning-effort, --api-key, --base-url or --api-style"
+            "--reasoning-effort, --api-key, --base-url, --api-style or Gnosis paths"
         ),
     )
     cfg.add_argument(
@@ -610,6 +614,7 @@ def build_parser() -> argparse.ArgumentParser:
             "dr-tulu",
             "gemini",
             "tavily",
+            "gnosis",
         ],
         help="Research provider",
     )
@@ -622,6 +627,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     cfg.add_argument("--api-key", default=None, help="Provider API key")
     cfg.add_argument("--base-url", default=None, help="Provider API base URL")
+    cfg.add_argument(
+        "--gnosis-config-path",
+        default=None,
+        metavar="PATH",
+        help="Gnosis native /runs request-options JSON (LLM and search settings)",
+    )
+    cfg.add_argument(
+        "--gnosis-output-dir",
+        default=None,
+        metavar="PATH",
+        help="Shared Gnosis output directory containing logs/result_*/final_result.json",
+    )
     cfg.add_argument(
         "--api-style",
         default=None,

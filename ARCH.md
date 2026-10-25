@@ -38,6 +38,7 @@ graph TD
         P3[dr_tulu_backend.py]
         P5[codex_backend.py]
         P6[tavily_backend.py]
+        P7[gnosis_backend.py]
         CA[codex_auth.py]
     end
 
@@ -48,6 +49,7 @@ graph TD
         H4[DR-Tulu /chat endpoint]
         H5[ChatGPT Codex private Responses endpoint]
         H6[Tavily Research API]
+        H7[Gnosis run API and shared output]
         OA[OpenAI OAuth device flow]
     end
 
@@ -62,6 +64,7 @@ graph TD
     P --> P3
     P --> P5
     P --> P6
+    P --> P7
     P1 -- "Makes API calls to" --> H
     P1 -- "Makes API calls to" --> H2
     P2 -- "Makes API calls to" --> H3
@@ -69,6 +72,7 @@ graph TD
     P5 -- "Streams research from" --> H5
     P5 -- "Loads/refreshes credentials with" --> CA
     P6 -- "Creates and polls tasks through" --> H6
+    P7 -- "Submits runs and reads persisted answers" --> H7
     CA -- "Authenticates through" --> OA
 ```
 
@@ -90,6 +94,7 @@ The project is composed of four main layers:
     *   `backends/openai_backend.py` implements the OpenAI Responses API and Chat Completions flows, including citation extraction and background polling.
     *   `backends/gemini_backend.py` implements Gemini Deep Research over the Interactions API, including polling and result normalization.
     *   `backends/tavily_backend.py` implements Tavily Research task creation, polling, and report recovery.
+    *   `backends/gnosis_backend.py` submits Gnosis search runs, reads telemetry, and recovers full answers from a shared output directory.
     *   `backends/dr_tulu_backend.py` implements the DR-Tulu research agent integration via Allen AI's `/chat` endpoint.
     *   `backends/codex_backend.py` implements experimental ChatGPT subscription access through the private Codex Responses stream.
     *   `codex_auth.py` owns the separate device-code session, optional access-token-only Codex import, atomic token rotation, and local logout.
@@ -99,6 +104,7 @@ The project is composed of four main layers:
     * Provider `openai` with `api_style = "chat_completions"`: OpenAI Chat Completions API -- works with any OpenAI-compatible provider (Perplexity, Groq, Ollama, vLLM, etc.). No built-in tools (`web_search`, `code_interpreter`); no background mode or polling.
     * Provider `gemini`: Gemini Deep Research agent over the Interactions API. Background execution and polling are required; built-in Google Search and URL context are provided by Gemini.
     * Provider `tavily`: Tavily Research over its asynchronous Research API. Task IDs support polling and completed-report recovery; `mini` is the default model.
+    * Provider `gnosis`: self-hosted openJiuwen DeepSearch `POST /runs` on port 8089, forced to state-space search with the question router disabled. Native request settings live in a private JSON file. Full-answer recovery requires a shared output mount; telemetry alone is insufficient. No SDK dependency or Code Interpreter support.
     * Provider `dr-tulu`: Allen AI's DR-Tulu research agent accessed via its `/chat` endpoint. A lightweight integration that delegates research to a separately hosted DR-Tulu service.
     * Provider `openai-codex`: account-scoped model discovery followed by a synchronous SSE Responses request with native web search. Code Interpreter, background polling, cancellation, task recovery, and endpoint overrides are intentionally unsupported.
 
@@ -195,6 +201,22 @@ The project is composed of four main layers:
     -   `get_task_status()` and `get_task_result()`: Retrieve task status and recover completed reports by ID.
     -   `_extract_result()`: Converts Tavily's report and source list into the shared result format.
 
+### `src/deep_research_mcp/backends/gnosis_backend.py`
+
+- **Purpose**: Runs Gnosis state-space search through a separately deployed service.
+- `research()` reads `gnosis_config_path`, generates a fresh run ID, invokes the
+  task-start callback, and polls the full run telemetry range. Full re-reads avoid
+  losing events delivered out of sequence; submissions are not automatically retried.
+- `get_task_status()` / `get_task_result()` map the internal conversation ID from
+  `run_started` to `gnosis_output_dir/logs/result_<id>/final_result.json`. Path
+  traversal and escaping symlinks are rejected. Missing or partial files are not
+  interpreted as successful answers; nonterminal history cannot prove liveness.
+- Confirmed predictions become reports. Inline Markdown links become citations;
+  fetched-but-uncited evidence is not promoted to citations. Guesses/empty answers
+  remain failures, and timeout preserves the ID with optional cancellation.
+- The MCP server must share the output mount. Server restart recovery of active
+  searches and HTTP-only report recovery are not supported by this upstream API.
+
 ### `src/deep_research_mcp/backends/dr_tulu_backend.py`
 
 -   **Purpose**: Implements the DR-Tulu research agent integration.
@@ -247,7 +269,7 @@ The MCP server exposes two tools to clients like Claude Code. Each tool accepts 
 
 ### `deep_research()`
 
-**Purpose**: Performs autonomous deep research using the configured provider (OpenAI Responses API, experimental OpenAI Codex subscription access, Gemini Deep Research, Tavily Research, or DR-Tulu).
+**Purpose**: Performs autonomous deep research using the configured provider (OpenAI Responses API, experimental OpenAI Codex subscription access, Gemini Deep Research, Tavily Research, DR-Tulu, or Gnosis).
 
 **Arguments**:
 - `query` (string, required): Complete research question, including any user-provided context needed to answer it
@@ -299,7 +321,7 @@ The MCP server exposes two tools to clients like Claude Code. Each tool accepts 
 **Arguments**:
 - `task_id` (string, required): Task ID returned by `deep_research()`, in the form `<backend>:<provider task id>`; an un-prefixed ID is looked up on the default backend
 
-**Returns**: String containing task status information. When the task is completed and the provider supports result retrieval (OpenAI Responses API, Gemini Interactions API, Tavily Research API), the full rendered research report is appended.
+**Returns**: String containing task status information. When the task is completed and the provider supports result retrieval (OpenAI Responses API, Gemini Interactions API, Tavily Research API, or Gnosis with shared output), the full rendered research report is appended.
 
 **Return Structure**:
 ```
