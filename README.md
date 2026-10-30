@@ -786,10 +786,60 @@ Notes:
   required env vars through.
 - The server exposes three tools: `deep_research` (with an optional `backend`
   argument naming a `[backends.<name>]` table from `~/.deep_research`),
-  `research_status`, and `list_backends`, which reports each backend's
-  provider, model, endpoint, and whether credentials were found. Named
+  `research_status`, and `list_backends`, which returns structured backend
+  metadata and credential-presence flags (see below). Named
   backends require the TOML file; an environment-only deployment exposes just
   the default backend. Task IDs are returned as `<backend>:<id>`.
+
+#### Backend discovery output
+
+`list_backends()` takes no arguments and returns an object with a `backends`
+array and an `error` field. The MCP response's `structuredContent` contains
+that object directly; `content` also contains its JSON text representation for
+clients that only read text. The tool advertises an `outputSchema` for this
+structure. For example, a configured OpenAI backend can produce:
+
+```json
+{
+  "backends": [
+    {
+      "name": "default",
+      "provider": "openai",
+      "model": "gpt-6-sol",
+      "base_url": "https://api.openai.com/v1",
+      "api_style": "responses",
+      "reasoning_effort": "high",
+      "api_key_present": true,
+      "oauth_present": null,
+      "run_options_present": null,
+      "shared_output_present": null,
+      "error": null
+    }
+  ],
+  "error": null
+}
+```
+
+The default entry comes first, followed by named backends in configuration order.
+`api_style` applies only to the `openai` provider. `reasoning_effort` is the
+configured value, or `null` when omitted; it does not infer a model's defaults.
+`api_key_present` reports key presence for providers other than `openai-codex`;
+that provider uses `oauth_present` to report whether its auth file exists.
+Gnosis additionally reports `run_options_present` and `shared_output_present`.
+Inapplicable flags are `null`. Local services may not require an API key, and
+presence does not prove valid credentials, model access, or service health.
+API keys, OAuth tokens, and Gnosis file contents are never included.
+
+A failure to read or enumerate the configuration returns an empty `backends`
+array and a top-level `error`. A backend that cannot be loaded remains in the
+array with its `name` and `error`; its other fields are `null`, and other
+backends are still listed. Successful error fields are `null`.
+
+This replaces the previous newline-delimited text return value. Clients should
+read `result.structuredContent["backends"]`; text-only clients can JSON-decode
+the text content instead of parsing the old lines. `deep_research` and
+`research_status` retain their existing Markdown/text results. Restart an
+already-running server to load the new implementation and tool schema.
 
 #### OAuth authentication for HTTP
 

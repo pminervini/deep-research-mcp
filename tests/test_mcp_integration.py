@@ -94,6 +94,15 @@ async def test_mcp_tool_schema():
     }
     assert set(tools["research_status"].inputSchema["properties"]) == {"task_id"}
     assert set(tools["list_backends"].inputSchema.get("properties", {})) == set()
+    output_schema = tools["list_backends"].outputSchema
+    assert output_schema is not None
+    assert set(output_schema["properties"]) == {"backends", "error"}
+    assert output_schema["properties"]["backends"]["type"] == "array"
+    backend_schema = output_schema["$defs"]["BackendInfo"]["properties"]
+    assert {"name", "provider", "reasoning_effort", "api_key_present"} <= set(
+        backend_schema
+    )
+    assert "api_key" not in backend_schema
 
 
 def test_lazy_agent_applies_cancel_on_timeout_override():
@@ -253,13 +262,63 @@ async def test_stdio_server_initializes_and_exposes_tools(tmp_path):
             )
             assert "not available for the openai-codex provider" in codex_text
 
-            backends_text = rendered(await session.call_tool("list_backends", {}))
-            assert "- default: provider=dr-tulu" in backends_text
-            assert "base_url=http://127.0.0.1:18080" in backends_text
-            assert "- tulu-b: provider=dr-tulu" in backends_text
-            assert "base_url=http://127.0.0.1:18081" in backends_text
-            assert "- codex: provider=openai-codex" in backends_text
-            assert "oauth:" in backends_text
+            listing = await session.call_tool("list_backends", {})
+            assert listing.structuredContent is not None
+            assert json.loads(rendered(listing)) == listing.structuredContent
+            assert listing.structuredContent["error"] is None
+            backends = {
+                item["name"]: item for item in listing.structuredContent["backends"]
+            }
+            assert list(backends) == ["default", "codex", "tulu-b"]
+            assert backends["default"]["provider"] == "dr-tulu"
+            assert backends["default"]["base_url"] == "http://127.0.0.1:18080"
+            assert backends["tulu-b"]["provider"] == "dr-tulu"
+            assert backends["tulu-b"]["base_url"] == "http://127.0.0.1:18081"
+            assert backends["codex"]["provider"] == "openai-codex"
+            assert backends["codex"]["oauth_present"] is False
+            assert backends["codex"]["api_key_present"] is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("global_error", [False, True])
+async def test_list_backends_errors_stay_structured_over_stdio(
+    tmp_path: Path, global_error: bool
+) -> None:
+    """Configuration changes after startup retain the advertised output schema."""
+    server = StdioServerParameters(
+        command=sys.executable,
+        args=["-m", "deep_research_mcp.mcp_server"],
+        env=_named_backends_env(tmp_path),
+        cwd=Path(__file__).resolve().parents[1],
+    )
+    async with stdio_client(server) as (reader, writer):
+        async with ClientSession(reader, writer) as session:
+            await session.initialize()
+            (tmp_path / ".deep_research").write_text(
+                (
+                    "invalid TOML"
+                    if global_error
+                    else '[backends.broken]\nprovider = "unsupported"\n'
+                ),
+                encoding="utf-8",
+            )
+            result = await session.call_tool("list_backends", {})
+            assert not result.isError
+            payload = result.structuredContent
+            assert payload is not None
+            text = "\n".join(
+                item.text for item in result.content if item.type == "text"
+            )
+            assert json.loads(text) == payload
+            if global_error:
+                assert payload["backends"] == []
+                assert payload["error"]
+            else:
+                assert payload["error"] is None
+                assert payload["backends"][0]["name"] == "default"
+                assert payload["backends"][0]["error"] is None
+                assert payload["backends"][1]["name"] == "broken"
+                assert "unsupported" in payload["backends"][1]["error"]
 
 
 def test_mcp_server_structure():

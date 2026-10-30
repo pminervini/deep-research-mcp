@@ -578,9 +578,23 @@ do not prove that research completed.
 
 ### `list_backends`
 
-Use to see which backends the server operator has declared, with provider,
-model, endpoint, and whether credentials were found. Pass a listed name as
-`backend` to `deep_research`.
+Call without arguments to see which backends the server operator has declared.
+Read the object in `result.structuredContent`: its `backends` array contains
+entries with `name`, `provider`, `model`, `base_url`, `api_style`,
+`reasoning_effort`, `api_key_present`, `oauth_present`, `run_options_present`,
+`shared_output_present`, and `error`. Pass an entry's `name` as `backend` to
+`deep_research`. The default entry comes first. The tool advertises an output
+schema, and text-only clients can JSON-decode its text content to obtain the
+same object; do not parse the former newline-delimited listing.
+
+Check the top-level `error` for configuration enumeration failures (an empty
+array), and each entry's `error` for backend load failures. Successful errors
+and inapplicable metadata/presence fields are `null`. API-key presence applies
+outside `openai-codex`; OAuth-file presence applies to `openai-codex`; Gnosis
+also reports its options-file and shared-output presence. No secret values are
+returned. See README's [backend discovery output](../../README.md#backend-discovery-output)
+for the full contract and client migration. Already-running servers must be
+restarted to load this implementation and schema.
 
 Credential presence in `list_backends` is a configuration check, not proof of
 valid authentication, model access, or service health. Backend names, model

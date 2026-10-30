@@ -60,7 +60,7 @@ from deep_research_mcp.config import (
     split_backend_task_id,
 )
 from deep_research_mcp.errors import ResearchError
-from deep_research_mcp.results import ResearchResult
+from deep_research_mcp.results import BackendInfo, BackendListResult, ResearchResult
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -482,54 +482,56 @@ async def research_status(
         return f"Error checking status: {str(e)}"
 
 
-@mcp.tool()
-def list_backends() -> str:
+@mcp.tool(structured_output=True)
+def list_backends() -> BackendListResult:
     """
     List the research backends this server can use with the deep_research tool.
 
-    **Returns:** One line per backend with its provider, model, endpoint, and
-    whether credentials were found. 'default' is the server's [research]
-    configuration; the others are named [backends.<name>] tables. Local
-    providers (dr-tulu, Gnosis, local OpenAI-compatible servers) may not need a
-    service API key. For Gnosis, file presence is reported separately; it does
-    not establish working LLM or search credentials.
+    **Returns:** A structured object with a backends array and an error field.
+    Entries include name, provider, model, base_url, api_style, reasoning_effort,
+    and provider-specific presence flags: api_key_present, oauth_present,
+    run_options_present, shared_output_present. Inapplicable fields are null.
+    No credential values or Gnosis file contents are returned. Presence does
+    not prove valid authentication or service health; local services may not
+    need an API key. 'default' describes [research]; other names describe
+    [backends.<name>]. Configuration failures appear in the top-level error
+    or the affected entry's error. Successful error fields are null.
     """
     try:
         names = [DEFAULT_BACKEND_NAME, *load_backend_names()]
     except Exception as e:
-        return f"Failed to load configuration: {str(e)}"
+        return BackendListResult(error=f"Failed to load configuration: {str(e)}")
 
-    lines = []
+    backends: list[BackendInfo] = []
     for name in names:
         try:
             config = ResearchConfig.load(backend=name)
         except Exception as error:
-            lines.append(f"- {name}: configuration error: {error}")
+            backends.append(BackendInfo(name=name, error=str(error)))
             continue
+        backend = BackendInfo(
+            name=name,
+            provider=config.provider,
+            model=config.model,
+            base_url=config.base_url,
+            api_style=config.api_style if config.provider == "openai" else None,
+            reasoning_effort=config.reasoning_effort,
+        )
         if config.provider == "openai-codex":
-            credential = (
-                f"oauth: {'present' if DEFAULT_CODEX_AUTH_PATH.exists() else 'missing'}"
-            )
-        elif config.provider == "gnosis":
-            options_present = bool(
+            backend.oauth_present = DEFAULT_CODEX_AUTH_PATH.exists()
+        else:
+            backend.api_key_present = bool(config.api_key)
+        if config.provider == "gnosis":
+            backend.run_options_present = bool(
                 config.gnosis_config_path
                 and Path(config.gnosis_config_path).expanduser().is_file()
             )
-            output_present = bool(
+            backend.shared_output_present = bool(
                 config.gnosis_output_dir
                 and Path(config.gnosis_output_dir).expanduser().is_dir()
             )
-            credential = (
-                f"run_options: {'present' if options_present else 'missing'}, "
-                f"shared_output: {'present' if output_present else 'missing'}"
-            )
-        else:
-            credential = f"api_key: {'set' if config.api_key else 'not set'}"
-        lines.append(
-            f"- {name}: provider={config.provider}, model={config.model}, "
-            f"base_url={config.base_url}, {credential}"
-        )
-    return "\n".join(lines)
+        backends.append(backend)
+    return BackendListResult(backends=backends)
 
 
 def main():

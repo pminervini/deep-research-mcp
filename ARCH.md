@@ -233,7 +233,7 @@ The project is composed of four main layers:
     -   `_tag_task_id()` / `_split_task_id()`: Task IDs returned to clients are `<backend>:<provider task id>` so `research_status` can route them to the backend that owns them without server-side state; un-prefixed IDs go to the default backend. The webhook callback payload sent by `DeepResearchAgent` still carries the raw provider ID.
     -   `@mcp.tool() deep_research()`: The main tool that performs research. It picks the agent for the optional `backend` argument, calls its `research()` method, and formats the output for the client.
     -   `@mcp.tool() research_status()`: A tool to check the status of a research task on whichever backend its ID names.
-    -   `@mcp.tool() list_backends()`: Lists the default and named backends with provider, model, endpoint, and whether an API key (or the Codex OAuth file) is present. It reports without validating.
+    -   `@mcp.tool(structured_output=True) list_backends()`: Returns a `BackendListResult` containing typed `BackendInfo` entries, provider-specific presence flags, and structured configuration errors. The SDK exposes an output schema, structured content, and a JSON text representation. Discovery does not validate credentials or contact providers.
     -   `main()`: The entry point for running the MCP server. It loads and validates the default configuration and every named backend, then starts the server. Transport is selectable via `--transport {stdio,http}` with `--host`/`--port` for HTTP.
 
 ### `src/deep_research_mcp/config.py`
@@ -265,7 +265,7 @@ The project is composed of four main layers:
 
 ## MCP Server Methods
 
-The MCP server exposes two tools to clients like Claude Code. Each tool accepts specific arguments and returns structured data.
+The MCP server exposes three tools to clients like Claude Code. Research and status return Markdown/text; backend discovery returns a structured object.
 
 ### `deep_research()`
 
@@ -349,10 +349,24 @@ Completed at: [timestamp]  # Only if completed
 
 **Arguments**: none
 
-**Returns**: One line per backend, starting with `default`:
-```
-- default: provider=openai, model=gpt-6-sol, base_url=https://api.openai.com/v1, api_key: set
-- tulu-lab: provider=dr-tulu, model=dr-tulu, base_url=http://lab-box:8080/, api_key: not set
-- codex: provider=openai-codex, model=auto, base_url=https://chatgpt.com/backend-api/codex, oauth: present
-```
-A backend whose table fails to load is listed with `configuration error: ...` instead.
+**Returns**: `BackendListResult`, a Pydantic model defined alongside `BackendInfo`
+in `results.py`. MCP exposes the object directly in `structuredContent`, with
+the same object serialized as JSON in text `content` and a declared `outputSchema`.
+There is no string-valued `result` wrapper. The canonical JSON example and client
+migration instructions are in [Backend discovery output](README.md#backend-discovery-output).
+
+- `backends`: ordered list, with `default` first, then configured names.
+- Each entry includes `name`, `provider`, `model`, `base_url`, `api_style`,
+  `reasoning_effort`, `api_key_present`, `oauth_present`, `run_options_present`,
+  `shared_output_present`, and `error`.
+- `api_style` is null outside the `openai` provider. Unset reasoning effort is
+  null rather than an inferred model default.
+- Presence flags are booleans when applicable and null otherwise. API-key
+  presence applies outside `openai-codex`; OAuth-file presence applies only to
+  `openai-codex`; Gnosis options/output presence applies only to `gnosis`.
+  Local services may need no API key. No secrets or Gnosis file contents are read
+  into the response, and no provider requests or authentication checks are made.
+- Top-level `error`: null on successful enumeration; otherwise an error string
+  with an empty `backends` list. An individual backend load failure instead sets
+  that entry's `error`, leaves its metadata null except for `name`, and permits
+  other entries to be returned.

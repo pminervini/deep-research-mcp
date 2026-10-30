@@ -3,6 +3,7 @@
 """Gnosis provider configuration and CLI/TUI routing contracts."""
 
 from pathlib import Path
+import json
 import os
 import sys
 
@@ -151,5 +152,14 @@ async def test_gnosis_named_backend_is_discoverable_over_stdio(tmp_path: Path) -
             text = "\n".join(
                 item.text for item in result.content if item.type == "text"
             )
-            assert "- gnosis: provider=gnosis, model=gnosis" in text
-            assert "run_options: missing, shared_output: present" in text
+            payload = result.structuredContent
+            assert payload is not None
+            assert json.loads(text) == payload
+            assert payload["error"] is None
+            backend = next(
+                item for item in payload["backends"] if item["name"] == "gnosis"
+            )
+            assert backend["provider"] == "gnosis"
+            assert backend["model"] == "gnosis"
+            assert backend["run_options_present"] is False
+            assert backend["shared_output_present"] is True

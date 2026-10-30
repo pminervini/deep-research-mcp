@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 
 """
-Structured result models for research and task status operations.
+Structured result models for research, task status, and backend discovery.
 """
 
 from dataclasses import dataclass, field
 from typing import Any
+
+from pydantic import BaseModel, Field
 
 
 @dataclass(slots=True)
@@ -118,3 +120,26 @@ class ResearchTaskStatus:
     def error_status(cls, *, task_id: str, error: str) -> "ResearchTaskStatus":
         """Build an error task status response."""
         return cls(task_id=task_id, status="error", error=error)
+
+
+class BackendInfo(BaseModel):
+    """Configured backend metadata; presence flags do not establish readiness."""
+
+    name: str
+    provider: str | None = None
+    model: str | None = None
+    base_url: str | None = None
+    api_style: str | None = None
+    reasoning_effort: str | None = None
+    api_key_present: bool | None = None
+    oauth_present: bool | None = None
+    run_options_present: bool | None = None
+    shared_output_present: bool | None = None
+    error: str | None = None
+
+
+class BackendListResult(BaseModel):
+    """Structured discovery response, including global configuration failures."""
+
+    backends: list[BackendInfo] = Field(default_factory=list)
+    error: str | None = None
