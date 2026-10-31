@@ -16,6 +16,9 @@ These guidelines reduce common LLM coding mistakes. They bias toward caution ove
 - No error handling for impossible scenarios.
 - If you write 200 lines and it could be 50, rewrite it.
 - Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+- Budget the whole maintained change, including tests, documentation, and untracked files. Simplification tasks must shrink it overall; stop and obtain approval before net growth.
+- Reuse existing tests/fixtures and canonical documentation. Preserve meaningful coverage; do not minify, relocate, or delete useful checks just to meet a line budget.
+- Before handoff, report added/deleted/net lines for runtime, tests, documentation, and the total against the pre-task baseline. Review every new file or helper as maintenance debt.
 
 ### Surgical Changes
 - Don't "improve" adjacent code, comments, or formatting.
@@ -54,7 +57,6 @@ These guidelines reduce common LLM coding mistakes. They bias toward caution ove
 ## Build, Test, and Development Commands
 - Setup env: `uv sync --upgrade --extra dev` (or compatibility: `python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && pip install -e .`).
 - Run MCP server: `uv run deep-research-mcp`.
-- Try CLI: `uv run python cli/deep-research-cli.py research "What’s new in quantum computing?" --model gpt-6-sol`.
 - Tests: `uv run pytest -v` or `uv run pytest --cov=deep_research_mcp tests/`.
 - Lint/format/type-check: `uv run black .`, `uv run pylint src/deep_research_mcp tests`, `uv run mypy src/deep_research_mcp`.
 - Before committing or opening a PR, run `uv run black --fast --check .` to match the CI formatting check.

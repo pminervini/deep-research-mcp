@@ -22,11 +22,13 @@ from mcp.client.stdio import StdioServerParameters, stdio_client
 # Import the underlying functions directly
 from deep_research_mcp import __version__
 import deep_research_mcp.mcp_server as mcp_server
+from deep_research_mcp.cli import _render_mcp_result
 from deep_research_mcp.mcp_server import (
     deep_research,
     mcp,
     research_status,
 )
+from tests.tui_test_utils import load_tui_module
 
 
 @pytest.mark.asyncio
@@ -51,10 +53,8 @@ async def test_deep_research_invalid_api_key_graceful_error():
             system_instructions="This is just a test",
             include_analysis=False,
         )
-        assert isinstance(result, str)
-        assert result.startswith("Unexpected error:") or result.startswith(
-            "Research error:"
-        )
+        assert result["status"] in {"failed", "error"}
+        assert result["message"]
     finally:
         if old_provider is None:
             os.environ.pop("PROVIDER", None)
@@ -103,6 +103,11 @@ async def test_mcp_tool_schema():
         backend_schema
     )
     assert "api_key" not in backend_schema
+    for name in ("deep_research", "research_status"):
+        schema = tools[name].outputSchema
+        assert schema is not None
+        assert schema["type"] == "object"
+        assert "result" not in schema.get("required", [])
 
 
 def test_lazy_agent_applies_cancel_on_timeout_override():
@@ -219,8 +224,9 @@ async def test_deep_research_unknown_backend_returns_error():
     finally:
         mcp_server._agents.clear()  # pylint: disable=protected-access
 
-    assert result.startswith("Failed to initialize research agent:")
-    assert "nope" in result
+    assert result["status"] == "error"
+    assert result["message"].startswith("Failed to initialize research agent:")
+    assert "nope" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -247,20 +253,25 @@ async def test_stdio_server_initializes_and_exposes_tools(tmp_path):
             tool_names = {tool.name for tool in tools.tools}
             assert tool_names == {"deep_research", "research_status", "list_backends"}
 
-            status_text = rendered(
-                await session.call_tool("research_status", {"task_id": "fake-task-id"})
-            )
-            assert "Task fake-task-id status: unknown" in status_text
-
-            named_text = rendered(
-                await session.call_tool("research_status", {"task_id": "tulu-b:fake"})
-            )
-            assert "Task tulu-b:fake status: unknown" in named_text
-
-            codex_text = rendered(
-                await session.call_tool("research_status", {"task_id": "codex:fake"})
-            )
-            assert "not available for the openai-codex provider" in codex_text
+            for task_id, expected_id in (
+                ("fake-task-id", "default:fake-task-id"),
+                ("tulu-b:fake", "tulu-b:fake"),
+                ("codex:fake", "codex:fake"),
+            ):
+                response = await session.call_tool(
+                    "research_status", {"task_id": task_id}
+                )
+                payload = response.structuredContent
+                assert payload is not None
+                assert json.loads(rendered(response)) == payload
+                assert payload["task_id"] == expected_id
+                assert payload["status"] == "unknown"
+                assert payload["result"] is None
+                if task_id.startswith("codex:"):
+                    assert (
+                        "not available for the openai-codex provider"
+                        in payload["message"]
+                    )
 
             listing = await session.call_tool("list_backends", {})
             assert listing.structuredContent is not None
@@ -313,6 +324,15 @@ async def test_list_backends_errors_stay_structured_over_stdio(
             if global_error:
                 assert payload["backends"] == []
                 assert payload["error"]
+                failure = await session.call_tool(
+                    "research_status", {"task_id": "raw-id"}
+                )
+                assert not failure.isError
+                assert failure.structuredContent is not None
+                assert failure.structuredContent["status"] == "error"
+                assert failure.structuredContent["task_id"] == "default:raw-id"
+                assert failure.structuredContent["error"]
+                assert failure.structuredContent["result"] is None
             else:
                 assert payload["error"] is None
                 assert payload["backends"][0]["name"] == "default"
@@ -337,29 +357,53 @@ def test_mcp_server_structure():
 
 
 @pytest.mark.asyncio
-async def test_research_status_recovered_report_keeps_backend_prefix(tmp_path):
-    """A report recovered from a named backend renders the prefixed task ID.
-
-    Uses a real local HTTP endpoint that speaks the Tavily task API, so the
-    recovery path runs through the real agent and backend.
-    """
+@pytest.mark.parametrize("backend", ["", "lab"])
+@pytest.mark.parametrize(
+    "task_id",
+    ["complete", "failed", "running", "http-error", "recovery-error", "unavailable"],
+)
+async def test_research_status_recovered_report_keeps_backend_prefix(
+    tmp_path: Path, backend: str, task_id: str
+) -> None:
+    """Exercise research/recovery JSON through the existing loopback provider."""
+    # pylint: disable=protected-access
+    report = "# Provider-authored report\n\nUnicode: café."
+    citation = {"index": 1, "title": "Example", "url": "https://example.com/a"}
+    reads = 0
 
     class TavilyTaskHandler(BaseHTTPRequestHandler):
-        """Serve one completed Tavily research task for any task ID."""
+        """Serve explicit local test data, including provider/recovery failures."""
 
-        def do_GET(self):  # pylint: disable=invalid-name
-            task_id = self.path.rsplit("/", 1)[-1]
+        def do_POST(self) -> None:  # pylint: disable=invalid-name
+            self.rfile.read(int(self.headers["Content-Length"]))
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(json.dumps({"request_id": task_id}).encode())
+
+        def do_GET(self) -> None:  # pylint: disable=invalid-name
+            nonlocal reads
+            assert self.path == f"/research/{task_id}"
+            reads += 1
+            status = task_id if task_id in {"running", "failed"} else "completed"
+            if task_id == "unavailable" and reads > 1:
+                status = "running"
             payload = json.dumps(
                 {
                     "request_id": task_id,
-                    "status": "completed",
+                    "status": status,
                     "created_at": "2026-10-19T06:00:00Z",
                     "completed_at": "2026-10-19T06:05:00Z",
-                    "content": "Recovered report body.",
+                    "content": report,
+                    "detail": "Fixture provider failure",
                     "sources": [{"url": "https://example.com/a", "title": "Example"}],
                 }
             ).encode("utf-8")
-            self.send_response(200)
+            self.send_response(
+                500
+                if task_id == "http-error"
+                or (task_id == "recovery-error" and reads > 1)
+                else 200
+            )
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(payload)))
             self.end_headers()
@@ -374,33 +418,54 @@ async def test_research_status_recovered_report_keeps_backend_prefix(tmp_path):
 
     try:
         host, port = server.server_address
-        (tmp_path / ".deep_research").write_text(
-            "[backends.lab]\n"
+        table = (
             'provider = "tavily"\n'
             f'base_url = "http://{host}:{port}"\n'
-            'api_key = "test-key"\n',
-            encoding="utf-8",
+            'api_key = "test-key"\ntimeout = 0.02\npoll_interval = 0.02\n'
         )
-        server_env = dict(os.environ)
-        server_env.update(
-            {
-                "HOME": str(tmp_path),
-                "RESEARCH_PROVIDER": "dr-tulu",
-                "RESEARCH_BASE_URL": "http://127.0.0.1:18080",
-            }
+        (tmp_path / ".deep_research").write_text(
+            f"[research]\n{table}[backends.lab]\n{table}",
+            encoding="utf-8",
         )
         mcp_server_params = StdioServerParameters(
             command=sys.executable,
             args=["-m", "deep_research_mcp.mcp_server"],
-            env=server_env,
+            env={"HOME": str(tmp_path), "PATH": os.environ.get("PATH", "")},
             cwd=Path(__file__).resolve().parents[1],
         )
 
         async with stdio_client(mcp_server_params) as (read_stream, write_stream):
             async with ClientSession(read_stream, write_stream) as session:
                 await session.initialize()
+                tagged_id = f"{backend or 'default'}:{task_id}"
+                if task_id not in {"recovery-error", "unavailable"}:
+                    research = await session.call_tool(
+                        "deep_research", {"query": task_id, "backend": backend}
+                    )
+                    assert not research.isError
+                    data = research.structuredContent
+                    assert data is not None
+                    assert json.loads(_render_mcp_result(research)) == data
+                    research_text = "\n".join(
+                        item.text for item in research.content if item.type == "text"
+                    )
+                    assert json.loads(research_text) == data
+                    assert "test-key" not in research_text
+                    assert data["task_id"] == tagged_id
+                    assert isinstance(data["execution_time"], (int, float))
+                    assert data["citations"] == (
+                        [citation] if task_id == "complete" else []
+                    )
+                    assert data["status"] == (
+                        "completed" if task_id == "complete" else "failed"
+                    )
+                    assert data["final_report"] == (
+                        report if task_id == "complete" else ""
+                    )
+                    assert data["status"] == "completed" or data["message"]
+                    reads = 0
                 result = await session.call_tool(
-                    "research_status", {"task_id": "lab:task-123"}
+                    "research_status", {"task_id": tagged_id}
                 )
                 assert result.isError is False
                 text = "\n".join(
@@ -409,10 +474,29 @@ async def test_research_status_recovered_report_keeps_backend_prefix(tmp_path):
                     if hasattr(item, "text")
                 )
 
-        assert "Task lab:task-123 status: completed" in text
-        assert "Recovered report body." in text
-        assert "- **Task ID**: lab:task-123" in text
-        assert "- **Task ID**: task-123" not in text
+        payload = result.structuredContent
+        assert payload is not None
+        assert json.loads(text) == payload
+        assert payload["task_id"] == tagged_id
+        assert json.loads(_render_mcp_result(result)) == payload
+        assert "test-key" not in text
+        if task_id == "complete":
+            assert payload["status"] == "completed"
+            assert payload["created_at"] == "2026-10-19T06:00:00Z"
+            assert payload["result"]["final_report"] == report
+            assert payload["result"]["task_id"] == tagged_id
+            assert payload["completed_at"] == "2026-10-19T06:05:00Z"
+            assert payload["result"]["citations"] == [citation]
+            tui = load_tui_module()
+            assert tui._render_mcp_result is _render_mcp_result
+            assert json.loads(tui._render_mcp_result(result)) == payload
+        else:
+            assert payload["result"] is None
+        if task_id in {"http-error", "recovery-error"}:
+            assert payload["error"]
+            assert payload["status"] == (
+                "error" if task_id == "http-error" else "completed"
+            )
     finally:
         server.shutdown()
         thread.join()

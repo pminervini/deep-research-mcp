@@ -80,7 +80,7 @@ graph TD
 
 The project is composed of four main layers:
 
-1.  **MCP Server (`mcp_server.py`)**: This is the entry point for external clients like Claude Code. It uses the `mcp.server.fastmcp` module from the official MCP Python SDK to expose the core research functionality as tools. It handles incoming requests, initializes one `DeepResearchAgent` per configured backend, and formats the results for the client. It includes three tools: `deep_research()`, `research_status()`, and `list_backends()`.
+1.  **MCP Server (`mcp_server.py`)**: This is the entry point for external clients like Claude Code. It uses the `mcp.server.fastmcp` module from the official MCP Python SDK to expose the core research functionality as tools. It handles incoming requests, initializes one `DeepResearchAgent` per configured backend, and returns structured results. It includes three tools: `deep_research()`, `research_status()`, and `list_backends()`.
 
 2.  **Orchestration (`agent.py`, `config.py`, `errors.py`)**: This layer contains the application-facing orchestration logic.
     *   `agent.py` owns the top-level research flow, completion callbacks, status lookup, and delegation to the configured backend. It does not embed provider-specific execution logic directly.
@@ -124,6 +124,7 @@ The project is composed of four main layers:
 -   **Purpose**: Implements the installed `deep-research-cli` console command.
 -   **Key Functionality**:
     -   Runs direct research or connects to a Streamable HTTP MCP server.
+    -   Direct-agent mode retains formatted reports and optional JSON output. MCP mode serializes the structured research/status object as JSON for display or research output files, preserving the nested recovery `result`.
     -   `--backend NAME` selects a `[backends.<name>]` table via `ResearchConfig.load(backend=...)`; `check_backend_flags()` rejects it alongside provider-scoped override flags. In MCP client mode the name is forwarded as the `backend` tool argument.
     -   Displays resolved configuration and checks task status. In direct mode `status` splits `<backend>:<id>` task IDs with `split_backend_task_id()` so IDs copied from MCP output reach the right backend; a prefix that disagrees with an explicit `--backend` is an error. In MCP client mode it applies `prefix_task_id_with_backend()` so a raw ID is sent as `<backend>:<id>`.
     -   Manages the independent OpenAI Codex login, status, and logout flows.
@@ -137,6 +138,7 @@ The project is composed of four main layers:
     -   `_status_config()`: Picks the backend for a direct-mode status check. A recognized `<backend>:` prefix selects that backend; a raw ID uses the backend the TUI was started with.
     -   `_check_mcp_status()`: Sends an explicit prefix unchanged and prefixes a raw ID with the startup backend via `prefix_task_id_with_backend()`.
     -   `_run_mcp_research()`: Forwards the startup backend as the `backend` tool argument.
+    -   MCP research/status output is displayed and saved as JSON, including nested recovered results. Direct-agent report formatting and its JSON toggle are unchanged.
 
 ### `src/deep_research_mcp/backends/__init__.py`
 
@@ -230,9 +232,9 @@ The project is composed of four main layers:
 -   **Purpose**: Implements the MCP (Model-Client Protocol) server using the `mcp.server.fastmcp` module from the official MCP Python SDK. Supports both stdio and HTTP (streaming) transports. Exposes the research functionality as tools that can be called by clients like Claude Code or any MCP‑compatible client.
 -   **Key Functionality**:
     -   `_ensure_research_agent(backend)`: Lazily builds and caches one `DeepResearchAgent` per backend name in the module-level `_agents` dict. `"default"` (or an empty name) is the `[research]` table; other names resolve to `[backends.<name>]` via `ResearchConfig.load(backend=...)`. The `--cancel-on-timeout` override and log level are applied per build and are server-wide.
-    -   `_tag_task_id()` / `_split_task_id()`: Task IDs returned to clients are `<backend>:<provider task id>` so `research_status` can route them to the backend that owns them without server-side state; un-prefixed IDs go to the default backend. The webhook callback payload sent by `DeepResearchAgent` still carries the raw provider ID.
-    -   `@mcp.tool() deep_research()`: The main tool that performs research. It picks the agent for the optional `backend` argument, calls its `research()` method, and formats the output for the client.
-    -   `@mcp.tool() research_status()`: A tool to check the status of a research task on whichever backend its ID names.
+    -   `_tag_task_id()` / `_split_task_id()`: Task IDs returned to clients are `<backend>:<provider task id>` so `research_status` can route them to the backend that owns them without server-side state; un-prefixed IDs go to the default backend and are prefixed in the response. Providers and the webhook callback payload sent by `DeepResearchAgent` still use raw provider IDs.
+    -   `@mcp.tool(..., structured_output=True) deep_research()`: Picks the agent for the optional `backend` argument and serializes the existing `ResearchResult` with `dataclasses.asdict()` to return `dict[str, Any]`, including structured failures from the existing result helpers. No MCP Markdown renderer or new response model is used.
+    -   `@mcp.tool(..., structured_output=True) research_status()`: Serializes the existing `ResearchTaskStatus` with `dataclasses.asdict()` and adds a `result` field containing a recovered research object or `null`.
     -   `@mcp.tool(structured_output=True) list_backends()`: Returns a `BackendListResult` containing typed `BackendInfo` entries, provider-specific presence flags, and structured configuration errors. The SDK exposes an output schema, structured content, and a JSON text representation. Discovery does not validate credentials or contact providers.
     -   `main()`: The entry point for running the MCP server. It loads and validates the default configuration and every named backend, then starts the server. Transport is selectable via `--transport {stdio,http}` with `--host`/`--port` for HTTP.
 
@@ -265,7 +267,10 @@ The project is composed of four main layers:
 
 ## MCP Server Methods
 
-The MCP server exposes three tools to clients like Claude Code. Research and status return Markdown/text; backend discovery returns a structured object.
+The MCP server exposes three tools to clients like Claude Code. All return
+structured objects directly in `structuredContent`, with matching SDK-generated
+JSON text in `content` and a declared `outputSchema`. Research and status reuse
+the existing normalized dataclasses rather than introducing new schema models.
 
 ### `deep_research()`
 
@@ -278,41 +283,10 @@ The MCP server exposes three tools to clients like Claude Code. Research and sta
 - `callback_url` (string, optional): Webhook URL notified with a completion payload after research finishes
 - `backend` (string, optional): Name of a `[backends.<name>]` table from `~/.deep_research`; empty selects the default `[research]` backend
 
-**Returns**: String containing formatted markdown report. The `Task ID` line has the form `<backend>:<provider task id>`.
-
-**Return Structure**:
-```
-# Research Report: [query]
-
-[final_report content]
-
-## Research Metadata
-- **Total research steps**: [number]
-- **Search queries executed**: [number]
-- **Citations found**: [number]
-- **Task ID**: [uuid]
-- **Execution time**: [seconds]
-
-## Citations
-1. [Title](URL)
-2. [Title](URL)
-...
-```
-
-**Example Successful Response Dictionary** (internal format before string formatting):
-```python
-{
-    "status": "completed",
-    "final_report": "# Introduction\nThis report examines...",
-    "citations": [
-        {"index": 1, "title": "Example Title", "url": "https://example.com"}
-    ],
-    "reasoning_steps": 5,
-    "search_queries": ["quantum computing 2024", "latest breakthroughs"],
-    "total_steps": 12,
-    "task_id": "abc123-def456-ghi789"
-}
-```
+**Returns**: `asdict(ResearchResult)`, including structured failures.
+`final_report` preserves provider text; MCP adds no report formatting.
+See [Research and status output](README.md#research-and-status-output) for the
+canonical contract and migration instructions.
 
 ### `research_status()`
 
@@ -321,27 +295,11 @@ The MCP server exposes three tools to clients like Claude Code. Research and sta
 **Arguments**:
 - `task_id` (string, required): Task ID returned by `deep_research()`, in the form `<backend>:<provider task id>`; an un-prefixed ID is looked up on the default backend
 
-**Returns**: String containing task status information. When the task is completed and the provider supports result retrieval (OpenAI Responses API, Gemini Interactions API, Tavily Research API, or Gnosis with shared output), the full rendered research report is appended.
-
-**Return Structure**:
-```
-Task [task_id] status: [status]
-Created at: [timestamp]
-Completed at: [timestamp]  # Only if completed
-
-# Research Report (recovered): [task_id]  # Only if completed
-...full report with metadata and citations...
-```
-
-**Example Response Dictionary** (internal format):
-```python
-{
-    "task_id": "abc123-def456-ghi789",
-    "status": "completed",  # or "running", "failed", "error"
-    "created_at": "2025-01-15T10:30:00Z",
-    "completed_at": "2025-01-15T10:35:00Z"
-}
-```
+**Returns**: `asdict(ResearchTaskStatus)` plus `result`: a recovered research
+object or `null`. Recovery errors preserve the provider status and set `error`.
+OpenAI Responses, Gemini, Tavily, and Gnosis with shared output support recovery.
+See the canonical [contract](README.md#research-and-status-output) for fields,
+task-ID routing, and error semantics.
 
 ### `list_backends()`
 

@@ -21,12 +21,10 @@ USAGE:
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
@@ -55,31 +53,18 @@ from deep_research_mcp import (
     DeepResearchAgent,
     ResearchConfig,
     ResearchError,
-    ResearchResult,
+)
+from deep_research_mcp.cli import (
+    DEFAULT_SYSTEM_PROMPT,
+    _render_mcp_result,
+    format_report,
+    format_result_json,
 )
 from deep_research_mcp.config import (
     DEFAULT_BACKEND_NAME,
     prefix_task_id_with_backend,
     split_backend_task_id,
 )
-
-DEFAULT_SYSTEM_PROMPT = """
-You are a professional researcher preparing a structured, data-driven report.
-Your task is to analyze the research question the user poses.
-
-Do:
-- Focus on data-rich insights: include specific figures, trends, statistics,
-  and measurable outcomes.
-- When appropriate, summarize data in a way that could be turned into charts
-  or tables, and call this out in the response.
-- Prioritize reliable, up-to-date sources: peer-reviewed research, official
-  organizations, regulatory agencies, or authoritative reports.
-- Include inline citations and return all source metadata.
-
-Be analytical, avoid generalities, and ensure that each section supports
-data-backed reasoning.
-""".strip()
-
 
 CODEX_THEME = Theme(
     name="codex",
@@ -111,60 +96,17 @@ def get_provider_defaults(
     provider: str, api_style: str = "responses"
 ) -> ProviderDefaults:
     """Return provider-specific default model and base URL."""
-    if provider == "openai":
-        if api_style == "chat_completions":
-            return ProviderDefaults(
-                provider=provider,
-                api_style=api_style,
-                model="gpt-6-luna",
-                base_url="https://api.openai.com/v1",
-            )
-        return ProviderDefaults(
-            provider=provider,
-            api_style="responses",
-            model="gpt-6-sol",
-            base_url="https://api.openai.com/v1",
-        )
-    if provider == "openai-codex":
-        return ProviderDefaults(
-            provider=provider,
-            api_style="responses",
-            model="auto",
-            base_url="https://chatgpt.com/backend-api/codex",
-        )
-    if provider == "dr-tulu":
-        return ProviderDefaults(
-            provider="dr-tulu",
-            api_style="responses",
-            model="dr-tulu",
-            base_url="http://localhost:8080/",
-        )
-    if provider == "gemini":
-        return ProviderDefaults(
-            provider=provider,
-            api_style="responses",
-            model="deep-research-preview-04-2026",
-            base_url="https://generativelanguage.googleapis.com",
-        )
-    if provider == "tavily":
-        return ProviderDefaults(
-            provider=provider,
-            api_style="responses",
-            model="mini",
-            base_url="https://api.tavily.com",
-        )
-    if provider == "gnosis":
-        return ProviderDefaults(
-            provider=provider,
-            api_style="responses",
-            model="gnosis",
-            base_url="http://127.0.0.1:8089",
-        )
+    config = ResearchConfig.from_env(
+        {
+            "RESEARCH_PROVIDER": provider,
+            "RESEARCH_API_STYLE": api_style if provider == "openai" else "responses",
+        }
+    )
     return ProviderDefaults(
-        provider="openai",
-        api_style="responses",
-        model="gpt-6-luna",
-        base_url="https://api.openai.com/v1",
+        provider=config.provider,
+        api_style=config.api_style,
+        model=config.model,
+        base_url=config.base_url or "",
     )
 
 
@@ -890,9 +832,9 @@ class DeepResearchTUI(App):
 
             if result.status == "completed":
                 if self._get_json_output():
-                    output = self._format_result_json(result)
+                    output = format_result_json(result)
                 else:
-                    output = self._format_report(result)
+                    output = format_report(result)
                 self._set_output(output)
                 self._set_status("Research completed")
                 self.notify("Research completed successfully", severity="information")
@@ -947,7 +889,7 @@ class DeepResearchTUI(App):
                         },
                     )
 
-                    text = self._render_mcp_result(result)
+                    text = _render_mcp_result(result)
                     self._set_output(text)
 
                     if result.isError:
@@ -1040,7 +982,7 @@ class DeepResearchTUI(App):
                         {"task_id": mcp_task_id},
                     )
 
-                    text = self._render_mcp_result(result)
+                    text = _render_mcp_result(result)
                     self._set_output(text)
 
                     if result.isError:
@@ -1075,63 +1017,6 @@ class DeepResearchTUI(App):
         except Exception as e:
             self._set_status(f"Save error: {e}")
             self.notify(f"Save failed: {e}", severity="error")
-
-    def _format_report(self, result: ResearchResult) -> str:
-        """Format a ResearchResult as a human-readable report."""
-        parts: list[str] = []
-        parts.append("=" * 60)
-        parts.append("RESEARCH REPORT")
-        parts.append("=" * 60)
-
-        if result.task_id:
-            parts.append(f"Task ID: {result.task_id}")
-        if result.total_steps:
-            parts.append(f"Total steps: {result.total_steps}")
-        if result.search_queries:
-            parts.append(f"Search queries: {len(result.search_queries)}")
-        if result.citations:
-            parts.append(f"Citations: {len(result.citations)}")
-        if isinstance(result.execution_time, (int, float)):
-            parts.append(f"Execution time: {result.execution_time:.2f}s")
-        if result.message:
-            parts.append(f"Provider note: {result.message}")
-
-        parts.append("")
-        parts.append(result.final_report)
-
-        if result.citations:
-            parts.append("")
-            parts.append("=" * 60)
-            parts.append("CITATIONS")
-            parts.append("=" * 60)
-            for citation in result.citations:
-                parts.append(f"{citation.index}. [{citation.title}]({citation.url})")
-
-        return "\n".join(parts)
-
-    def _format_result_json(self, result: ResearchResult) -> str:
-        """Format a ResearchResult as JSON."""
-        data = asdict(result)
-        return json.dumps(data, indent=2, ensure_ascii=False)
-
-    def _render_mcp_result(self, result: Any) -> str:
-        """Extract text from an MCP CallToolResult."""
-        from mcp import types
-
-        if result.structuredContent is not None:
-            sc = result.structuredContent
-            if isinstance(sc, dict) and "result" in sc:
-                val = sc.get("result")
-                return val if isinstance(val, str) else str(val)
-            return str(sc)
-
-        parts: list[str] = []
-        for item in result.content or []:
-            if isinstance(item, types.TextContent):
-                parts.append(item.text)
-            else:
-                parts.append(str(item))
-        return "\n".join(parts)
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -560,14 +560,19 @@ context needed to answer it. Use `system_instructions` for research methodology,
 source, scope, and output requirements. Conversational hosts should ask any
 necessary follow-up questions before calling the tool.
 
-The returned task ID has the form `<backend>:<provider task id>`, for example
-`default:resp_abc123`. Pass it back to `research_status` unchanged.
+Read the JSON object directly from `response.structuredContent`, or JSON-decode
+the matching text content. Read the provider's unmodified text in `final_report`;
+inspect `status`, `message`, and `error_code` for failures. Pass an available
+`<backend>:<provider task id>` back to `research_status` unchanged.
+See the canonical [JSON contract](../../README.md#research-and-status-output).
 
 ### `research_status`
 
 Use to poll a known task ID and recover a completed report for OpenAI Responses,
-Gemini, Tavily, or Gnosis with its shared output mount. An un-prefixed MCP ID is looked up on the default backend.
-Recovered reports retain the backend-prefixed task ID.
+Gemini, Tavily, or Gnosis with its shared output mount. An un-prefixed MCP ID is
+looked up on the default backend. Read a recovered report from
+`response.structuredContent["result"]["final_report"]` when `result` is not `null`.
+Inspect `error` even when status is `completed`: report recovery can fail.
 
 Capture the tagged ID from MCP progress notifications as soon as the task
 starts. If the original call times out, recover with that ID before launching
@@ -603,9 +608,12 @@ has no per-call provider, model, or reasoning-effort override.
 
 ## CLI As MCP Client
 
-When you pass `--server-url`, the CLI becomes an MCP client instead of creating `DeepResearchAgent` itself.
+When you pass `--server-url`, the CLI becomes an MCP client instead of creating
+`DeepResearchAgent` itself. MCP `research` and `status` output is JSON without
+`--json`, including the nested recovery `result`. The TUI also displays and saves
+JSON in MCP mode; direct-agent output is unchanged.
 
-### Live CLI-over-MCP Example
+### CLI-over-MCP Example
 
 Command:
 
@@ -615,7 +623,7 @@ uv run deep-research-cli \
   --server-url http://127.0.0.1:8081/mcp \
   --system-prompt "Answer in exactly 2 bullets and one takeaway sentence. Keep the whole answer under 140 words. Prefer technical sources." \
   --no-analysis \
-  --output-file mcp-report.md
+  --output-file mcp-result.json
 ```
 
 Observed client-side progress output:
@@ -626,53 +634,32 @@ Observed client-side progress output:
 [progress] 100.0% Research completed successfully
 ```
 
-Observed report excerpt:
-
-```text
-# Research Report: Why can flow matching models use fewer inference steps than diffusion models?
-
-# Inference Efficiency of Flow Matching
-
-* **Optimal Transport Trajectories:** Unlike diffusion models that reverse stochastic, highly curved random walks, flow matching models learn a continuous, deterministic vector field ...
-* **Reduced Discretization Error:** Because these straight flow trajectories possess near-minimal curvature ...
-
-**Takeaway:** Flow matching models require significantly fewer inference steps because they replace tortuous stochastic diffusion processes with highly rectified, deterministic ODEs ...
-
-## Research Metadata
-- **Total research steps**: 1
-- **Search queries executed**: 0
-- **Citations found**: 0
-- **Task ID**: <mcp_task_id>
-- **Execution time**: 88.10 seconds
-```
+The saved file contains the research JSON object, with the provider's answer
+in `final_report` and metadata in separate fields. Progress notifications are
+separate from that result.
 
 ## Python Speaking MCP Directly
 
-### Live `research_status` Example
+### `research_status` Example
 
 Code:
 
 ```python
 import asyncio
+import json
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 
-TASK_ID = "YOUR_TASK_ID"
+TASK_ID = "default:YOUR_PROVIDER_TASK_ID"
 
 async def main() -> None:
     async with streamablehttp_client("http://127.0.0.1:8081/mcp") as (read_stream, write_stream, _):
         async with ClientSession(read_stream, write_stream) as session:
             await session.initialize()
             result = await session.call_tool("research_status", {"task_id": TASK_ID})
-            print(result.structuredContent)
+            print(json.dumps(result.structuredContent, ensure_ascii=False, indent=2))
 
 asyncio.run(main())
-```
-
-Observed output:
-
-```text
-{'result': 'Task YOUR_TASK_ID status: completed\nCreated at: <created_at>\nCompleted at: <completed_at>'}
 ```
 
 ## Backend-Specific Notes

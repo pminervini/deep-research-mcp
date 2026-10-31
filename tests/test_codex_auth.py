@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
@@ -23,24 +22,7 @@ from deep_research_mcp.codex_auth import (
     CodexAuthManager,
     CodexTokens,
 )
-
-
-def _jwt(*, expires_at: float, account_id: str = "account-123") -> str:
-    header = _b64_json({"alg": "none", "typ": "JWT"})
-    payload = _b64_json(
-        {
-            "exp": expires_at,
-            "https://api.openai.com/auth": {"chatgpt_account_id": account_id},
-        }
-    )
-    return f"{header}.{payload}."
-
-
-def _b64_json(value: dict[str, object]) -> str:
-    encoded = base64.urlsafe_b64encode(
-        json.dumps(value, separators=(",", ":")).encode()
-    )
-    return encoded.decode().rstrip("=")
+from tests.codex_test_utils import _jwt
 
 
 @pytest.fixture

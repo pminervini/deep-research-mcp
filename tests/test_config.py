@@ -119,97 +119,31 @@ def test_invalid_reasoning_effort_rejected(provider: str, effort: str):
 
 def test_api_style_from_env():
     """Test loading api_style from RESEARCH_API_STYLE env var"""
-    old_api_style = os.environ.get("RESEARCH_API_STYLE")
-    old_model = os.environ.get("RESEARCH_MODEL")
-
-    os.environ["RESEARCH_API_STYLE"] = "chat_completions"
-    os.environ["RESEARCH_MODEL"] = "gpt-5-mini"
-
-    try:
-        config = ResearchConfig.from_env()
-        assert config.api_style == "chat_completions"
-    finally:
-        if old_api_style:
-            os.environ["RESEARCH_API_STYLE"] = old_api_style
-        else:
-            os.environ.pop("RESEARCH_API_STYLE", None)
-
-        if old_model:
-            os.environ["RESEARCH_MODEL"] = old_model
-        else:
-            os.environ.pop("RESEARCH_MODEL", None)
+    config = ResearchConfig.from_env(
+        {"RESEARCH_API_STYLE": "chat_completions", "RESEARCH_MODEL": "gpt-5-mini"}
+    )
+    assert config.api_style == "chat_completions"
 
 
 def test_api_style_invalid_value_rejected():
     """Test that invalid api_style values are rejected"""
-    old_api_style = os.environ.get("RESEARCH_API_STYLE")
-
-    os.environ["RESEARCH_API_STYLE"] = "invalid_value"
-
-    try:
-        with pytest.raises(ConfigurationError, match="Invalid api_style"):
-            ResearchConfig.from_env()
-    finally:
-        if old_api_style:
-            os.environ["RESEARCH_API_STYLE"] = old_api_style
-        else:
-            os.environ.pop("RESEARCH_API_STYLE", None)
+    with pytest.raises(ConfigurationError, match="Invalid api_style"):
+        ResearchConfig.from_env({"RESEARCH_API_STYLE": "invalid_value"})
 
 
 def test_api_style_chat_completions_default_model():
     """Test that chat_completions mode defaults to gpt-6-luna for openai provider"""
-    old_api_style = os.environ.get("RESEARCH_API_STYLE")
-    old_model = os.environ.get("RESEARCH_MODEL")
-
-    os.environ["RESEARCH_API_STYLE"] = "chat_completions"
-    os.environ.pop("RESEARCH_MODEL", None)
-
-    try:
-        config = ResearchConfig.from_env()
-        assert config.api_style == "chat_completions"
-        assert config.model == "gpt-6-luna"
-    finally:
-        if old_api_style:
-            os.environ["RESEARCH_API_STYLE"] = old_api_style
-        else:
-            os.environ.pop("RESEARCH_API_STYLE", None)
-
-        if old_model:
-            os.environ["RESEARCH_MODEL"] = old_model
-        else:
-            os.environ.pop("RESEARCH_MODEL", None)
+    config = ResearchConfig.from_env({"RESEARCH_API_STYLE": "chat_completions"})
+    assert config.api_style == "chat_completions"
+    assert config.model == "gpt-6-luna"
 
 
 def test_gemini_provider_defaults():
     """Test Gemini provider default model and endpoint resolution."""
-    old_provider = os.environ.get("RESEARCH_PROVIDER")
-    old_model = os.environ.get("RESEARCH_MODEL")
-    old_base_url = os.environ.get("RESEARCH_BASE_URL")
-
-    os.environ["RESEARCH_PROVIDER"] = "gemini"
-    os.environ.pop("RESEARCH_MODEL", None)
-    os.environ.pop("RESEARCH_BASE_URL", None)
-
-    try:
-        config = ResearchConfig.from_env()
-        assert config.provider == "gemini"
-        assert config.model == "deep-research-preview-04-2026"
-        assert config.base_url == "https://generativelanguage.googleapis.com"
-    finally:
-        if old_provider:
-            os.environ["RESEARCH_PROVIDER"] = old_provider
-        else:
-            os.environ.pop("RESEARCH_PROVIDER", None)
-
-        if old_model:
-            os.environ["RESEARCH_MODEL"] = old_model
-        else:
-            os.environ.pop("RESEARCH_MODEL", None)
-
-        if old_base_url:
-            os.environ["RESEARCH_BASE_URL"] = old_base_url
-        else:
-            os.environ.pop("RESEARCH_BASE_URL", None)
+    config = ResearchConfig.from_env({"RESEARCH_PROVIDER": "gemini"})
+    assert config.provider == "gemini"
+    assert config.model == "deep-research-preview-04-2026"
+    assert config.base_url == "https://generativelanguage.googleapis.com"
 
 
 def test_tavily_provider_defaults_and_key_precedence():
@@ -230,34 +164,10 @@ def test_tavily_provider_defaults_and_key_precedence():
 
 def test_dr_tulu_provider_defaults():
     """Test Dr Tulu provider default model and endpoint resolution."""
-    old_provider = os.environ.get("RESEARCH_PROVIDER")
-    old_model = os.environ.get("RESEARCH_MODEL")
-    old_base_url = os.environ.get("RESEARCH_BASE_URL")
-
-    os.environ["RESEARCH_PROVIDER"] = "dr-tulu"
-    os.environ.pop("RESEARCH_MODEL", None)
-    os.environ.pop("RESEARCH_BASE_URL", None)
-
-    try:
-        config = ResearchConfig.from_env()
-        assert config.provider == "dr-tulu"
-        assert config.model == "dr-tulu"
-        assert config.base_url == "http://localhost:8080/"
-    finally:
-        if old_provider:
-            os.environ["RESEARCH_PROVIDER"] = old_provider
-        else:
-            os.environ.pop("RESEARCH_PROVIDER", None)
-
-        if old_model:
-            os.environ["RESEARCH_MODEL"] = old_model
-        else:
-            os.environ.pop("RESEARCH_MODEL", None)
-
-        if old_base_url:
-            os.environ["RESEARCH_BASE_URL"] = old_base_url
-        else:
-            os.environ.pop("RESEARCH_BASE_URL", None)
+    config = ResearchConfig.from_env({"RESEARCH_PROVIDER": "dr-tulu"})
+    assert config.provider == "dr-tulu"
+    assert config.model == "dr-tulu"
+    assert config.base_url == "http://localhost:8080/"
 
 
 def test_openai_codex_provider_uses_fixed_defaults():
@@ -291,67 +201,14 @@ def test_openai_codex_rejects_direct_custom_endpoint():
 
 def test_gemini_api_key_aliases():
     """Test Gemini provider API key aliases."""
-    old_provider = os.environ.get("RESEARCH_PROVIDER")
-    old_research_api_key = os.environ.get("RESEARCH_API_KEY")
-    old_gemini_api_key = os.environ.get("GEMINI_API_KEY")
-    old_google_api_key = os.environ.get("GOOGLE_API_KEY")
-
-    os.environ["RESEARCH_PROVIDER"] = "gemini"
-    os.environ.pop("RESEARCH_API_KEY", None)
-    os.environ["GEMINI_API_KEY"] = "gemini-key"
-    os.environ.pop("GOOGLE_API_KEY", None)
-
-    try:
-        config = ResearchConfig.from_env()
-        assert config.api_key == "gemini-key"
-    finally:
-        if old_provider:
-            os.environ["RESEARCH_PROVIDER"] = old_provider
-        else:
-            os.environ.pop("RESEARCH_PROVIDER", None)
-
-        if old_research_api_key:
-            os.environ["RESEARCH_API_KEY"] = old_research_api_key
-        else:
-            os.environ.pop("RESEARCH_API_KEY", None)
-
-        if old_gemini_api_key:
-            os.environ["GEMINI_API_KEY"] = old_gemini_api_key
-        else:
-            os.environ.pop("GEMINI_API_KEY", None)
-
-        if old_google_api_key:
-            os.environ["GOOGLE_API_KEY"] = old_google_api_key
-        else:
-            os.environ.pop("GOOGLE_API_KEY", None)
+    config = ResearchConfig.from_env(
+        {"RESEARCH_PROVIDER": "gemini", "GEMINI_API_KEY": "gemini-key"}
+    )
+    assert config.api_key == "gemini-key"
 
 
 def test_provider_alias_env_var():
     """Test backward-compatible PROVIDER env var support."""
-    old_provider = os.environ.get("PROVIDER")
-    old_research_provider = os.environ.get("RESEARCH_PROVIDER")
-    old_model = os.environ.get("RESEARCH_MODEL")
-
-    os.environ["PROVIDER"] = "gemini"
-    os.environ.pop("RESEARCH_PROVIDER", None)
-    os.environ.pop("RESEARCH_MODEL", None)
-
-    try:
-        config = ResearchConfig.from_env()
-        assert config.provider == "gemini"
-        assert config.model == "deep-research-preview-04-2026"
-    finally:
-        if old_provider:
-            os.environ["PROVIDER"] = old_provider
-        else:
-            os.environ.pop("PROVIDER", None)
-
-        if old_research_provider:
-            os.environ["RESEARCH_PROVIDER"] = old_research_provider
-        else:
-            os.environ.pop("RESEARCH_PROVIDER", None)
-
-        if old_model:
-            os.environ["RESEARCH_MODEL"] = old_model
-        else:
-            os.environ.pop("RESEARCH_MODEL", None)
+    config = ResearchConfig.from_env({"PROVIDER": "gemini"})
+    assert config.provider == "gemini"
+    assert config.model == "deep-research-preview-04-2026"

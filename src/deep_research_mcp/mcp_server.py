@@ -44,8 +44,9 @@ import argparse
 import asyncio
 import logging
 from contextlib import suppress
+from dataclasses import asdict
 from pathlib import Path
-from typing import Annotated, Literal, cast
+from typing import Annotated, Any, Literal, cast
 
 from mcp.server.fastmcp import Context, FastMCP
 
@@ -60,7 +61,12 @@ from deep_research_mcp.config import (
     split_backend_task_id,
 )
 from deep_research_mcp.errors import ResearchError
-from deep_research_mcp.results import BackendInfo, BackendListResult, ResearchResult
+from deep_research_mcp.results import (
+    BackendInfo,
+    BackendListResult,
+    ResearchResult,
+    ResearchTaskStatus,
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -182,71 +188,6 @@ async def _safe_report_progress(
         logger.debug("Failed to report progress", exc_info=True)
 
 
-def _render_citations(result: ResearchResult) -> str:
-    """Render citations as a markdown list.
-
-    When the title is just the URL (e.g. Gemini grounding redirects carry no
-    title), render the URL once instead of duplicating it as link text.
-    """
-    return "\n".join(
-        (
-            f"{citation.index}. <{citation.url}>"
-            if citation.title == citation.url
-            else f"{citation.index}. [{citation.title}]({citation.url})"
-        )
-        for citation in result.citations
-    )
-
-
-def _render_research_markdown(
-    *,
-    title: str,
-    result: ResearchResult,
-    intro_lines: list[str] | None = None,
-    extra_metadata_lines: list[str] | None = None,
-) -> str:
-    """Render a research result into the MCP markdown response format."""
-    metadata_lines = [
-        f"- **Total research steps**: {result.total_steps}",
-        f"- **Search queries executed**: {len(result.search_queries)}",
-        f"- **Citations found**: {len(result.citations)}",
-        f"- **Task ID**: {result.task_id}",
-    ]
-
-    if extra_metadata_lines:
-        metadata_lines.extend(extra_metadata_lines)
-
-    if isinstance(result.execution_time, (int, float)):
-        metadata_lines.append(
-            f"- **Execution time**: {result.execution_time:.2f} seconds"
-        )
-    if result.message:
-        metadata_lines.append(f"- **Provider note**: {result.message}")
-
-    markdown_lines = [f"# {title}", ""]
-
-    if intro_lines:
-        markdown_lines.extend(intro_lines)
-        markdown_lines.append("")
-
-    markdown_lines.extend(
-        [
-            result.final_report,
-            "",
-            "## Research Metadata",
-            *metadata_lines,
-            "",
-            "## Citations",
-        ]
-    )
-
-    citations = _render_citations(result)
-    if citations:
-        markdown_lines.append(citations)
-
-    return "\n".join(markdown_lines)
-
-
 async def _run_research_with_progress(
     *,
     agent: DeepResearchAgent,
@@ -322,7 +263,7 @@ async def _run_research_with_progress(
 
 
 # Define the actual async functions that will be wrapped by FastMCP
-@mcp.tool(meta=RESEARCH_TOOL_META)
+@mcp.tool(meta=RESEARCH_TOOL_META, structured_output=True)
 async def deep_research(
     query: Annotated[
         str,
@@ -348,7 +289,7 @@ async def deep_research(
         "Name of a backend declared in the server's [backends] config table. Leave empty for the default backend. Use list_backends to see what is available.",
     ] = "",
     ctx: Context | None = None,
-) -> str:
+) -> dict[str, Any]:
     """
     Performs autonomous deep research using the configured provider with web search and analysis capabilities.
 
@@ -364,14 +305,19 @@ async def deep_research(
     - Complex topics needing multiple source synthesis
     - Academic-style research with proper citations
 
-    **Returns:** Structured markdown report with citations, metadata, and research insights.
+    **Returns:** A structured research result with status, task_id, final_report,
+    citations, reasoning_steps, search_queries, total_steps, message, error_code,
+    and execution_time. Provider-written report text is preserved unchanged.
+    Failures use the same fields with status='failed' or 'error'.
 
     **Note:** Uses provider-native research backends - monitor costs as research can generate substantial tokens.
     """
     try:
         agent = _ensure_research_agent(backend)
     except Exception as e:
-        return f"Failed to initialize research agent: {str(e)}"
+        return asdict(
+            ResearchResult.error(message=f"Failed to initialize research agent: {e}")
+        )
 
     try:
         result = await _run_research_with_progress(
@@ -391,38 +337,30 @@ async def deep_research(
                     total=1,
                     message="Research completed successfully",
                 )
-            return _render_research_markdown(
-                title=f"Research Report: {query}",
-                result=result,
-            )
-
-        failure_message = result.message or "Unknown error"
-        if result.task_id:
-            failure_message = f"{failure_message} (task ID: {result.task_id})"
-        if ctx:
+        elif ctx:
             await _safe_report_progress(
                 ctx,
                 progress=1,
                 total=1,
-                message=f"Research failed: {failure_message}",
+                message=f"Research failed: {result.message or 'Unknown error'}",
             )
-        return f"Research failed: {failure_message}"
+        return asdict(result)
 
     except ResearchError as e:
         logger.error(f"Research error: {e}")
-        return f"Research error: {str(e)}"
+        return asdict(ResearchResult.error(message=f"Research error: {e}"))
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
-        return f"Unexpected error: {str(e)}"
+        return asdict(ResearchResult.error(message=f"Unexpected error: {e}"))
 
 
-@mcp.tool(meta=RESEARCH_TOOL_META)
+@mcp.tool(meta=RESEARCH_TOOL_META, structured_output=True)
 async def research_status(
     task_id: Annotated[
         str,
         "Research task ID returned by deep_research tool, passed back verbatim. Format: '<backend>:<provider task id>' like 'default:abc123-def456-ghi789'; an un-prefixed ID is looked up on the default backend.",
     ],
-) -> str:
+) -> dict[str, Any]:
     """
     Check the current status and progress of a running research task.
 
@@ -431,55 +369,46 @@ async def research_status(
     - Want to check if a task completed successfully
     - Need to recover the report from a task whose original call was lost
 
-    **Returns:** Task status ('running', 'completed', 'failed') with timestamps.
-    When the task is completed, the full research report is also returned.
+    **Returns:** A structured object with task_id, status, created_at,
+    completed_at, message, error, and result. Task IDs are backend-prefixed.
+    The result is a full research result when recovered, otherwise null.
+    Status/initialization failures use status='error'; a recovery failure
+    preserves the provider status and sets error. Report text is not reformatted.
     """
     try:
         backend, raw_task_id = _split_task_id(task_id)
+        task_id = _tag_task_id(backend, raw_task_id)
         agent = _ensure_research_agent(backend)
     except Exception as e:
-        return f"Failed to initialize research agent: {str(e)}"
+        return {
+            **asdict(ResearchTaskStatus.error_status(task_id=task_id, error=str(e))),
+            "result": None,
+        }
 
     try:
         status = await agent.get_task_status(raw_task_id)
-
-        if status.status == "error":
-            return f"Error checking status: {status.error or 'Unknown error'}"
-
-        result = f"Task {task_id} status: {status.status}"
-
-        if status.created_at:
-            result += f"\nCreated at: {status.created_at}"
-
-        if status.completed_at:
-            result += f"\nCompleted at: {status.completed_at}"
-
-        if status.message:
-            result += f"\nMessage: {status.message}"
-
+        status.task_id = task_id
+        result: ResearchResult | None = None
         if status.status == "completed":
             try:
                 task_result = await agent.get_task_result(raw_task_id)
             except Exception as error:
                 logger.error(f"Error fetching result for task {task_id}: {error}")
+                status.error = str(error)
                 task_result = None
             if task_result and task_result.is_completed:
-                # Backends return the raw provider ID; restore the backend
-                # prefix so the recovered report's ID routes back correctly.
                 task_result.task_id = _tag_task_id(
                     backend, task_result.task_id or raw_task_id
                 )
-                report = _render_research_markdown(
-                    title=f"Research Report (recovered): {task_id}",
-                    result=task_result,
-                )
-                return f"{result}\n\n{report}"
-
-        return result
+                result = task_result
+        return {**asdict(status), "result": asdict(result) if result else None}
 
     except Exception as e:
         logger.error(f"Error checking status: {e}")
-        return f"Error checking status: {str(e)}"
+        return {
+            **asdict(ResearchTaskStatus.error_status(task_id=task_id, error=str(e))),
+            "result": None,
+        }
 
 
 @mcp.tool(structured_output=True)

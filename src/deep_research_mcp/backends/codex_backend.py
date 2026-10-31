@@ -21,6 +21,7 @@ from deep_research_mcp.codex_auth import (
     CodexAuthError,
     CodexAuthManager,
     CodexTokens,
+    _response_error_detail,
 )
 from deep_research_mcp.config import OPENAI_CODEX_BASE_URL, ResearchConfig
 from deep_research_mcp.errors import ConfigurationError, ResearchError
@@ -498,7 +499,7 @@ class CodexResearchBackend(ResearchBackend):
     def _raise_http_error(response: httpx.Response, action: str) -> None:
         if not response.is_error:
             return
-        detail = _http_error_detail(response)
+        detail = _response_error_detail(response)
         suffix = f": {detail}" if detail else ""
         if response.status_code == 403:
             raise CodexBackendError(
@@ -559,19 +560,6 @@ def _event_error_message(event: dict[str, Any]) -> str:
     if isinstance(error, dict):
         return str(error.get("message") or error.get("code") or "Codex stream error")
     return str(event.get("message") or error or "Codex stream error")
-
-
-def _http_error_detail(response: httpx.Response) -> str:
-    try:
-        data = response.json()
-    except json.JSONDecodeError:
-        return response.text.strip()[:300]
-    if not isinstance(data, dict):
-        return ""
-    error = data.get("error")
-    if isinstance(error, dict):
-        return str(error.get("message") or error.get("code") or "")
-    return str(error or data.get("message") or "")
 
 
 def _extract_text_citations(text: str) -> list[ResearchCitation]:

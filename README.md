@@ -791,6 +791,30 @@ Notes:
   backends require the TOML file; an environment-only deployment exposes just
   the default backend. Task IDs are returned as `<backend>:<id>`.
 
+#### Research and status output
+
+`deep_research` and `research_status` return JSON objects directly in MCP
+`structuredContent`, with matching SDK-generated JSON text in `content`.
+
+- `deep_research`: `status`, `task_id`, `final_report`, `citations` (each with
+  `index`, `title`, `url`), `reasoning_steps`, `search_queries`, `total_steps`,
+  `message`, `error_code`, and `execution_time`.
+- `research_status`: `task_id`, `status`, `created_at`, `completed_at`, `message`,
+  `error`, and `result`. `result` is `null` unless a completed report is recovered;
+  then it contains the full research object. A recovery exception preserves the
+  provider status and sets `error`; completion alone does not guarantee recovery.
+
+Available task IDs use `<backend>:<id>`; providers receive raw IDs. A research
+result without an ID has `task_id: null`. If initialization prevents routing,
+status errors retain the supplied ID. Timestamps retain provider-specific values.
+Inspect `status`, `message`/`error`, and `error_code` for failures, not prose
+prefixes or only MCP's `isError` flag.
+
+Migration: read the object directly, without a string-valued `result` wrapper.
+Report text is in `final_report` (or `result.final_report` after recovery).
+Provider-written Markdown is unchanged; MCP-added report formatting is removed.
+Restart an already-running server to load the updated implementation and schemas.
+
 #### Backend discovery output
 
 `list_backends()` takes no arguments and returns an object with a `backends`
@@ -837,9 +861,7 @@ backends are still listed. Successful error fields are `null`.
 
 This replaces the previous newline-delimited text return value. Clients should
 read `result.structuredContent["backends"]`; text-only clients can JSON-decode
-the text content instead of parsing the old lines. `deep_research` and
-`research_status` retain their existing Markdown/text results. Restart an
-already-running server to load the new implementation and tool schema.
+the text content instead of parsing the old lines.
 
 #### OAuth authentication for HTTP
 
@@ -959,7 +981,7 @@ unset; it applies to OpenAI and Codex direct-agent mode.
 
 - In `mcp` mode, set `MCP Server URL` to a running Streamable HTTP endpoint such as `http://127.0.0.1:8080/mcp`.
 - The TUI reuses the same config-loading behavior as `deep-research-cli`, so `~/.deep_research` and any startup overrides still apply.
-- Direct-agent JSON rendering is available through the `JSON Output` toggle; MCP mode saves the textual tool response exactly as returned by the server.
+- Direct-agent formatted reports and the `JSON Output` toggle are unchanged. MCP mode displays and saves the structured research/status object as JSON, including a recovered report under `result`; it does not unwrap that field as report text.
 - The current layout is designed for terminals at least 100 columns wide and 28 rows tall.
 
 #### Quick Start
@@ -1191,7 +1213,9 @@ Ok
 **`research QUERY --server-url URL`** -- use MCP client mode.
 
 Instead of running the agent directly, connect to a running Deep Research MCP
-server over Streamable HTTP.
+server over Streamable HTTP. Both `research` and `status` display JSON in MCP
+mode without requiring `--json`; `research --output-file` saves that JSON object.
+Direct-agent mode keeps its formatted reports and optional `--json` output.
 
 ```bash
 # First, start the MCP server in another terminal:
@@ -1199,7 +1223,7 @@ uv run deep-research-mcp --transport http --host 127.0.0.1 --port 8080
 
 # Then run queries against it:
 uv run deep-research-cli research "AI trends" \
-  --server-url http://127.0.0.1:8080/mcp
+  --server-url http://127.0.0.1:8080/mcp --output-file research.json
 ```
 
 **`status TASK_ID`** -- check the status of a running research task.

@@ -10,6 +10,7 @@ drive it with the real CLI and TUI client code paths.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from pathlib import Path
 import socket
@@ -101,8 +102,11 @@ def test_cli_mcp_status_raw_id_uses_backend_flag(mcp_server_url, capsys):
     assert asyncio.run(cmd_status(args)) == 0
 
     output = capsys.readouterr().out
-    assert "Task lab:task-42 status: unknown" in output
-    assert CODEX_MESSAGE in output
+    payload = json.loads(output[output.index("{") :])
+    assert payload["task_id"] == "lab:task-42"
+    assert payload["status"] == "unknown"
+    assert CODEX_MESSAGE in payload["message"]
+    assert payload["result"] is None
 
 
 def test_cli_mcp_status_without_backend_uses_server_default(mcp_server_url, capsys):
@@ -114,8 +118,10 @@ def test_cli_mcp_status_without_backend_uses_server_default(mcp_server_url, caps
     assert asyncio.run(cmd_status(args)) == 0
 
     output = capsys.readouterr().out
-    assert "Task task-42 status: unknown" in output
-    assert CODEX_MESSAGE not in output
+    payload = json.loads(output[output.index("{") :])
+    assert payload["task_id"] == "default:task-42"
+    assert payload["status"] == "unknown"
+    assert CODEX_MESSAGE not in payload["message"]
 
 
 def test_cli_mcp_status_rejects_conflicting_prefix(mcp_server_url):
@@ -147,8 +153,11 @@ async def test_tui_mcp_status_raw_id_uses_startup_backend(mcp_server_url):
         await app.workers.wait_for_complete()
         output = app._output_text
 
-    assert "Task lab:task-42 status: unknown" in output
-    assert CODEX_MESSAGE in output
+    payload = json.loads(output)
+    assert payload["task_id"] == "lab:task-42"
+    assert payload["status"] == "unknown"
+    assert CODEX_MESSAGE in payload["message"]
+    assert payload["result"] is None
 
 
 @pytest.mark.asyncio
@@ -180,5 +189,7 @@ async def test_tui_mcp_status_keeps_explicit_prefix(
         await app.workers.wait_for_complete()
         output = app._output_text
 
-    assert f"Task {task_id} status: unknown" in output
-    assert (CODEX_MESSAGE in output) is expect_codex
+    payload = json.loads(output)
+    assert payload["task_id"] == task_id
+    assert payload["status"] == "unknown"
+    assert (CODEX_MESSAGE in payload["message"]) is expect_codex

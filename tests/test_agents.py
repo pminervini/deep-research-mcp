@@ -122,12 +122,16 @@ async def run_provider_check(provider, model, api_style="responses"):
             system_instructions="Keep it brief; this is a test run.",
             include_analysis=False,
         )
-        logger.info(f"deep_research completed. Result length: {len(result)} chars")
+        logger.info(
+            f"deep_research completed. Report length: {len(result['final_report'])} chars"
+        )
 
         # A live provider check is useful only when the request succeeds.
-        assert isinstance(result, str)
-        assert result.startswith("# Research Report:"), result
-        assert "## Research Metadata" in result
+        assert isinstance(result, dict)
+        assert result["status"] == "completed", result
+        assert result["final_report"]
+        assert result["task_id"].startswith("default:")
+        assert isinstance(result["citations"], list)
         logger.info(f"Test PASSED for provider={provider} (api_style={api_style})")
 
     finally:

@@ -265,15 +265,11 @@ async def _mcp_progress_callback(
 
 
 def _render_mcp_result(result: Any) -> str:
-    """Extract text from an MCP CallToolResult."""
+    """Serialize structured MCP content as JSON, falling back to text content."""
     from mcp import types
 
     if result.structuredContent is not None:
-        sc = result.structuredContent
-        if isinstance(sc, dict) and "result" in sc:
-            val = sc.get("result")
-            return val if isinstance(val, str) else str(val)
-        return str(sc)
+        return json.dumps(result.structuredContent, indent=2, ensure_ascii=False)
 
     parts: list[str] = []
     for item in result.content or []:

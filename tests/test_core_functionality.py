@@ -19,7 +19,6 @@ from deep_research_mcp.backends import (
     TavilyResearchBackend,
 )
 from deep_research_mcp.config import ResearchConfig
-from deep_research_mcp.results import ResearchResult
 
 
 @pytest.mark.parametrize(
@@ -339,42 +338,3 @@ def test_openai_reasoning_effort_overrides_model_default():
     kwargs = backend._build_responses_create_kwargs([], backend._build_tools(False))
     assert kwargs["reasoning"] == {"effort": "low", "summary": "auto"}
     assert kwargs["tool_choice"] == "required"
-
-
-def test_render_citations_avoids_duplicating_url_only_titles():
-    """Citations without a real title render the URL once, not as [url](url)."""
-    from deep_research_mcp.mcp_server import _render_citations
-    from deep_research_mcp.results import ResearchCitation
-
-    result = ResearchResult.completed(
-        task_id="task-test",
-        final_report="Report",
-        citations=[
-            ResearchCitation(
-                index=1,
-                title="https://example.com/very-long-redirect",
-                url="https://example.com/very-long-redirect",
-            ),
-            ResearchCitation(index=2, title="Example", url="https://example.com"),
-        ],
-    )
-
-    assert _render_citations(result) == (
-        "1. <https://example.com/very-long-redirect>\n"
-        "2. [Example](https://example.com)"
-    )
-
-
-def test_render_research_markdown_includes_provider_note():
-    """Completed capability warnings remain visible to MCP clients."""
-    from deep_research_mcp.mcp_server import _render_research_markdown
-
-    result = ResearchResult.completed(
-        task_id="task-test",
-        final_report="Report",
-        message="Web search only.",
-    )
-
-    rendered = _render_research_markdown(title="Report", result=result)
-
-    assert "- **Provider note**: Web search only." in rendered
