@@ -88,7 +88,7 @@ def test_openai_responses_default_model():
 
     assert config.provider == "openai"
     assert config.api_style == "responses"
-    assert config.model == "gpt-6-sol"
+    assert config.model == ResearchConfig().model == "gpt-6.1-sol"
     assert config.base_url == "https://api.openai.com/v1"
     assert config.timeout == 1800.0
     assert config.poll_interval == 30.0

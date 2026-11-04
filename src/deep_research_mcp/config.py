@@ -25,7 +25,7 @@ OPENAI_CODEX_BASE_URL = "https://chatgpt.com/backend-api/codex"
 # extra base-URL settings). The openai default model also depends on api_style.
 _PROVIDER_DEFAULTS: dict[str, tuple[str, str, tuple[str, ...], tuple[str, ...]]] = {
     "openai": (
-        "gpt-6-sol",
+        "gpt-6.1-sol",
         "https://api.openai.com/v1",
         ("OPENAI_API_KEY",),
         ("OPENAI_BASE_URL",),
@@ -192,7 +192,7 @@ class ResearchConfig:
     api_key: str | None = None
     base_url: str | None = None
     provider: str = "openai"
-    model: str = "gpt-6-sol"
+    model: str = "gpt-6.1-sol"
     api_style: str = "responses"
     timeout: float = 1800.0
     poll_interval: float = 30.0

@@ -41,7 +41,7 @@ def test_provider_defaults_for_openai_responses():
 
     assert defaults.provider == "openai"
     assert defaults.api_style == "responses"
-    assert defaults.model == "gpt-6-sol"
+    assert defaults.model == "gpt-6.1-sol"
     assert defaults.base_url == "https://api.openai.com/v1"
 
 

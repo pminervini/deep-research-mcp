@@ -253,6 +253,7 @@ def test_openai_extract_results_dedupes_citations_and_joins_blocks():
         ("gpt-5.6-luna", "xhigh"),
         ("gpt-6-astra", "xhigh"),
         ("gpt-6-sol", "xhigh"),
+        ("gpt-6.1-sol", "xhigh"),
         ("gpt-6-luna", "xhigh"),
     ],
 )
@@ -332,7 +333,7 @@ def test_openai_custom_model_uses_current_web_search_without_gpt5_options():
 def test_openai_reasoning_effort_overrides_model_default():
     backend = object.__new__(OpenAIResearchBackend)
     backend.config = SimpleNamespace(
-        model="gpt-6-sol", reasoning_effort="low", enable_reasoning_summaries=True
+        model="gpt-6.1-sol", reasoning_effort="low", enable_reasoning_summaries=True
     )
     # pylint: disable=protected-access
     kwargs = backend._build_responses_create_kwargs([], backend._build_tools(False))

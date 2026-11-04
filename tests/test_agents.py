@@ -3,7 +3,7 @@
 """
 Tests that the MCP server entrypoints run for real with API providers.
 For the openai provider, we ONLY use `gpt-5-mini` since it's WAY cheaper
-than the default gpt-6-sol research configuration.
+than the default gpt-6.1-sol research configuration.
 """
 
 import os

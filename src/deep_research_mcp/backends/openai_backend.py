@@ -42,7 +42,7 @@ GPT_5_PRO_WITHOUT_CODE_INTERPRETER_PATTERN = re.compile(
     r"^gpt-5(?:\.4)?-pro(?:-\d{4}-\d{2}-\d{2})?$"
 )
 GPT_6_RESEARCH_MODEL_PATTERN = re.compile(
-    r"^gpt-6-(?:astra|sol|luna)(?:-\d{4}-\d{2}-\d{2})?$"
+    r"^(?:gpt-6-(?:astra|sol|luna)|gpt-6\.1-sol)(?:-\d{4}-\d{2}-\d{2})?$"
 )
 
 

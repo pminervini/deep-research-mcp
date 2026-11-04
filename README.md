@@ -16,7 +16,7 @@ A Python-based agent that integrates research providers with Claude Code through
 - Python 3.11+
 - [uv](https://docs.astral.sh/uv/) installed
 - One of:
-  - OpenAI API access (Responses API model `gpt-6-sol`)
+  - OpenAI API access (Responses API model `gpt-6.1-sol`)
   - ChatGPT subscription with Codex access (experimental `openai-codex` provider)
   - Gemini API access with the Interactions API / Deep Research agent enabled
   - Tavily API access for Tavily Research
@@ -99,7 +99,7 @@ Common settings:
 [research]                                  # Core Deep Research functionality
 provider = "openai"                         # Available options: "openai", "openai-codex", "dr-tulu", "gemini", "tavily", "gnosis" -- defaults to "openai"
 api_style = "responses"                     # Only applies to provider="openai"; use "chat_completions" for Perplexity, Groq, Ollama, etc.
-model = "gpt-6-sol"                         # OpenAI: model identifier; Codex: "auto" or account model slug; Dr Tulu: logical provider id; Gemini: agent id; Tavily: "mini", "pro", or "auto"
+model = "gpt-6.1-sol"                       # OpenAI: model identifier; Codex: "auto" or account model slug; Dr Tulu: logical provider id; Gemini: agent id; Tavily: "mini", "pro", or "auto"
 reasoning_effort = "medium"                  # Optional for OpenAI API and Codex subscription; omit to keep provider/model defaults
 api_key = "your-api-key"                    # API key, optional
 base_url = "https://api.openai.com/v1"      # OpenAI: OpenAI-compatible endpoint; Codex uses a fixed endpoint; Dr Tulu: service base URL; Gemini: https://generativelanguage.googleapis.com; Tavily: https://api.tavily.com
@@ -137,7 +137,7 @@ Named backends (`[backends.<name>]`) are isolated from the default: `provider`, 
 
 OpenAI provider example:
 
-The default `gpt-6-sol` balances demanding research and cost; choose
+The default `gpt-6.1-sol` balances demanding research and cost; choose
 `gpt-6-astra` for maximum capability or `gpt-6-luna` for lower-cost work.
 The Responses backend enables web search and optional Code Interpreter.
 Chat Completions defaults to `gpt-6-luna` but does not enable hosted research
@@ -156,7 +156,7 @@ summaries (`enable_reasoning_summaries`). Environment variable:
 ```toml
 [research]
 provider = "openai"
-model = "gpt-6-sol"                         # OpenAI model
+model = "gpt-6.1-sol"                       # OpenAI model
 api_key = "YOUR_OPENAI_API_KEY"             # Defaults to OPENAI_API_KEY
 base_url = "https://api.openai.com/v1"      # OpenAI-compatible endpoint
 timeout = 1800
@@ -829,7 +829,7 @@ structure. For example, a configured OpenAI backend can produce:
     {
       "name": "default",
       "provider": "openai",
-      "model": "gpt-6-sol",
+      "model": "gpt-6.1-sol",
       "base_url": "https://api.openai.com/v1",
       "api_style": "responses",
       "reasoning_effort": "high",
@@ -959,7 +959,7 @@ status in either mode.
 
 In `agent` mode, the TUI applies provider-aware defaults:
 
-- `openai` + `responses`: model `gpt-6-sol`, base URL `https://api.openai.com/v1`
+- `openai` + `responses`: model `gpt-6.1-sol`, base URL `https://api.openai.com/v1`
 - `openai` + `chat_completions`: model `gpt-6-luna`, base URL `https://api.openai.com/v1`
 - `openai-codex`: model `auto`, fixed base URL `https://chatgpt.com/backend-api/codex`
 - `dr-tulu`: model `dr-tulu`, base URL `http://localhost:8080/`
@@ -1021,7 +1021,7 @@ Execution time: 245.94s
 ```bash
 uv run deep-research-cli \
   --provider openai \
-  --model gpt-6-sol \
+  --model gpt-6.1-sol \
   --base-url https://api.openai.com/v1 \
   research "What is the capital of France?"
 ```
@@ -1358,7 +1358,7 @@ Configuration class for the research agent.
 - `provider`: Research provider (`openai`, `openai-codex`, `dr-tulu`, `gemini`, `tavily`, or `gnosis`; default: `openai`)
 - `api_style`: API style for the `openai` provider (`responses` or `chat_completions`; default: `responses`). Ignored for other providers.
 - `model`: Model identifier
-  - OpenAI: Responses model (e.g., `gpt-6-sol`)
+  - OpenAI: Responses model (e.g., `gpt-6.1-sol`)
   - OpenAI Codex subscription: `auto` (default) or an account catalogue slug
   - Dr Tulu: logical provider id (default: `dr-tulu`)
   - Gemini: Deep Research agent id (for example `deep-research-preview-04-2026`)
